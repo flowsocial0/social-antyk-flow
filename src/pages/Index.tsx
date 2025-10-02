@@ -4,10 +4,8 @@ import { BookOpen, Calendar, TrendingUp, Activity } from "lucide-react";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { QuickActions } from "@/components/dashboard/QuickActions";
-
 const Index = () => {
-  return (
-    <div className="min-h-screen bg-background">
+  return <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-gradient-primary shadow-sm">
         <div className="container mx-auto px-4 py-6">
@@ -16,9 +14,7 @@ const Index = () => {
               <h1 className="text-3xl font-bold text-primary-foreground">SocialFlow</h1>
               <p className="text-sm text-primary-foreground/90 mt-1">Menedżer mediów społecznościowych księgarni Antyk</p>
             </div>
-            <Button variant="secondary" size="lg">
-              Połącz Supabase
-            </Button>
+            
           </div>
         </div>
       </header>
@@ -34,8 +30,6 @@ const Index = () => {
         {/* Recent Activity */}
         <RecentActivity />
       </main>
-    </div>
-  );
+    </div>;
 };
-
 export default Index;
