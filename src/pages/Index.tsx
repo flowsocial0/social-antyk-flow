@@ -4,6 +4,7 @@ import { BookOpen, Calendar, TrendingUp, Activity } from "lucide-react";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { QuickActions } from "@/components/dashboard/QuickActions";
+import { BooksList } from "@/components/books/BooksList";
 const Index = () => {
   return <div className="min-h-screen bg-background">
       {/* Header */}
@@ -26,6 +27,9 @@ const Index = () => {
 
         {/* Quick Actions */}
         <QuickActions />
+
+        {/* Books List */}
+        <BooksList />
 
         {/* Recent Activity */}
         <RecentActivity />
