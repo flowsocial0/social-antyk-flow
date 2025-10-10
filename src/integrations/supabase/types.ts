@@ -21,6 +21,7 @@ export type Database = {
           id: string
           image_url: string | null
           promotional_price: number | null
+          published: boolean
           sale_price: number | null
           stock_status: string | null
           title: string
@@ -33,6 +34,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           promotional_price?: number | null
+          published?: boolean
           sale_price?: number | null
           stock_status?: string | null
           title: string
@@ -45,6 +47,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           promotional_price?: number | null
+          published?: boolean
           sale_price?: number | null
           stock_status?: string | null
           title?: string

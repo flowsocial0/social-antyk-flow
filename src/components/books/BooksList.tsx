@@ -19,10 +19,6 @@ export const BooksList = () => {
     },
   });
 
-  const isPublished = (stockStatus: string | null) => {
-    if (!stockStatus) return false;
-    return stockStatus.toLowerCase() !== "niewidoczny";
-  };
 
   return (
     <Card>
@@ -57,8 +53,8 @@ export const BooksList = () => {
                         {book.sale_price ? `${book.sale_price} zł` : "-"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={isPublished(book.stock_status) ? "default" : "secondary"}>
-                          {isPublished(book.stock_status) ? "Opublikowano" : "Ukryto"}
+                        <Badge variant={book.published ? "default" : "secondary"}>
+                          {book.published ? "Opublikowano" : "Nieopublikowano"}
                         </Badge>
                       </TableCell>
                     </TableRow>
