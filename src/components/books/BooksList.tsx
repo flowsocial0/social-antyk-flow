@@ -56,7 +56,10 @@ export const BooksList = () => {
 
   const authorizeTwitterMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('twitter-oauth-start');
+      const redirectUri = `${window.location.origin}/twitter-callback`;
+      const { data, error } = await supabase.functions.invoke('twitter-oauth-start', {
+        body: { redirectUri }
+      });
       
       if (error) throw error;
       return data;

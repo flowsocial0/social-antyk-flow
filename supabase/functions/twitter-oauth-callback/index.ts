@@ -2,21 +2,20 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
 
 const CLIENT_ID = Deno.env.get("TWITTER_OAUTH2_CLIENT_ID")?.trim();
 const CLIENT_SECRET = Deno.env.get("TWITTER_OAUTH2_CLIENT_SECRET")?.trim();
-const REDIRECT_URI = `${Deno.env.get("SUPABASE_URL")}/functions/v1/twitter-oauth-callback`;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function exchangeCodeForToken(code: string, codeVerifier: string) {
+async function exchangeCodeForToken(code: string, codeVerifier: string, redirectUri: string) {
   const tokenUrl = 'https://api.twitter.com/2/oauth2/token';
   
   const body = new URLSearchParams({
     code,
     grant_type: 'authorization_code',
     client_id: CLIENT_ID!,
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: redirectUri,
     code_verifier: codeVerifier,
   });
 
@@ -48,31 +47,26 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const url = new URL(req.url);
-    const code = url.searchParams.get('code');
-    const state = url.searchParams.get('state');
-    const error = url.searchParams.get('error');
-
-    if (error) {
-      throw new Error(`OAuth error: ${error}`);
-    }
+    // Get parameters from request body
+    const body = await req.json().catch(() => ({}));
+    const { code, codeVerifier, state, redirectUri } = body;
 
     if (!code) {
       throw new Error('No authorization code received');
     }
 
-    console.log('Received callback with code and state:', { code: code.substring(0, 10) + '...', state });
-
-    // Get code_verifier from request body or query params
-    const body = await req.json().catch(() => ({}));
-    const codeVerifier = body.codeVerifier || url.searchParams.get('code_verifier');
-
     if (!codeVerifier) {
-      throw new Error('code_verifier is required. Pass it in the request body or query params.');
+      throw new Error('code_verifier is required in request body');
     }
 
+    if (!redirectUri) {
+      throw new Error('redirectUri is required in request body');
+    }
+
+    console.log('Received callback with code and state:', { code: code.substring(0, 10) + '...', state });
+
     // Exchange code for token
-    const tokenData = await exchangeCodeForToken(code, codeVerifier);
+    const tokenData = await exchangeCodeForToken(code, codeVerifier, redirectUri);
     
     console.log('Token data received:', {
       token_type: tokenData.token_type,

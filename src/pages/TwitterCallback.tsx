@@ -43,6 +43,8 @@ export default function TwitterCallback() {
           throw new Error("State mismatch - możliwe naruszenie bezpieczeństwa");
         }
 
+        const redirectUri = `${window.location.origin}/twitter-callback`;
+
         // Call callback function
         const { data, error: callbackError } = await supabase.functions.invoke(
           "twitter-oauth-callback",
@@ -50,7 +52,8 @@ export default function TwitterCallback() {
             body: { 
               code, 
               codeVerifier,
-              state 
+              state,
+              redirectUri
             },
           }
         );

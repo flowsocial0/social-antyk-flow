@@ -1,5 +1,4 @@
 const CLIENT_ID = Deno.env.get("TWITTER_OAUTH2_CLIENT_ID")?.trim();
-const REDIRECT_URI = `${Deno.env.get("SUPABASE_URL")}/functions/v1/twitter-oauth-callback`;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,6 +35,14 @@ Deno.serve(async (req) => {
       throw new Error('TWITTER_OAUTH2_CLIENT_ID not configured');
     }
 
+    // Get redirect URI from request body
+    const body = await req.json().catch(() => ({}));
+    const redirectUri = body.redirectUri;
+
+    if (!redirectUri) {
+      throw new Error('redirectUri is required in request body');
+    }
+
     // Generate PKCE parameters
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = await generateCodeChallenge(codeVerifier);
@@ -45,7 +52,7 @@ Deno.serve(async (req) => {
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: CLIENT_ID,
-      redirect_uri: REDIRECT_URI,
+      redirect_uri: redirectUri,
       scope: 'tweet.read tweet.write users.read offline.access',
       state: state,
       code_challenge: codeChallenge,
