@@ -8,6 +8,7 @@ import { Loader2, Send, Calendar, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { ScheduleDialog } from "./ScheduleDialog";
+import { BulkScheduleDialog } from "./BulkScheduleDialog";
 
 export const BooksList = () => {
   const { toast } = useToast();
@@ -181,8 +182,55 @@ export const BooksList = () => {
     },
   });
 
+  const bulkScheduleMutation = useMutation({
+    mutationFn: async ({ intervalMinutes }: { intervalMinutes: number }) => {
+      const unpublishedBooks = books?.filter((book) => !book.published) || [];
+      
+      // Schedule each book with increasing time intervals
+      const updates = unpublishedBooks.map((book, index) => {
+        const scheduledAt = new Date();
+        scheduledAt.setMinutes(scheduledAt.getMinutes() + (intervalMinutes * index));
+        
+        return supabase
+          .from("books")
+          .update({
+            scheduled_publish_at: scheduledAt.toISOString(),
+            auto_publish_enabled: true
+          })
+          .eq("id", book.id);
+      });
+
+      const results = await Promise.all(updates);
+      const errors = results.filter(r => r.error);
+      
+      if (errors.length > 0) {
+        throw new Error(`Nie udało się zaplanować ${errors.length} książek`);
+      }
+
+      return unpublishedBooks.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["books"] });
+      toast({
+        title: "✅ Zaplanowano publikacje",
+        description: `${count} książek zostanie opublikowanych automatycznie`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Błąd",
+        description: error.message || "Nie udało się zaplanować publikacji",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleScheduleChange = (bookId: string, scheduledAt: string | null, autoPublishEnabled: boolean) => {
     schedulePublishMutation.mutate({ bookId, scheduledAt, autoPublishEnabled });
+  };
+
+  const handleBulkSchedule = (intervalMinutes: number) => {
+    bulkScheduleMutation.mutate({ intervalMinutes });
   };
 
   const unpublishedCount = books?.filter((book) => !book.published).length || 0;
@@ -208,10 +256,15 @@ export const BooksList = () => {
           >
             {testConnectionMutation.isPending ? "Testowanie..." : "🔍 Test połączenia"}
           </Button>
+          <BulkScheduleDialog
+            unpublishedCount={unpublishedCount}
+            onSchedule={handleBulkSchedule}
+            isScheduling={bulkScheduleMutation.isPending}
+          />
           {unpublishedCount > 0 && (
             <Button onClick={handlePublishAll} disabled={publishMutation.isPending} size="sm">
               <Send className="mr-2 h-4 w-4" />
-              Opublikuj wszystkie ({unpublishedCount})
+              Teraz wszystkie ({unpublishedCount})
             </Button>
           )}
         </div>
