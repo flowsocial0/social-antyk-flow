@@ -12,6 +12,7 @@ export const BooksList = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [publishingIds, setPublishingIds] = useState<Set<string>>(new Set());
+  const [oauthState, setOauthState] = useState<{ codeVerifier?: string; state?: string }>({});
   
   const { data: books, isLoading } = useQuery({
     queryKey: ["books"],
@@ -42,9 +43,42 @@ export const BooksList = () => {
       });
     },
     onError: (error: any) => {
+      const message = error.message || "Sprawdź swoje klucze API i uprawnienia w X";
       toast({
         title: "❌ Błąd połączenia",
-        description: error.message || "Sprawdź swoje klucze API i uprawnienia w X",
+        description: message.includes('No Twitter access token') 
+          ? "Najpierw autoryzuj aplikację klikając 'Autoryzuj Twitter'"
+          : message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const authorizeTwitterMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('twitter-oauth-start');
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      // Store PKCE parameters
+      setOauthState({
+        codeVerifier: data.codeVerifier,
+        state: data.state,
+      });
+      
+      // Store in sessionStorage as backup
+      sessionStorage.setItem('twitter_oauth_verifier', data.codeVerifier);
+      sessionStorage.setItem('twitter_oauth_state', data.state);
+      
+      // Redirect to Twitter
+      window.location.href = data.authUrl;
+    },
+    onError: (error: any) => {
+      toast({
+        title: "❌ Błąd autoryzacji",
+        description: error.message || "Nie udało się rozpocząć autoryzacji",
         variant: "destructive",
       });
     },
@@ -118,6 +152,14 @@ export const BooksList = () => {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Lista książek</CardTitle>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => authorizeTwitterMutation.mutate()}
+            disabled={authorizeTwitterMutation.isPending}
+            size="sm"
+          >
+            {authorizeTwitterMutation.isPending ? "Przekierowywanie..." : "🔑 Autoryzuj Twitter"}
+          </Button>
           <Button
             variant="outline"
             onClick={() => testConnectionMutation.mutate()}

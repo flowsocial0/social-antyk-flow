@@ -2,7 +2,29 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
 
 const CLIENT_ID = Deno.env.get("TWITTER_OAUTH2_CLIENT_ID")?.trim();
 const CLIENT_SECRET = Deno.env.get("TWITTER_OAUTH2_CLIENT_SECRET")?.trim();
-const ACCESS_TOKEN = Deno.env.get("TWITTER_OAUTH2_ACCESS_TOKEN")?.trim();
+
+async function getAccessToken(supabaseClient: any): Promise<string> {
+  const { data, error } = await supabaseClient
+    .from('twitter_oauth_tokens')
+    .select('access_token, expires_at')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error || !data) {
+    throw new Error('No Twitter access token found. Please authorize the app first.');
+  }
+
+  // Check if token is expired
+  if (data.expires_at) {
+    const expiresAt = new Date(data.expires_at);
+    if (expiresAt < new Date()) {
+      throw new Error('Twitter access token has expired. Please re-authorize the app.');
+    }
+  }
+
+  return data.access_token;
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,27 +34,25 @@ const corsHeaders = {
 function validateEnvironmentVariables() {
   if (!CLIENT_ID) throw new Error("Missing TWITTER_OAUTH2_CLIENT_ID environment variable");
   if (!CLIENT_SECRET) throw new Error("Missing TWITTER_OAUTH2_CLIENT_SECRET environment variable");
-  if (!ACCESS_TOKEN) throw new Error("Missing TWITTER_OAUTH2_ACCESS_TOKEN environment variable");
 }
 
-function getAuthHeaders(): Record<string, string> {
+function getAuthHeaders(accessToken: string): Record<string, string> {
   return {
-    "Authorization": `Bearer ${ACCESS_TOKEN}`,
+    "Authorization": `Bearer ${accessToken}`,
     "Content-Type": "application/json",
   };
 }
 
-async function testConnection(): Promise<any> {
+async function testConnection(accessToken: string): Promise<any> {
   const url = "https://api.x.com/2/users/me";
 
   console.log("=== Testing Twitter OAuth 2.0 Connection ===");
-  console.log("Client ID (first 10 chars):", CLIENT_ID?.substring(0, 10) + "...");
-  console.log("Access Token (first 10 chars):", ACCESS_TOKEN?.substring(0, 10) + "...");
+  console.log("Access Token (first 10 chars):", accessToken?.substring(0, 10) + "...");
 
   try {
     const response = await fetch(url, {
       method: "GET",
-      headers: getAuthHeaders(),
+      headers: getAuthHeaders(accessToken),
     });
 
     const responseText = await response.text();
@@ -58,7 +78,7 @@ async function testConnection(): Promise<any> {
   }
 }
 
-async function sendTweet(tweetText: string): Promise<any> {
+async function sendTweet(tweetText: string, accessToken: string): Promise<any> {
   const url = "https://api.x.com/2/tweets";
   const body = { text: tweetText };
 
@@ -66,7 +86,7 @@ async function sendTweet(tweetText: string): Promise<any> {
 
   const response = await fetch(url, {
     method: "POST",
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(accessToken),
     body: JSON.stringify(body),
   });
 
@@ -104,10 +124,13 @@ Deno.serve(async (req) => {
 
     const { bookId, bookIds, testConnection: shouldTestConnection } = await req.json();
     
+    // Get access token from database
+    const accessToken = await getAccessToken(supabaseClient);
+    
     // Test connection endpoint
     if (shouldTestConnection) {
       console.log("Testing Twitter API connection...");
-      const result = await testConnection();
+      const result = await testConnection(accessToken);
       return new Response(
         JSON.stringify({ 
           success: true, 
@@ -164,7 +187,7 @@ Deno.serve(async (req) => {
         console.log("Tweet to send:", tweetText);
 
         // Send tweet
-        const tweetResponse = await sendTweet(tweetText);
+        const tweetResponse = await sendTweet(tweetText, accessToken);
         console.log("Tweet sent successfully:", tweetResponse);
 
         // Update book as published
