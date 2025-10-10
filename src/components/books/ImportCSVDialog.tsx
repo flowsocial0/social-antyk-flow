@@ -40,6 +40,29 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
     return isNaN(parsed) ? null : parsed;
   };
 
+  // Decode CSV with fallback to common Polish encodings
+  const decodeWithFallback = (buffer: ArrayBuffer) => {
+    const encodings = ["utf-8", "windows-1250", "iso-8859-2"] as const;
+    let bestText = "";
+    let bestEnc: string = encodings[0];
+    let lowestRepl = Number.POSITIVE_INFINITY;
+    for (const enc of encodings) {
+      try {
+        const decoder = new TextDecoder(enc as unknown as string, { fatal: false });
+        const text = decoder.decode(new Uint8Array(buffer));
+        const repl = (text.match(/\uFFFD/g) ?? []).length;
+        if (repl < lowestRepl) {
+          lowestRepl = repl;
+          bestText = text;
+          bestEnc = enc as unknown as string;
+        }
+      } catch {
+        // ignore decoding errors and try next encoding
+      }
+    }
+    return { text: bestText, encoding: bestEnc };
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
@@ -56,15 +79,18 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
     setImporting(true);
     setProgress({ success: 0, failed: 0, total: 0 });
 
-    Papa.parse<CSVRow>(file, {
+    const arrayBuffer = await file.arrayBuffer();
+    const { text: csvText } = decodeWithFallback(arrayBuffer);
+
+    Papa.parse<CSVRow>(csvText, {
       header: true,
       skipEmptyLines: true,
-      encoding: "UTF-8",
       complete: async (results) => {
-        // Filter out items marked as "niewidoczny"
-        const visibleItems = results.data.filter(
-          (row) => row["Stan towaru"]?.trim().toLowerCase() !== "niewidoczny"
-        );
+        // Filter out items marked as "niewidoczny" and empty statuses
+        const visibleItems = results.data.filter((row) => {
+          const status = row["Stan towaru"]?.trim().toLowerCase();
+          return !!status && status !== "niewidoczny";
+        });
         const total = visibleItems.length;
         let success = 0;
         let failed = 0;
