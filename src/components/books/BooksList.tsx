@@ -261,7 +261,51 @@ export const BooksList = () => {
       intervalMinutes
     });
   };
+  const cancelAllScheduledMutation = useMutation({
+    mutationFn: async () => {
+      const scheduledBooks = books?.filter(book => 
+        book.scheduled_publish_at && book.auto_publish_enabled && !book.published
+      ) || [];
+
+      const updates = scheduledBooks.map(book =>
+        supabase
+          .from("books")
+          .update({
+            auto_publish_enabled: false,
+            scheduled_publish_at: null
+          })
+          .eq("id", book.id)
+      );
+
+      const results = await Promise.all(updates);
+      const errors = results.filter(r => r.error);
+      if (errors.length > 0) {
+        throw new Error(`Nie udało się anulować ${errors.length} publikacji`);
+      }
+      return scheduledBooks.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["books"] });
+      toast({
+        title: "✅ Anulowano publikacje",
+        description: `Anulowano ${count} zaplanowanych publikacji`
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Błąd",
+        description: error.message || "Nie udało się anulować publikacji",
+        variant: "destructive"
+      });
+    }
+  });
+  const handleCancelAllScheduled = () => {
+    cancelAllScheduledMutation.mutate();
+  };
   const unpublishedCount = books?.filter(book => !book.published).length || 0;
+  const scheduledCount = books?.filter(book => 
+    book.scheduled_publish_at && book.auto_publish_enabled && !book.published
+  ).length || 0;
   return <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Lista książek</CardTitle>
@@ -273,7 +317,15 @@ export const BooksList = () => {
             {testConnectionMutation.isPending ? "Testowanie..." : "🔍 Test połączenia"}
           </Button>
           <BulkScheduleDialog unpublishedCount={unpublishedCount} onSchedule={handleBulkSchedule} isScheduling={bulkScheduleMutation.isPending} />
-          {unpublishedCount > 0}
+          <Button
+            variant="outline"
+            onClick={handleCancelAllScheduled}
+            disabled={scheduledCount === 0 || cancelAllScheduledMutation.isPending}
+            size="sm"
+          >
+            {cancelAllScheduledMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Anuluj wszystkie ({scheduledCount})
+          </Button>
         </div>
       </CardHeader>
       <CardContent>
