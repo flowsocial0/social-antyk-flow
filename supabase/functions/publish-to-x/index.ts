@@ -76,6 +76,34 @@ function generateOAuthHeader(method: string, url: string): string {
   );
 }
 
+async function testConnection(): Promise<any> {
+  const url = "https://api.x.com/2/users/me";
+  const method = "GET";
+
+  const oauthHeader = generateOAuthHeader(method, url);
+  console.log("Test Connection - OAuth Header:", oauthHeader);
+
+  const response = await fetch(url, {
+    method: method,
+    headers: {
+      Authorization: oauthHeader,
+      "Content-Type": "application/json",
+    },
+  });
+
+  const responseText = await response.text();
+  console.log("Test Connection - Response Status:", response.status);
+  console.log("Test Connection - Response Body:", responseText);
+
+  if (!response.ok) {
+    throw new Error(
+      `HTTP error! status: ${response.status}, body: ${responseText}`
+    );
+  }
+
+  return JSON.parse(responseText);
+}
+
 async function sendTweet(tweetText: string): Promise<any> {
   const url = "https://api.x.com/2/tweets";
   const method = "POST";
@@ -119,7 +147,21 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { bookId, bookIds } = await req.json();
+    const { bookId, bookIds, testConnection: shouldTestConnection } = await req.json();
+    
+    // Test connection endpoint
+    if (shouldTestConnection) {
+      console.log("Testing Twitter API connection...");
+      const result = await testConnection();
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: "Connection successful! Your API keys are working.",
+          user: result.data 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     console.log("Received request:", { bookId, bookIds });
 
     // Handle single or multiple books

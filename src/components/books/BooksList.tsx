@@ -26,6 +26,30 @@ export const BooksList = () => {
     },
   });
 
+  const testConnectionMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('publish-to-x', {
+        body: { testConnection: true }
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "✅ Połączenie działa!",
+        description: `Zalogowano jako: ${data.user?.username || data.user?.name || 'użytkownik'}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "❌ Błąd połączenia",
+        description: error.message || "Sprawdź swoje klucze API i uprawnienia w X",
+        variant: "destructive",
+      });
+    },
+  });
+
   const publishMutation = useMutation({
     mutationFn: async ({ bookId, bookIds }: { bookId?: string; bookIds?: string[] }) => {
       const { data, error } = await supabase.functions.invoke('publish-to-x', {
@@ -93,16 +117,26 @@ export const BooksList = () => {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Lista książek</CardTitle>
-        {unpublishedCount > 0 && (
-          <Button 
-            onClick={handlePublishAll}
-            disabled={publishMutation.isPending}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => testConnectionMutation.mutate()}
+            disabled={testConnectionMutation.isPending}
             size="sm"
           >
-            <Send className="mr-2 h-4 w-4" />
-            Opublikuj wszystkie ({unpublishedCount})
+            {testConnectionMutation.isPending ? "Testowanie..." : "🔍 Test X API"}
           </Button>
-        )}
+          {unpublishedCount > 0 && (
+            <Button 
+              onClick={handlePublishAll}
+              disabled={publishMutation.isPending}
+              size="sm"
+            >
+              <Send className="mr-2 h-4 w-4" />
+              Opublikuj wszystkie ({unpublishedCount})
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {isLoading ? (
