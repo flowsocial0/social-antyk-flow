@@ -13,15 +13,12 @@ export const BooksList = () => {
   const queryClient = useQueryClient();
   const [publishingIds, setPublishingIds] = useState<Set<string>>(new Set());
   const [oauthState, setOauthState] = useState<{ codeVerifier?: string; state?: string }>({});
-  
+
   const { data: books, isLoading } = useQuery({
     queryKey: ["books"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("books")
-        .select("*")
-        .order("created_at", { ascending: false });
-      
+      const { data, error } = await supabase.from("books").select("*").order("created_at", { ascending: false });
+
       if (error) throw error;
       return data;
     },
@@ -29,24 +26,24 @@ export const BooksList = () => {
 
   const testConnectionMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('publish-to-x', {
-        body: { testConnection: true }
+      const { data, error } = await supabase.functions.invoke("publish-to-x", {
+        body: { testConnection: true },
       });
-      
+
       if (error) throw error;
       return data;
     },
     onSuccess: (data) => {
       toast({
         title: "✅ Połączenie działa!",
-        description: `Zalogowano jako: ${data.user?.username || data.user?.name || 'użytkownik'}`,
+        description: `Zalogowano jako: ${data.user?.username || data.user?.name || "użytkownik"}`,
       });
     },
     onError: (error: any) => {
       const message = error.message || "Sprawdź swoje klucze API i uprawnienia w X";
       toast({
         title: "❌ Błąd połączenia",
-        description: message.includes('No Twitter access token') 
+        description: message.includes("No Twitter access token")
           ? "Najpierw autoryzuj aplikację klikając 'Autoryzuj Twitter'"
           : message,
         variant: "destructive",
@@ -57,10 +54,10 @@ export const BooksList = () => {
   const authorizeTwitterMutation = useMutation({
     mutationFn: async () => {
       const redirectUri = `${window.location.origin}/twitter-callback`;
-      const { data, error } = await supabase.functions.invoke('twitter-oauth-start', {
-        body: { redirectUri }
+      const { data, error } = await supabase.functions.invoke("twitter-oauth-start", {
+        body: { redirectUri },
       });
-      
+
       if (error) throw error;
       return data;
     },
@@ -70,11 +67,11 @@ export const BooksList = () => {
         codeVerifier: data.codeVerifier,
         state: data.state,
       });
-      
+
       // Store in sessionStorage as backup
-      sessionStorage.setItem('twitter_oauth_verifier', data.codeVerifier);
-      sessionStorage.setItem('twitter_oauth_state', data.state);
-      
+      sessionStorage.setItem("twitter_oauth_verifier", data.codeVerifier);
+      sessionStorage.setItem("twitter_oauth_state", data.state);
+
       // Redirect to Twitter
       window.location.href = data.authUrl;
     },
@@ -89,16 +86,16 @@ export const BooksList = () => {
 
   const publishMutation = useMutation({
     mutationFn: async ({ bookId, bookIds }: { bookId?: string; bookIds?: string[] }) => {
-      const { data, error } = await supabase.functions.invoke('publish-to-x', {
-        body: { bookId, bookIds }
+      const { data, error } = await supabase.functions.invoke("publish-to-x", {
+        body: { bookId, bookIds },
       });
-      
+
       if (error) throw error;
       return data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["books"] });
-      
+
       const { summary } = data;
       if (summary.successful > 0) {
         toast({
@@ -124,16 +121,16 @@ export const BooksList = () => {
     },
     onSettled: () => {
       setPublishingIds(new Set());
-    }
+    },
   });
 
   const handlePublishSingle = async (bookId: string) => {
-    setPublishingIds(prev => new Set(prev).add(bookId));
+    setPublishingIds((prev) => new Set(prev).add(bookId));
     publishMutation.mutate({ bookId });
   };
 
   const handlePublishAll = async () => {
-    const unpublishedBooks = books?.filter(book => !book.published) || [];
+    const unpublishedBooks = books?.filter((book) => !book.published) || [];
     if (unpublishedBooks.length === 0) {
       toast({
         title: "Brak książek",
@@ -141,14 +138,13 @@ export const BooksList = () => {
       });
       return;
     }
-    
-    const bookIds = unpublishedBooks.map(book => book.id);
+
+    const bookIds = unpublishedBooks.map((book) => book.id);
     setPublishingIds(new Set(bookIds));
     publishMutation.mutate({ bookIds });
   };
 
-  const unpublishedCount = books?.filter(book => !book.published).length || 0;
-
+  const unpublishedCount = books?.filter((book) => !book.published).length || 0;
 
   return (
     <Card>
@@ -161,7 +157,7 @@ export const BooksList = () => {
             disabled={authorizeTwitterMutation.isPending}
             size="sm"
           >
-            {authorizeTwitterMutation.isPending ? "Przekierowywanie..." : "🔑 Autoryzuj Twitter"}
+            {authorizeTwitterMutation.isPending ? "Przekierowywanie..." : "🔑 Zaloguj"}
           </Button>
           <Button
             variant="outline"
@@ -169,14 +165,10 @@ export const BooksList = () => {
             disabled={testConnectionMutation.isPending}
             size="sm"
           >
-            {testConnectionMutation.isPending ? "Testowanie..." : "🔍 Test X API"}
+            {testConnectionMutation.isPending ? "Testowanie..." : "🔍 Test połączenia"}
           </Button>
           {unpublishedCount > 0 && (
-            <Button 
-              onClick={handlePublishAll}
-              disabled={publishMutation.isPending}
-              size="sm"
-            >
+            <Button onClick={handlePublishAll} disabled={publishMutation.isPending} size="sm">
               <Send className="mr-2 h-4 w-4" />
               Opublikuj wszystkie ({unpublishedCount})
             </Button>
@@ -208,9 +200,7 @@ export const BooksList = () => {
                       <TableCell className="font-medium">{book.code}</TableCell>
                       <TableCell className="max-w-md truncate">{book.title}</TableCell>
                       <TableCell>{book.stock_status || "-"}</TableCell>
-                      <TableCell>
-                        {book.sale_price ? `${book.sale_price} zł` : "-"}
-                      </TableCell>
+                      <TableCell>{book.sale_price ? `${book.sale_price} zł` : "-"}</TableCell>
                       <TableCell>
                         <Badge variant={book.published ? "default" : "secondary"}>
                           {book.published ? "Opublikowano" : "Nieopublikowano"}
