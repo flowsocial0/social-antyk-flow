@@ -98,6 +98,27 @@ export type Database = {
         }
         Relationships: []
       }
+      xml_books: {
+        Row: {
+          created_at: string
+          id: string
+          product_url: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_url: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_url?: string
+          title?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Upload, Calendar, Settings, RefreshCw } from "lucide-react";
+import { Plus, Upload, Calendar, Settings, RefreshCw, Download } from "lucide-react";
 import { ImportCSVDialog } from "@/components/books/ImportCSVDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation } from "@tanstack/react-query";
@@ -23,6 +23,24 @@ export const QuickActions = () => {
     },
     onError: (error: any) => {
       toast.error("Błąd synchronizacji", {
+        description: error.message
+      });
+    }
+  });
+
+  const loadXmlBooksMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('load-xml-books');
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Dane załadowane`, {
+        description: `Załadowano ${data.stats.booksLoaded} książek z XML`
+      });
+    },
+    onError: (error: any) => {
+      toast.error("Błąd ładowania", {
         description: error.message
       });
     }
@@ -52,6 +70,14 @@ export const QuickActions = () => {
       label: "Połącz platformy",
       description: "Połącz konta społecznościowe",
       variant: "secondary" as const
+    },
+    {
+      icon: Download,
+      label: "Załaduj XML",
+      description: "Załaduj tytuły i linki z XML",
+      variant: "secondary" as const,
+      onClick: () => loadXmlBooksMutation.mutate(),
+      loading: loadXmlBooksMutation.isPending
     },
     {
       icon: RefreshCw,
