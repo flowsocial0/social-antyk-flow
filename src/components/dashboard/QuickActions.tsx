@@ -1,11 +1,33 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Upload, Calendar, Settings } from "lucide-react";
+import { Plus, Upload, Calendar, Settings, RefreshCw } from "lucide-react";
 import { ImportCSVDialog } from "@/components/books/ImportCSVDialog";
+import { supabase } from "@/integrations/supabase/client";
+import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 export const QuickActions = () => {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+
+  const syncBooksMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('sync-books-from-xml');
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Synchronizacja zakończona`, {
+        description: `Zaktualizowano ${data.stats.updated} książek z ${data.stats.xmlBooksFound} dostępnych`
+      });
+    },
+    onError: (error: any) => {
+      toast.error("Błąd synchronizacji", {
+        description: error.message
+      });
+    }
+  });
+
   const actions = [
     {
       icon: Plus,
@@ -30,6 +52,14 @@ export const QuickActions = () => {
       label: "Połącz platformy",
       description: "Połącz konta społecznościowe",
       variant: "secondary" as const
+    },
+    {
+      icon: RefreshCw,
+      label: "Synchronizuj dane",
+      description: "Pobierz dane z XML",
+      variant: "secondary" as const,
+      onClick: () => syncBooksMutation.mutate(),
+      loading: syncBooksMutation.isPending
     }
   ];
 
@@ -41,14 +71,22 @@ export const QuickActions = () => {
           {actions.map((action, index) => {
             const Icon = action.icon;
             const isImportAction = index === 1; // "Importuj CSV" button
+            const isSyncAction = 'onClick' in action;
             return (
               <Button
                 key={index}
                 variant={action.variant}
                 className="h-auto flex-col items-start p-6 space-y-2 hover:shadow-glow transition-all duration-300"
-                onClick={isImportAction ? () => setImportDialogOpen(true) : undefined}
+                onClick={
+                  isImportAction 
+                    ? () => setImportDialogOpen(true) 
+                    : isSyncAction && action.onClick 
+                    ? action.onClick 
+                    : undefined
+                }
+                disabled={isSyncAction && action.loading}
               >
-                <Icon className="h-8 w-8 mb-2" />
+                <Icon className={`h-8 w-8 mb-2 ${isSyncAction && action.loading ? 'animate-spin' : ''}`} />
                 <span className="font-semibold text-base">{action.label}</span>
                 <span className="text-xs opacity-70 font-normal">{action.description}</span>
               </Button>

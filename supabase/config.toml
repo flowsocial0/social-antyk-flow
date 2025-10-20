@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.twitter-oauth-callback]
 verify_jwt = false
+
+[functions.sync-books-from-xml]
+verify_jwt = false
