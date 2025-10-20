@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
     // Get all books from database
     const { data: dbBooks, error: fetchError } = await supabase
       .from('books')
-      .select('id, code');
+      .select('id, code, title');
     
     if (fetchError) {
       console.error('Error fetching books:', fetchError);
@@ -77,17 +77,27 @@ Deno.serve(async (req) => {
     
     console.log(`Found ${dbBooks?.length || 0} books in database`);
     
-    // Update each book with matching XML data
+    // Helper function to normalize titles for comparison
+    const normalizeTitle = (title: string) => {
+      return title.toLowerCase().trim().replace(/\s+/g, ' ');
+    };
+    
+    // Update each book by matching titles
     let updatedCount = 0;
     let notFoundCount = 0;
     
     for (const dbBook of dbBooks || []) {
-      const xmlBook = books.find(b => b.code === dbBook.code);
+      // Try to find by normalized title
+      const normalizedDbTitle = normalizeTitle(dbBook.title);
+      const xmlBook = books.find(b => 
+        normalizeTitle(b.title) === normalizedDbTitle
+      );
       
       if (xmlBook) {
         const { error: updateError } = await supabase
           .from('books')
           .update({
+            code: xmlBook.code,
             title: xmlBook.title,
             image_url: xmlBook.image_url,
             product_url: xmlBook.product_url,
@@ -97,14 +107,14 @@ Deno.serve(async (req) => {
           .eq('id', dbBook.id);
         
         if (updateError) {
-          console.error(`Error updating book ${dbBook.code}:`, updateError);
+          console.error(`Error updating book "${dbBook.title}":`, updateError);
         } else {
           updatedCount++;
-          console.log(`Updated book: ${dbBook.code} - ${xmlBook.title}`);
+          console.log(`Updated book: ${dbBook.title} -> ${xmlBook.code}`);
         }
       } else {
         notFoundCount++;
-        console.log(`Book not found in XML: ${dbBook.code}`);
+        console.log(`Book not found in XML: ${dbBook.title}`);
       }
     }
     
