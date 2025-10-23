@@ -4,13 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Send, Calendar, Clock, ExternalLink, Eye } from "lucide-react";
+import { Loader2, Send, Calendar, Clock, ExternalLink, Eye, Layout, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { ScheduleDialog } from "./ScheduleDialog";
 import { BulkScheduleDialog } from "./BulkScheduleDialog";
 import { XPostPreviewDialog } from "./XPostPreviewDialog";
 import type { Tables } from "@/integrations/supabase/types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 export const BooksList = () => {
   const {
     toast
@@ -177,6 +178,32 @@ export const BooksList = () => {
       bookIds
     });
   };
+
+  const updateTemplateMutation = useMutation({
+    mutationFn: async ({ bookId, templateType }: { bookId: string; templateType: string }) => {
+      const { error } = await supabase
+        .from("books")
+        .update({ template_type: templateType })
+        .eq("id", bookId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["books"] });
+      toast({
+        title: "Szablon zaktualizowany",
+        description: "Szablon posta został zmieniony.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Błąd",
+        description: `Nie udało się zmienić szablonu: ${error.message}`,
+      });
+    },
+  });
+
   const schedulePublishMutation = useMutation({
     mutationFn: async ({
       bookId,
@@ -341,6 +368,7 @@ export const BooksList = () => {
                 <TableRow>
                   <TableHead>Kod</TableHead>
                   <TableHead>Tytuł</TableHead>
+                  <TableHead>Szablon</TableHead>
                   <TableHead>Link</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Cena</TableHead>
@@ -354,6 +382,35 @@ export const BooksList = () => {
                 {books && books.length > 0 ? books.map(book => <TableRow key={book.id}>
                       <TableCell className="font-medium">{book.code}</TableCell>
                       <TableCell className="max-w-md truncate">{book.title}</TableCell>
+                      <TableCell>
+                        <Select
+                          value={book.template_type || "text"}
+                          onValueChange={(value) =>
+                            updateTemplateMutation.mutate({
+                              bookId: book.id,
+                              templateType: value,
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-[140px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="text">
+                              <div className="flex items-center gap-2">
+                                <FileText className="w-4 h-4" />
+                                Tekstowy
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="visual">
+                              <div className="flex items-center gap-2">
+                                <Layout className="w-4 h-4" />
+                                Wizualny
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
                       <TableCell>
                         {book.product_url ? (
                           <a 
@@ -399,7 +456,7 @@ export const BooksList = () => {
                           </Button>}
                       </TableCell>
                      </TableRow>) : <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center text-muted-foreground">
                       Brak książek w bazie
                     </TableCell>
                   </TableRow>}
