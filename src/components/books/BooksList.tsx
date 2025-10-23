@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Send, Calendar, Clock, ExternalLink, Eye, Layout, FileText, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Loader2, Send, Calendar, Clock, ExternalLink, Eye, Layout, FileText, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { ScheduleDialog } from "./ScheduleDialog";
@@ -29,22 +29,31 @@ export const BooksList = () => {
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [sortColumn, setSortColumn] = useState<SortColumn>("code");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
   const {
-    data: books,
+    data: booksData,
     isLoading
   } = useQuery({
-    queryKey: ["books", sortColumn, sortDirection],
+    queryKey: ["books", sortColumn, sortDirection, currentPage],
     queryFn: async () => {
-      const {
-        data,
-        error
-      } = await supabase.from("books").select("*").order(sortColumn, {
-        ascending: sortDirection === "asc"
-      });
+      const from = (currentPage - 1) * itemsPerPage;
+      const to = from + itemsPerPage - 1;
+      
+      const { data, error, count } = await supabase
+        .from("books")
+        .select("*", { count: 'exact' })
+        .order(sortColumn, { ascending: sortDirection === "asc" })
+        .range(from, to);
+      
       if (error) throw error;
-      return data;
+      return { books: data, totalCount: count || 0 };
     }
   });
+
+  const books = booksData?.books;
+  const totalCount = booksData?.totalCount || 0;
+  const totalPages = Math.ceil(totalCount / itemsPerPage);
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -517,6 +526,33 @@ export const BooksList = () => {
                   </TableRow>}
               </TableBody>
             </Table>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Strona {currentPage} z {totalPages} ({totalCount} książek)
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Poprzednia
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Następna
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>}
       </CardContent>
       <XPostPreviewDialog
