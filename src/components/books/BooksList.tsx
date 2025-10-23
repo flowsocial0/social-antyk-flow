@@ -4,11 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Send, Calendar, Clock, ExternalLink } from "lucide-react";
+import { Loader2, Send, Calendar, Clock, ExternalLink, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { ScheduleDialog } from "./ScheduleDialog";
 import { BulkScheduleDialog } from "./BulkScheduleDialog";
+import { XPostPreviewDialog } from "./XPostPreviewDialog";
+import type { Tables } from "@/integrations/supabase/types";
 export const BooksList = () => {
   const {
     toast
@@ -19,6 +21,8 @@ export const BooksList = () => {
     codeVerifier?: string;
     state?: string;
   }>({});
+  const [previewBook, setPreviewBook] = useState<Tables<"books"> | null>(null);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const {
     data: books,
     isLoading
@@ -342,6 +346,7 @@ export const BooksList = () => {
                   <TableHead>Cena</TableHead>
                   <TableHead>Publikacja</TableHead>
                   <TableHead>Harmonogram</TableHead>
+                  <TableHead>Podgląd</TableHead>
                   <TableHead className="text-right">Akcje</TableHead>
                 </TableRow>
               </TableHeader>
@@ -373,6 +378,18 @@ export const BooksList = () => {
                       <TableCell>
                         {!book.published && <ScheduleDialog book={book} onScheduleChange={handleScheduleChange} />}
                       </TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setPreviewBook(book);
+                            setPreviewDialogOpen(true);
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                       <TableCell className="text-right">
                         {!book.published && <Button size="sm" variant="outline" onClick={() => handlePublishSingle(book.id)} disabled={publishingIds.has(book.id)}>
                             {publishingIds.has(book.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <>
@@ -381,8 +398,8 @@ export const BooksList = () => {
                               </>}
                           </Button>}
                       </TableCell>
-                    </TableRow>) : <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground">
+                     </TableRow>) : <TableRow>
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">
                       Brak książek w bazie
                     </TableCell>
                   </TableRow>}
@@ -390,5 +407,10 @@ export const BooksList = () => {
             </Table>
           </div>}
       </CardContent>
+      <XPostPreviewDialog
+        book={previewBook}
+        open={previewDialogOpen}
+        onOpenChange={setPreviewDialogOpen}
+      />
     </Card>;
 };
