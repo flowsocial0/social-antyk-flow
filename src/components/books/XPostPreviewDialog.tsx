@@ -25,24 +25,56 @@ export const XPostPreviewDialog = ({
   const isVisualTemplate = book.template_type === "visual";
 
   const renderTextTemplate = () => {
+    // Use BookPreview URL instead of direct shop URL for Twitter Card support
+    const bookPreviewUrl = `${window.location.origin}/book/${book.id}`;
+    
     let tweetText = `📚 Nowość w ofercie!\n\n${book.title}\n\n`;
     
     if (book.sale_price) {
       tweetText += `💰 Cena: ${book.sale_price} zł\n\n`;
     }
     
-    if (book.product_url) {
-      tweetText += `Sprawdź: ${book.product_url}\n\n`;
-    }
+    tweetText += `🛒 Sprawdź w księgarni:\n👉 ${bookPreviewUrl}\n\n`;
     
     tweetText += `#ksiazki #antyk #promocja`;
 
     return (
-      <Card className="max-w-xl bg-card">
-        <CardContent className="p-6">
-          <pre className="whitespace-pre-wrap font-sans text-card-foreground">{tweetText}</pre>
-        </CardContent>
-      </Card>
+      <div className="space-y-2">
+        <Card className="max-w-xl bg-card">
+          <CardContent className="p-6">
+            <pre className="whitespace-pre-wrap font-sans text-card-foreground">{tweetText}</pre>
+          </CardContent>
+        </Card>
+        <p className="text-xs text-muted-foreground text-center">
+          ℹ️ Link prowadzi do strony z podglądem, która przekierowuje do sklepu (lepszy podgląd na X/Twitter)
+        </p>
+      </div>
+    );
+  };
+
+  const renderVisualTemplate = () => {
+    const bookPreviewUrl = `${window.location.origin}/book/${book.id}`;
+    
+    let tweetText = `📚 ${book.title}\n\n`;
+    
+    if (book.sale_price) {
+      tweetText += `💰 ${book.sale_price} zł\n\n`;
+    }
+    
+    tweetText += `👉 Kup teraz:\n${bookPreviewUrl}`;
+
+    return (
+      <div className="space-y-4">
+        <Card className="max-w-xl bg-card">
+          <CardContent className="p-6">
+            <pre className="whitespace-pre-wrap font-sans text-card-foreground">{tweetText}</pre>
+          </CardContent>
+        </Card>
+        <p className="text-xs text-muted-foreground text-center mb-2">
+          ℹ️ Link prowadzi do strony z podglądem, która przekierowuje do sklepu (lepszy podgląd na X/Twitter)
+        </p>
+        <XPostPreview book={book} />
+      </div>
     );
   };
 
@@ -58,7 +90,7 @@ export const XPostPreviewDialog = ({
           </DialogDescription>
         </DialogHeader>
         <div className="flex justify-center py-4">
-          {isVisualTemplate ? <XPostPreview book={book} /> : renderTextTemplate()}
+          {isVisualTemplate ? renderVisualTemplate() : renderTextTemplate()}
         </div>
       </DialogContent>
     </Dialog>
