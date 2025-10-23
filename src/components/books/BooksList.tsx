@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Send, Calendar, Clock, ExternalLink, Eye, Layout, FileText } from "lucide-react";
+import { Loader2, Send, Calendar, Clock, ExternalLink, Eye, Layout, FileText, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { ScheduleDialog } from "./ScheduleDialog";
@@ -12,6 +12,9 @@ import { BulkScheduleDialog } from "./BulkScheduleDialog";
 import { XPostPreviewDialog } from "./XPostPreviewDialog";
 import type { Tables } from "@/integrations/supabase/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+type SortColumn = "code" | "title" | "stock_status" | "sale_price" | "published";
+type SortDirection = "asc" | "desc";
+
 export const BooksList = () => {
   const {
     toast
@@ -24,22 +27,44 @@ export const BooksList = () => {
   }>({});
   const [previewBook, setPreviewBook] = useState<Tables<"books"> | null>(null);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [sortColumn, setSortColumn] = useState<SortColumn>("code");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const {
     data: books,
     isLoading
   } = useQuery({
-    queryKey: ["books"],
+    queryKey: ["books", sortColumn, sortDirection],
     queryFn: async () => {
       const {
         data,
         error
-      } = await supabase.from("books").select("*").order("code", {
-        ascending: true
+      } = await supabase.from("books").select("*").order(sortColumn, {
+        ascending: sortDirection === "asc"
       });
       if (error) throw error;
       return data;
     }
   });
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const SortIcon = ({ column }: { column: SortColumn }) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="ml-2 h-4 w-4 inline" />;
+    }
+    return sortDirection === "asc" ? (
+      <ArrowUp className="ml-2 h-4 w-4 inline" />
+    ) : (
+      <ArrowDown className="ml-2 h-4 w-4 inline" />
+    );
+  };
   const testConnectionMutation = useMutation({
     mutationFn: async () => {
       const {
@@ -366,13 +391,43 @@ export const BooksList = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Kod</TableHead>
-                  <TableHead>Tytuł</TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-muted/50 select-none"
+                    onClick={() => handleSort("code")}
+                  >
+                    Kod
+                    <SortIcon column="code" />
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-muted/50 select-none"
+                    onClick={() => handleSort("title")}
+                  >
+                    Tytuł
+                    <SortIcon column="title" />
+                  </TableHead>
                   <TableHead>Szablon</TableHead>
                   <TableHead>Link</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Cena</TableHead>
-                  <TableHead>Publikacja</TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-muted/50 select-none"
+                    onClick={() => handleSort("stock_status")}
+                  >
+                    Status
+                    <SortIcon column="stock_status" />
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-muted/50 select-none"
+                    onClick={() => handleSort("sale_price")}
+                  >
+                    Cena
+                    <SortIcon column="sale_price" />
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-muted/50 select-none"
+                    onClick={() => handleSort("published")}
+                  >
+                    Publikacja
+                    <SortIcon column="published" />
+                  </TableHead>
                   <TableHead>Harmonogram</TableHead>
                   <TableHead>Podgląd</TableHead>
                   <TableHead className="text-right">Akcje</TableHead>
