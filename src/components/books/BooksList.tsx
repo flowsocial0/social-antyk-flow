@@ -448,7 +448,62 @@ export const BooksList = () => {
       <CardContent>
         {isLoading ? <div className="flex justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div> : <div className="rounded-md border">
+          </div> : <>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-4 border-b">
+              <div className="text-sm text-muted-foreground">
+                Strona {currentPage} z {totalPages} ({totalCount} książek)
+              </div>
+              <div className="flex gap-2 items-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Poprzednia
+                </Button>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Idź do:</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={totalPages}
+                    value={pageInput}
+                    onChange={(e) => setPageInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const n = Math.min(totalPages, Math.max(1, parseInt(pageInput || '1', 10) || 1));
+                        setCurrentPage(n);
+                      }
+                    }}
+                    className="w-20 h-8"
+                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      const n = Math.min(totalPages, Math.max(1, parseInt(pageInput || '1', 10) || 1));
+                      setCurrentPage(n);
+                    }}
+                  >
+                    Idź
+                  </Button>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Następna
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
+          <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -620,7 +675,8 @@ export const BooksList = () => {
                 </div>
               </div>
             )}
-          </div>}
+          </div>
+          </>}
       </CardContent>
       <XPostPreviewDialog
         book={previewBook}
