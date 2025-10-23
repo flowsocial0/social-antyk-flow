@@ -117,6 +117,29 @@ async function testConnectionWithOAuth2(bearerToken: string): Promise<any> {
   return JSON.parse(responseText);
 }
 
+// Verify OAuth 1.0a credentials by calling v1.1 endpoint
+async function verifyOAuth1(): Promise<{ ok: boolean; user?: any; status?: number; body?: string; error?: string }> {
+  const url = "https://api.twitter.com/1.1/account/verify_credentials.json";
+  const method = "GET";
+  const oauthHeader = generateOAuthHeader(method, url);
+  console.log("=== Testing Twitter OAuth 1.0a Connection ===");
+  const response = await fetch(url, {
+    method,
+    headers: { Authorization: oauthHeader }
+  });
+  const responseText = await response.text();
+  console.log("OAuth1 Verify - Status:", response.status);
+  console.log("OAuth1 Verify - Body:", responseText);
+  if (!response.ok) {
+    return { ok: false, status: response.status, body: responseText };
+  }
+  try {
+    return { ok: true, user: JSON.parse(responseText) };
+  } catch (_e) {
+    return { ok: true };
+  }
+}
+
 async function uploadMedia(imageUrl: string): Promise<string> {
   console.log("Downloading image from:", imageUrl);
   
@@ -125,38 +148,102 @@ async function uploadMedia(imageUrl: string): Promise<string> {
   if (!imageResponse.ok) {
     throw new Error(`Failed to download image: ${imageResponse.status}`);
   }
+
+  const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+  const imageArrayBuffer = await imageResponse.arrayBuffer();
+  const imageBase64 = btoa(String.fromCharCode(...new Uint8Array(imageArrayBuffer)));
+  console.log("Image downloaded, size:", imageArrayBuffer.byteLength, "bytes, type:", contentType);
   
-  const imageBlob = await imageResponse.blob();
-  const imageBuffer = await imageBlob.arrayBuffer();
-  const imageBase64 = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
-  
-  console.log("Image downloaded, size:", imageBuffer.byteLength, "bytes");
-  
-  // Upload to Twitter
-  const method = "POST";
-  const oauthHeader = generateOAuthHeader(method, UPLOAD_URL);
-  
-  const formData = new FormData();
-  formData.append("media_data", imageBase64);
-  
-  const response = await fetch(UPLOAD_URL, {
-    method: method,
-    headers: {
-      Authorization: oauthHeader,
-    },
-    body: formData,
-  });
-  
-  const responseText = await response.text();
-  console.log("Media Upload Response Status:", response.status);
-  console.log("Media Upload Response Body:", responseText);
-  
-  if (!response.ok) {
-    throw new Error(`Failed to upload media: ${response.status}, body: ${responseText}`);
+  // First try simple upload with media_data
+  try {
+    const method = "POST";
+    const oauthHeader = generateOAuthHeader(method, UPLOAD_URL);
+    const formData = new FormData();
+    formData.append("media_data", imageBase64);
+    
+    const response = await fetch(UPLOAD_URL, {
+      method,
+      headers: { Authorization: oauthHeader },
+      body: formData,
+    });
+    
+    const responseText = await response.text();
+    console.log("Media Upload Response Status:", response.status);
+    console.log("Media Upload Response Body:", responseText);
+    
+    if (response.ok) {
+      const result = JSON.parse(responseText);
+      return result.media_id_string;
+    } else {
+      console.warn("Simple media upload failed, will try chunked upload");
+    }
+  } catch (e) {
+    console.warn("Simple media upload threw, will try chunked upload:", e);
   }
-  
-  const result = JSON.parse(responseText);
-  return result.media_id_string;
+
+  // Fallback: Chunked upload (INIT -> APPEND -> FINALIZE)
+  const oauthHeader = generateOAuthHeader("POST", UPLOAD_URL);
+
+  // INIT
+  const initForm = new FormData();
+  initForm.append("command", "INIT");
+  initForm.append("total_bytes", String(imageArrayBuffer.byteLength));
+  initForm.append("media_type", contentType);
+
+  const initResp = await fetch(UPLOAD_URL, {
+    method: "POST",
+    headers: { Authorization: oauthHeader },
+    body: initForm,
+  });
+  const initText = await initResp.text();
+  console.log("INIT Response Status:", initResp.status);
+  console.log("INIT Response Body:", initText);
+  if (!initResp.ok) {
+    throw new Error(`INIT failed: ${initResp.status}, body: ${initText}`);
+  }
+  const initJson = JSON.parse(initText);
+  const mediaId = initJson.media_id_string;
+  if (!mediaId) {
+    throw new Error("INIT did not return media_id_string");
+  }
+
+  // APPEND (single chunk)
+  const appendForm = new FormData();
+  appendForm.append("command", "APPEND");
+  appendForm.append("media_id", mediaId);
+  appendForm.append("segment_index", "0");
+  appendForm.append("media", new Blob([imageArrayBuffer], { type: contentType }));
+
+  const appendResp = await fetch(UPLOAD_URL, {
+    method: "POST",
+    headers: { Authorization: oauthHeader },
+    body: appendForm,
+  });
+  const appendText = await appendResp.text();
+  console.log("APPEND Response Status:", appendResp.status);
+  console.log("APPEND Response Body:", appendText);
+  if (!appendResp.ok) {
+    throw new Error(`APPEND failed: ${appendResp.status}, body: ${appendText}`);
+  }
+
+  // FINALIZE
+  const finalizeForm = new FormData();
+  finalizeForm.append("command", "FINALIZE");
+  finalizeForm.append("media_id", mediaId);
+
+  const finalizeResp = await fetch(UPLOAD_URL, {
+    method: "POST",
+    headers: { Authorization: oauthHeader },
+    body: finalizeForm,
+  });
+  const finalizeText = await finalizeResp.text();
+  console.log("FINALIZE Response Status:", finalizeResp.status);
+  console.log("FINALIZE Response Body:", finalizeText);
+  if (!finalizeResp.ok) {
+    throw new Error(`FINALIZE failed: ${finalizeResp.status}, body: ${finalizeText}`);
+  }
+
+  return mediaId;
 }
 
 async function sendTweet(tweetText: string, mediaIds?: string[], oauth2Token?: string): Promise<any> {
@@ -215,16 +302,27 @@ Deno.serve(async (req) => {
     
     // Test connection endpoint
     if (shouldTestConnection) {
-      console.log("Testing Twitter API connection with OAuth2 token...");
-      if (!oauth2Token) {
-        throw new Error('Brak ważnego tokenu OAuth2. Zaloguj się ponownie.');
+      console.log("Testing Twitter API connection (OAuth1 and OAuth2)...");
+
+      // OAuth1 test (does not require OAuth2 token)
+      const oauth1 = await verifyOAuth1();
+
+      // OAuth2 test (optional)
+      let oauth2: any = { ok: false, error: 'Brak ważnego tokenu OAuth2' };
+      if (oauth2Token) {
+        try {
+          const result = await testConnectionWithOAuth2(oauth2Token);
+          oauth2 = { ok: true, user: result.data ?? result };
+        } catch (e: any) {
+          oauth2 = { ok: false, error: e.message };
+        }
       }
-      const result = await testConnectionWithOAuth2(oauth2Token);
+
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: "Connection successful! Your API keys are working.",
-          user: result.data ?? result 
+        JSON.stringify({
+          success: oauth1.ok || oauth2.ok,
+          oauth1,
+          oauth2,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

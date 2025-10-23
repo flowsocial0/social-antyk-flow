@@ -79,21 +79,20 @@ export const BooksList = () => {
   };
   const testConnectionMutation = useMutation({
     mutationFn: async () => {
-      const {
-        data,
-        error
-      } = await supabase.functions.invoke("publish-to-x", {
-        body: {
-          testConnection: true
-        }
+      const { data, error } = await supabase.functions.invoke("publish-to-x", {
+        body: { testConnection: true }
       });
       if (error) throw error;
       return data;
     },
-    onSuccess: data => {
+    onSuccess: (data: any) => {
+      const o1 = data?.oauth1;
+      const o2 = data?.oauth2;
+      const allOk = (o1?.ok) || (o2?.ok);
       toast({
-        title: "✅ Połączenie działa!",
-        description: `Zalogowano jako: ${data.user?.username || data.user?.name || "użytkownik"}`
+        title: allOk ? "✅ Wynik testu połączenia" : "❌ Problem z połączeniem",
+        description: `OAuth 1.0a: ${o1?.ok ? "OK" : `BŁĄD${o1?.error ? ` - ${o1.error}` : ""}`}\nOAuth 2.0: ${o2?.ok ? `OK (użytkownik: ${o2?.user?.username || o2?.user?.name || "?"})` : `BŁĄD${o2?.error ? ` - ${o2.error}` : ""}`}`,
+        variant: allOk ? "default" : "destructive",
       });
     },
     onError: (error: any) => {
