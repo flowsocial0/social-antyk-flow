@@ -1,29 +1,74 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
+import { createHmac } from "node:crypto";
 
-const CLIENT_ID = Deno.env.get("TWITTER_OAUTH2_CLIENT_ID")?.trim();
-const CLIENT_SECRET = Deno.env.get("TWITTER_OAUTH2_CLIENT_SECRET")?.trim();
+const API_KEY = Deno.env.get("TWITTER_CONSUMER_KEY")?.trim();
+const API_SECRET = Deno.env.get("TWITTER_CONSUMER_SECRET")?.trim();
+const ACCESS_TOKEN = Deno.env.get("TWITTER_ACCESS_TOKEN")?.trim();
+const ACCESS_TOKEN_SECRET = Deno.env.get("TWITTER_ACCESS_TOKEN_SECRET")?.trim();
 
-async function getAccessToken(supabaseClient: any): Promise<string> {
-  const { data, error } = await supabaseClient
-    .from('twitter_oauth_tokens')
-    .select('access_token, expires_at')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+function validateEnvironmentVariables() {
+  if (!API_KEY) throw new Error("Missing TWITTER_CONSUMER_KEY environment variable");
+  if (!API_SECRET) throw new Error("Missing TWITTER_CONSUMER_SECRET environment variable");
+  if (!ACCESS_TOKEN) throw new Error("Missing TWITTER_ACCESS_TOKEN environment variable");
+  if (!ACCESS_TOKEN_SECRET) throw new Error("Missing TWITTER_ACCESS_TOKEN_SECRET environment variable");
+}
 
-  if (error || !data) {
-    throw new Error('No Twitter access token found. Please authorize the app first.');
-  }
+function generateOAuthSignature(
+  method: string,
+  url: string,
+  params: Record<string, string>,
+  consumerSecret: string,
+  tokenSecret: string
+): string {
+  const signatureBaseString = `${method}&${encodeURIComponent(
+    url
+  )}&${encodeURIComponent(
+    Object.entries(params)
+      .sort()
+      .map(([k, v]) => `${k}=${v}`)
+      .join("&")
+  )}`;
+  const signingKey = `${encodeURIComponent(
+    consumerSecret
+  )}&${encodeURIComponent(tokenSecret)}`;
+  const hmacSha1 = createHmac("sha1", signingKey);
+  const signature = hmacSha1.update(signatureBaseString).digest("base64");
+  return signature;
+}
 
-  // Check if token is expired
-  if (data.expires_at) {
-    const expiresAt = new Date(data.expires_at);
-    if (expiresAt < new Date()) {
-      throw new Error('Twitter access token has expired. Please re-authorize the app.');
-    }
-  }
+function generateOAuthHeader(method: string, url: string): string {
+  const oauthParams = {
+    oauth_consumer_key: API_KEY!,
+    oauth_nonce: Math.random().toString(36).substring(2),
+    oauth_signature_method: "HMAC-SHA1",
+    oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+    oauth_token: ACCESS_TOKEN!,
+    oauth_version: "1.0",
+  };
 
-  return data.access_token;
+  const signature = generateOAuthSignature(
+    method,
+    url,
+    oauthParams,
+    API_SECRET!,
+    ACCESS_TOKEN_SECRET!
+  );
+
+  const signedOAuthParams = {
+    ...oauthParams,
+    oauth_signature: signature,
+  };
+
+  const entries = Object.entries(signedOAuthParams).sort((a, b) =>
+    a[0].localeCompare(b[0])
+  );
+
+  return (
+    "OAuth " +
+    entries
+      .map(([k, v]) => `${encodeURIComponent(k)}="${encodeURIComponent(v)}"`)
+      .join(", ")
+  );
 }
 
 const corsHeaders = {
@@ -31,81 +76,108 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function validateEnvironmentVariables() {
-  if (!CLIENT_ID) throw new Error("Missing TWITTER_OAUTH2_CLIENT_ID environment variable");
-  if (!CLIENT_SECRET) throw new Error("Missing TWITTER_OAUTH2_CLIENT_SECRET environment variable");
-}
+const BASE_URL = "https://api.x.com/2";
+const UPLOAD_URL = "https://upload.twitter.com/1.1/media/upload.json";
 
-function getAuthHeaders(accessToken: string): Record<string, string> {
-  return {
-    "Authorization": `Bearer ${accessToken}`,
-    "Content-Type": "application/json",
-  };
-}
-
-async function testConnection(accessToken: string): Promise<any> {
-  const url = "https://api.x.com/2/users/me";
-
-  console.log("=== Testing Twitter OAuth 2.0 Connection ===");
-  console.log("Access Token (first 10 chars):", accessToken?.substring(0, 10) + "...");
-
-  try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: getAuthHeaders(accessToken),
-    });
-
-    const responseText = await response.text();
-    console.log("Test Connection - Response Status:", response.status);
-    console.log("Test Connection - Response Body:", responseText);
-
-    if (!response.ok) {
-      let errorDetails;
-      try {
-        errorDetails = JSON.parse(responseText);
-      } catch (e) {
-        errorDetails = responseText;
-      }
-      throw new Error(
-        `HTTP error! status: ${response.status}, details: ${JSON.stringify(errorDetails)}`
-      );
-    }
-
-    return JSON.parse(responseText);
-  } catch (error) {
-    console.error("Test Connection - Error:", error);
-    throw error;
-  }
-}
-
-async function sendTweet(tweetText: string, accessToken: string): Promise<any> {
-  const url = "https://api.x.com/2/tweets";
-  const body = { text: tweetText };
-
-  console.log("Sending tweet with OAuth 2.0...");
-
+async function testConnection(): Promise<any> {
+  const url = `${BASE_URL}/users/me`;
+  const method = "GET";
+  const oauthHeader = generateOAuthHeader(method, url);
+  
+  console.log("=== Testing Twitter OAuth 1.0a Connection ===");
+  
   const response = await fetch(url, {
-    method: "POST",
-    headers: getAuthHeaders(accessToken),
+    method: method,
+    headers: {
+      Authorization: oauthHeader,
+      "Content-Type": "application/json",
+    },
+  });
+  
+  const responseText = await response.text();
+  console.log("Test Connection - Response Status:", response.status);
+  console.log("Test Connection - Response Body:", responseText);
+  
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}, body: ${responseText}`);
+  }
+  
+  return JSON.parse(responseText);
+}
+
+async function uploadMedia(imageUrl: string): Promise<string> {
+  console.log("Downloading image from:", imageUrl);
+  
+  // Download image
+  const imageResponse = await fetch(imageUrl);
+  if (!imageResponse.ok) {
+    throw new Error(`Failed to download image: ${imageResponse.status}`);
+  }
+  
+  const imageBlob = await imageResponse.blob();
+  const imageBuffer = await imageBlob.arrayBuffer();
+  const imageBase64 = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+  
+  console.log("Image downloaded, size:", imageBuffer.byteLength, "bytes");
+  
+  // Upload to Twitter
+  const method = "POST";
+  const oauthHeader = generateOAuthHeader(method, UPLOAD_URL);
+  
+  const formData = new FormData();
+  formData.append("media_data", imageBase64);
+  
+  const response = await fetch(UPLOAD_URL, {
+    method: method,
+    headers: {
+      Authorization: oauthHeader,
+    },
+    body: formData,
+  });
+  
+  const responseText = await response.text();
+  console.log("Media Upload Response Status:", response.status);
+  console.log("Media Upload Response Body:", responseText);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to upload media: ${response.status}, body: ${responseText}`);
+  }
+  
+  const result = JSON.parse(responseText);
+  return result.media_id_string;
+}
+
+async function sendTweet(tweetText: string, mediaIds?: string[]): Promise<any> {
+  const url = `${BASE_URL}/tweets`;
+  const method = "POST";
+  
+  const body: any = { text: tweetText };
+  if (mediaIds && mediaIds.length > 0) {
+    body.media = { media_ids: mediaIds };
+  }
+  
+  const oauthHeader = generateOAuthHeader(method, url);
+  
+  console.log("Sending tweet with OAuth 1.0a...");
+  console.log("Tweet body:", JSON.stringify(body));
+  
+  const response = await fetch(url, {
+    method: method,
+    headers: {
+      Authorization: oauthHeader,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(body),
   });
-
+  
   const responseText = await response.text();
   console.log("Tweet Response Status:", response.status);
   console.log("Tweet Response Body:", responseText);
-
+  
   if (!response.ok) {
-    let errorDetails;
-    try {
-      errorDetails = JSON.parse(responseText);
-    } catch (e) {
-      errorDetails = responseText;
-    }
-    throw new Error(
-      `HTTP error! status: ${response.status}, details: ${JSON.stringify(errorDetails)}`
-    );
+    throw new Error(`Failed to send tweet: ${response.status}, body: ${responseText}`);
   }
-
+  
   return JSON.parse(responseText);
 }
 
@@ -124,13 +196,10 @@ Deno.serve(async (req) => {
 
     const { bookId, bookIds, testConnection: shouldTestConnection } = await req.json();
     
-    // Get access token from database
-    const accessToken = await getAccessToken(supabaseClient);
-    
     // Test connection endpoint
     if (shouldTestConnection) {
       console.log("Testing Twitter API connection...");
-      const result = await testConnection(accessToken);
+      const result = await testConnection();
       return new Response(
         JSON.stringify({ 
           success: true, 
@@ -203,8 +272,22 @@ Deno.serve(async (req) => {
 
         console.log("Tweet to send:", tweetText);
 
+        // Upload media if image_url exists
+        let mediaIds: string[] | undefined = undefined;
+        if (book.image_url && isVisualTemplate) {
+          try {
+            console.log("Uploading media for visual template...");
+            const mediaId = await uploadMedia(book.image_url);
+            mediaIds = [mediaId];
+            console.log("Media uploaded successfully, media_id:", mediaId);
+          } catch (error) {
+            console.error("Failed to upload media, continuing without image:", error);
+            // Continue without media if upload fails
+          }
+        }
+
         // Send tweet
-        const tweetResponse = await sendTweet(tweetText, accessToken);
+        const tweetResponse = await sendTweet(tweetText, mediaIds);
         console.log("Tweet sent successfully:", tweetResponse);
 
         // Update book as published
