@@ -51,7 +51,11 @@ export const AITextDialog = ({
       if (error) throw error;
 
       if (data?.salesText) {
-        setGeneratedText(data.salesText);
+        // Add product link at the end
+        const fullText = data.productUrl 
+          ? `${data.salesText}\n\n${data.productUrl}`
+          : data.salesText;
+        setGeneratedText(fullText);
         toast.success("Tekst wygenerowany przez AI!");
       } else {
         throw new Error("Brak odpowiedzi od AI");

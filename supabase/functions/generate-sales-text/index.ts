@@ -21,6 +21,10 @@ serve(async (req) => {
 
     console.log('Generating sales text for book:', bookData.title);
 
+    // Calculate available characters for text (280 total - link length - spacing)
+    const linkLength = bookData.product_url ? bookData.product_url.length : 23; // Twitter shortens to ~23 chars
+    const availableChars = 280 - linkLength - 4; // -4 for "\n\n" before link
+
     // Construct a detailed prompt for Grok
     const prompt = `Stwórz ultra skuteczny tekst sprzedażowy dla następującej książki:
 
@@ -31,15 +35,16 @@ ${bookData.description ? `Opis: ${bookData.description}` : ''}
 ${bookData.stock_status ? `Status: ${bookData.stock_status}` : ''}
 
 WYMAGANIA:
-- Tekst musi być krótki i zwięzły (maksymalnie 280 znaków, bo to będzie post na X/Twitter)
+- Tekst musi mieć MAKSYMALNIE ${availableChars} znaków (bo link do sklepu zostanie dodany automatycznie na końcu)
 - Musi zawierać emocjonalny hook na początku
 - Podkreślić wartość i korzyści
-- Dodać call-to-action
+- Dodać call-to-action (np. "Sprawdź teraz!", "Kup dziś!")
 - Użyć emoji do zwiększenia engagement
 - Tekst w języku polskim
 - Skupić się na unikalnej wartości oferty
+- NIE dodawaj linku ani [link] - link zostanie dodany automatycznie
 
-Wygeneruj TYLKO tekst posta, bez żadnych dodatkowych komentarzy.`;
+Wygeneruj TYLKO tekst posta, bez żadnych dodatkowych komentarzy ani linków.`;
 
     const response = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
@@ -70,17 +75,15 @@ Wygeneruj TYLKO tekst posta, bez żadnych dodatkowych komentarzy.`;
     }
 
     const data = await response.json();
-    let generatedText = data.choices[0].message.content.trim();
-    
-    // Replace [link] placeholder with actual product URL
-    if (bookData.product_url) {
-      generatedText = generatedText.replace(/\[link\]/g, bookData.product_url);
-    }
+    const generatedText = data.choices[0].message.content.trim();
 
     console.log('Generated sales text:', generatedText);
 
     return new Response(
-      JSON.stringify({ salesText: generatedText }),
+      JSON.stringify({ 
+        salesText: generatedText,
+        productUrl: bookData.product_url 
+      }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200 
