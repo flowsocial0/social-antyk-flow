@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
+import Login from "./pages/Login";
 import TwitterCallback from "./pages/TwitterCallback";
 import BookPreview from "./pages/BookPreview";
 import BookRedirect from "./pages/BookRedirect";
@@ -19,6 +20,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/twitter-callback" element={<TwitterCallback />} />
           <Route path="/book/:id" element={<BookPreview />} />
           <Route path="/book/:id/redirect" element={<BookRedirect />} />
