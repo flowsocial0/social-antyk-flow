@@ -12,6 +12,7 @@ interface BulkScheduleDialogProps {
 }
 
 const INTERVAL_OPTIONS = [
+  { label: "4 minuty", value: 4 },
   { label: "5 minut", value: 5 },
   { label: "15 minut", value: 15 },
   { label: "30 minut", value: 30 },
