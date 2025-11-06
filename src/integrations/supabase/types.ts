@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       books: {
         Row: {
+          ai_generated_text: string | null
           auto_publish_enabled: boolean | null
           code: string
           created_at: string
@@ -35,6 +36,7 @@ export type Database = {
           warehouse_quantity: number | null
         }
         Insert: {
+          ai_generated_text?: string | null
           auto_publish_enabled?: boolean | null
           code: string
           created_at?: string
@@ -54,6 +56,7 @@ export type Database = {
           warehouse_quantity?: number | null
         }
         Update: {
+          ai_generated_text?: string | null
           auto_publish_enabled?: boolean | null
           code?: string
           created_at?: string

@@ -364,12 +364,16 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Format tweet using custom text or visual template
+        // Format tweet using AI-generated text from database, or fall back to visual template
         let tweetText;
-        if (customText) {
-          // Use custom AI-generated text
+        if (book.ai_generated_text) {
+          // Use AI-generated text from database
+          tweetText = `${book.ai_generated_text}\n\n${book.product_url}`;
+          console.log("Using AI-generated text from database");
+        } else if (customText) {
+          // Fallback to custom text parameter (for backwards compatibility)
           tweetText = customText;
-          console.log("Using custom AI-generated text for tweet");
+          console.log("Using custom text parameter");
         } else {
           // Use default visual template
           tweetText = `✨ LIMITOWANA OFERTA ✨\n\n📚 ${book.title}\n\n`;

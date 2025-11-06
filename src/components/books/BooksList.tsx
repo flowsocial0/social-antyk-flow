@@ -11,7 +11,6 @@ import { useState, useEffect } from "react";
 import { ScheduleDialog } from "./ScheduleDialog";
 import { BulkScheduleDialog } from "./BulkScheduleDialog";
 import { XPostPreviewDialog } from "./XPostPreviewDialog";
-import { AITextDialog } from "./AITextDialog";
 import type { Tables } from "@/integrations/supabase/types";
 
 type SortColumn = "code" | "title" | "stock_status" | "sale_price" | "published";
@@ -29,8 +28,6 @@ export const BooksList = () => {
   }>({});
   const [previewBook, setPreviewBook] = useState<Tables<"books"> | null>(null);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
-  const [aiTextBook, setAiTextBook] = useState<Tables<"books"> | null>(null);
-  const [aiTextDialogOpen, setAiTextDialogOpen] = useState(false);
   const [sortColumn, setSortColumn] = useState<SortColumn>("code");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -361,6 +358,69 @@ export const BooksList = () => {
     cancelAllScheduledMutation.mutate();
   };
 
+  const generateAllAITextsMutation = useMutation({
+    mutationFn: async () => {
+      const unpublishedBooks = books?.filter(book => !book.published && !book.ai_generated_text) || [];
+      
+      if (unpublishedBooks.length === 0) {
+        throw new Error("Brak książek do wygenerowania tekstów");
+      }
+
+      const results = [];
+      for (const book of unpublishedBooks) {
+        try {
+          const { data, error } = await supabase.functions.invoke("generate-sales-text", {
+            body: { bookData: book }
+          });
+
+          if (error) throw error;
+
+          // Save generated text to database
+          const { error: updateError } = await supabase
+            .from("books")
+            .update({ ai_generated_text: data.salesText })
+            .eq("id", book.id);
+
+          if (updateError) throw updateError;
+
+          results.push({ id: book.id, success: true });
+        } catch (error: any) {
+          console.error(`Failed to generate text for book ${book.id}:`, error);
+          results.push({ id: book.id, success: false, error: error.message });
+        }
+      }
+
+      return results;
+    },
+    onSuccess: (results) => {
+      queryClient.invalidateQueries({ queryKey: ["books"] });
+      const successful = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+      
+      if (successful > 0) {
+        toast({
+          title: "✅ Wygenerowano teksty AI",
+          description: `Wygenerowano ${successful} tekstów${failed > 0 ? `, ${failed} nieudanych` : ""}`
+        });
+      }
+      
+      if (failed > 0 && successful === 0) {
+        toast({
+          title: "Błąd generowania",
+          description: `Nie udało się wygenerować ${failed} tekstów`,
+          variant: "destructive"
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Błąd",
+        description: error.message || "Nie udało się wygenerować tekstów",
+        variant: "destructive"
+      });
+    }
+  });
+
   const unpublishMutation = useMutation({
     mutationFn: async (bookId: string) => {
       const { error } = await supabase
@@ -439,6 +499,14 @@ export const BooksList = () => {
             size="sm"
           >
             {migrateImagesMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Migracja...</> : "📦 Migruj obrazki"}
+          </Button>
+          <Button
+            variant="default"
+            onClick={() => generateAllAITextsMutation.mutate()}
+            disabled={generateAllAITextsMutation.isPending}
+            size="sm"
+          >
+            {generateAllAITextsMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generowanie...</> : <><Sparkles className="mr-2 h-4 w-4" />Generuj AI dla wszystkich</>}
           </Button>
           <BulkScheduleDialog unpublishedCount={unpublishedCount} onSchedule={handleBulkSchedule} isScheduling={bulkScheduleMutation.isPending} />
           <Button
@@ -550,6 +618,7 @@ export const BooksList = () => {
                     Publikacja
                     <SortIcon column="published" />
                   </TableHead>
+                  <TableHead>Tekst AI</TableHead>
                   <TableHead>Harmonogram</TableHead>
                   <TableHead>Podgląd</TableHead>
                   <TableHead className="text-right">Akcje</TableHead>
@@ -580,6 +649,15 @@ export const BooksList = () => {
                           {book.published ? "Opublikowano" : "Nieopublikowano"}
                         </Badge>
                       </TableCell>
+                      <TableCell className="max-w-xs">
+                        {book.ai_generated_text ? (
+                          <div className="text-xs text-muted-foreground truncate" title={book.ai_generated_text}>
+                            {book.ai_generated_text}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         {!book.published && <ScheduleDialog book={book} onScheduleChange={handleScheduleChange} />}
                       </TableCell>
@@ -597,26 +675,12 @@ export const BooksList = () => {
                       </TableCell>
                       <TableCell className="text-right">
                         {!book.published ? (
-                          <div className="flex gap-2 justify-end">
-                            <Button 
-                              size="sm" 
-                              variant="secondary"
-                              onClick={() => {
-                                setAiTextBook(book);
-                                setAiTextDialogOpen(true);
-                              }}
-                              disabled={publishingIds.has(book.id)}
-                            >
-                              <Sparkles className="mr-2 h-4 w-4" />
-                              AI Tekst
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handlePublishSingle(book.id)} disabled={publishingIds.has(book.id)}>
-                              {publishingIds.has(book.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <>
-                                  <Send className="mr-2 h-4 w-4" />
-                                  Opublikuj
-                                </>}
-                            </Button>
-                          </div>
+                          <Button size="sm" variant="outline" onClick={() => handlePublishSingle(book.id)} disabled={publishingIds.has(book.id)}>
+                            {publishingIds.has(book.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <>
+                                <Send className="mr-2 h-4 w-4" />
+                                Opublikuj
+                              </>}
+                          </Button>
                         ) : (
                           <Button 
                             size="sm" 
@@ -703,12 +767,6 @@ export const BooksList = () => {
         book={previewBook}
         open={previewDialogOpen}
         onOpenChange={setPreviewDialogOpen}
-      />
-      <AITextDialog
-        book={aiTextBook}
-        open={aiTextDialogOpen}
-        onOpenChange={setAiTextDialogOpen}
-        onPublish={handlePublishSingle}
       />
     </Card>;
 };
