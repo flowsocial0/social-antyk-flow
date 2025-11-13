@@ -28,11 +28,7 @@ const INTERVAL_OPTIONS = [
   { label: "24 godziny", value: 1440 },
 ];
 
-export const BulkScheduleDialog = ({ 
-  unpublishedCount, 
-  onSchedule, 
-  isScheduling 
-}: BulkScheduleDialogProps) => {
+export const BulkScheduleDialog = ({ unpublishedCount, onSchedule, isScheduling }: BulkScheduleDialogProps) => {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"interval" | "posts-per-day">("posts-per-day");
   const [intervalMinutes, setIntervalMinutes] = useState(160);
@@ -56,14 +52,13 @@ export const BulkScheduleDialog = ({
 
   const actualInterval = calculateInterval();
   const actualPostsPerDay = calculatePostsPerDay(actualInterval);
-  const booksToSchedule = useLimitDays && limitDays 
-    ? Math.min(actualPostsPerDay * limitDays, unpublishedCount)
-    : unpublishedCount;
+  const booksToSchedule =
+    useLimitDays && limitDays ? Math.min(actualPostsPerDay * limitDays, unpublishedCount) : unpublishedCount;
   const totalDays = Math.ceil(booksToSchedule / actualPostsPerDay);
 
   const getStartDateTime = () => {
     if (!useStartTime) return new Date();
-    
+
     const now = new Date();
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -77,12 +72,12 @@ export const BulkScheduleDialog = ({
     const minutes = totalMinutes % 60;
     const days = Math.floor(hours / 24);
     const remainingHours = hours % 24;
-    
+
     if (days > 0) {
-      return `${days}d ${remainingHours}h ${minutes > 0 ? `${minutes}min` : ''}`;
+      return `${days}d ${remainingHours}h ${minutes > 0 ? `${minutes}min` : ""}`;
     }
     if (remainingHours > 0) {
-      return `${remainingHours}h ${minutes > 0 ? `${minutes}min` : ''}`;
+      return `${remainingHours}h ${minutes > 0 ? `${minutes}min` : ""}`;
     }
     return `${minutes} min`;
   };
@@ -98,28 +93,28 @@ export const BulkScheduleDialog = ({
     if (actualPostsPerDay >= 10) {
       return {
         level: "danger",
-        message: "⚠️ UWAGA: Powyżej 10 postów/dzień - wysokie ryzyko rate limitów!",
-        color: "text-red-600 dark:text-red-400"
+        message: "⚠️ UWAGA: Powyżej 10 postów/dzień - wysokie ryzyko limitu wytrzymałości ludzi!",
+        color: "text-red-600 dark:text-red-400",
       };
     }
     if (actualPostsPerDay >= 8) {
       return {
         level: "warning",
-        message: "⚠️ Na granicy: 8-10 postów/dzień może powodować rate limity",
-        color: "text-orange-600 dark:text-orange-400"
+        message: "⚠️ Na granicy: 8-10 postów/dzień może powodować wkurzenie ludzi",
+        color: "text-orange-600 dark:text-orange-400",
       };
     }
     if (actualPostsPerDay >= 4) {
       return {
         level: "safe",
         message: "✅ Bezpieczne: 4-7 postów/dzień - zalecane dla księgarni",
-        color: "text-green-600 dark:text-green-400"
+        color: "text-green-600 dark:text-green-400",
       };
     }
     return {
       level: "low",
       message: "ℹ️ Mało postów: zwiększ częstotliwość dla lepszego zasięgu",
-      color: "text-blue-600 dark:text-blue-400"
+      color: "text-blue-600 dark:text-blue-400",
     };
   };
 
@@ -137,7 +132,7 @@ export const BulkScheduleDialog = ({
         <DialogHeader>
           <DialogTitle className="text-xl">Zaawansowane planowanie publikacji</DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-6 py-4">
           {/* Mode Selection */}
           <div className="space-y-3">
@@ -179,9 +174,7 @@ export const BulkScheduleDialog = ({
                 onChange={(e) => setPostsPerDay(Math.max(1, parseInt(e.target.value) || 1))}
                 className="text-lg font-semibold"
               />
-              <p className="text-xs text-muted-foreground">
-                = co {actualInterval} minut
-              </p>
+              <p className="text-xs text-muted-foreground">= co {actualInterval} minut</p>
             </div>
           )}
 
@@ -191,10 +184,7 @@ export const BulkScheduleDialog = ({
               <Label htmlFor="interval" className="text-sm font-medium">
                 Odstęp między publikacjami
               </Label>
-              <Select
-                value={intervalMinutes.toString()}
-                onValueChange={(value) => setIntervalMinutes(parseInt(value))}
-              >
+              <Select value={intervalMinutes.toString()} onValueChange={(value) => setIntervalMinutes(parseInt(value))}>
                 <SelectTrigger id="interval">
                   <SelectValue />
                 </SelectTrigger>
@@ -206,22 +196,23 @@ export const BulkScheduleDialog = ({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                = {actualPostsPerDay} postów dziennie
-              </p>
+              <p className="text-xs text-muted-foreground">= {actualPostsPerDay} postów dziennie</p>
             </div>
           )}
 
           {/* Rate Limit Warning */}
-          <div className={`rounded-lg p-3 border ${
-            rateLimitInfo.level === "danger" ? "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900" :
-            rateLimitInfo.level === "warning" ? "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900" :
-            rateLimitInfo.level === "safe" ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900" :
-            "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900"
-          }`}>
-            <p className={`text-sm font-medium ${rateLimitInfo.color}`}>
-              {rateLimitInfo.message}
-            </p>
+          <div
+            className={`rounded-lg p-3 border ${
+              rateLimitInfo.level === "danger"
+                ? "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900"
+                : rateLimitInfo.level === "warning"
+                  ? "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900"
+                  : rateLimitInfo.level === "safe"
+                    ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900"
+                    : "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900"
+            }`}
+          >
+            <p className={`text-sm font-medium ${rateLimitInfo.color}`}>{rateLimitInfo.message}</p>
           </div>
 
           {/* Limit Days */}
@@ -230,11 +221,7 @@ export const BulkScheduleDialog = ({
               <Label htmlFor="limit-days-toggle" className="text-sm font-medium">
                 Ogranicz do określonej liczby dni
               </Label>
-              <Switch
-                id="limit-days-toggle"
-                checked={useLimitDays}
-                onCheckedChange={setUseLimitDays}
-              />
+              <Switch id="limit-days-toggle" checked={useLimitDays} onCheckedChange={setUseLimitDays} />
             </div>
             {useLimitDays && (
               <Input
@@ -253,11 +240,7 @@ export const BulkScheduleDialog = ({
               <Label htmlFor="start-time-toggle" className="text-sm font-medium">
                 Ustaw godzinę pierwszej publikacji
               </Label>
-              <Switch
-                id="start-time-toggle"
-                checked={useStartTime}
-                onCheckedChange={setUseStartTime}
-              />
+              <Switch id="start-time-toggle" checked={useStartTime} onCheckedChange={setUseStartTime} />
             </div>
             {useStartTime && (
               <div className="flex gap-2 items-center">
@@ -266,7 +249,7 @@ export const BulkScheduleDialog = ({
                   min={0}
                   max={23}
                   value={startTimeHour}
-                  onChange={(e) => setStartTimeHour(e.target.value.padStart(2, '0'))}
+                  onChange={(e) => setStartTimeHour(e.target.value.padStart(2, "0"))}
                   className="w-20"
                   placeholder="GG"
                 />
@@ -276,7 +259,7 @@ export const BulkScheduleDialog = ({
                   min={0}
                   max={59}
                   value={startTimeMinute}
-                  onChange={(e) => setStartTimeMinute(e.target.value.padStart(2, '0'))}
+                  onChange={(e) => setStartTimeMinute(e.target.value.padStart(2, "0"))}
                   className="w-20"
                   placeholder="MM"
                 />
@@ -306,14 +289,14 @@ export const BulkScheduleDialog = ({
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Okres publikacji:</span>
-                <span className="font-bold">{totalDays} {totalDays === 1 ? 'dzień' : 'dni'}</span>
+                <span className="font-bold">
+                  {totalDays} {totalDays === 1 ? "dzień" : "dni"}
+                </span>
               </div>
               <div className="flex justify-between col-span-2">
                 <span className="text-muted-foreground">Pierwsza publikacja:</span>
                 <span className="font-bold">
-                  {useStartTime 
-                    ? format(getStartDateTime(), "dd.MM.yyyy 'o' HH:mm", { locale: pl })
-                    : "Natychmiast"}
+                  {useStartTime ? format(getStartDateTime(), "dd.MM.yyyy 'o' HH:mm", { locale: pl }) : "Natychmiast"}
                 </span>
               </div>
               <div className="flex justify-between col-span-2">
@@ -324,7 +307,7 @@ export const BulkScheduleDialog = ({
           </div>
 
           <p className="text-xs text-muted-foreground">
-            {useStartTime 
+            {useStartTime
               ? `Pierwsza książka zostanie opublikowana jutro o ${startTimeHour}:${startTimeMinute}, kolejne co ${actualInterval} minut.`
               : `Pierwsza książka zostanie opublikowana natychmiast, kolejne co ${actualInterval} minut.`}
           </p>
