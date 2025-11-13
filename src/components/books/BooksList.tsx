@@ -11,6 +11,7 @@ import { useState, useEffect } from "react";
 import { ScheduleDialog } from "./ScheduleDialog";
 import { BulkScheduleDialog } from "./BulkScheduleDialog";
 import { XPostPreviewDialog } from "./XPostPreviewDialog";
+import { PublicationMonitor } from "./PublicationMonitor";
 import type { Tables } from "@/integrations/supabase/types";
 
 type SortColumn = "code" | "title" | "stock_status" | "sale_price" | "published";
@@ -175,6 +176,7 @@ export const BooksList = () => {
       queryClient.invalidateQueries({
         queryKey: ["books"]
       });
+      queryClient.invalidateQueries({ queryKey: ["today-publication-stats"] });
       const {
         summary
       } = data;
@@ -250,6 +252,7 @@ export const BooksList = () => {
       queryClient.invalidateQueries({
         queryKey: ["books"]
       });
+      queryClient.invalidateQueries({ queryKey: ["today-publication-stats"] });
       toast({
         title: "Zapisano",
         description: "Harmonogram publikacji został zaktualizowany"
@@ -265,23 +268,38 @@ export const BooksList = () => {
   });
   const bulkScheduleMutation = useMutation({
     mutationFn: async ({
-      intervalMinutes
+      intervalMinutes,
+      limitDays,
+      startTime
     }: {
       intervalMinutes: number;
+      limitDays?: number;
+      startTime?: Date;
     }) => {
       // Fetch ALL unpublished books from database
       const { data: allBooks, error: fetchError } = await supabase
         .from("books")
         .select("*")
-        .eq("published", false);
+        .eq("published", false)
+        .order("code", { ascending: true });
 
       if (fetchError) throw fetchError;
 
-      const unpublishedBooks = allBooks || [];
+      let unpublishedBooks = allBooks || [];
+
+      // Calculate how many books to schedule based on posts per day and limit days
+      if (limitDays) {
+        const postsPerDay = Math.floor((24 * 60) / intervalMinutes);
+        const maxBooks = postsPerDay * limitDays;
+        unpublishedBooks = unpublishedBooks.slice(0, maxBooks);
+      }
+
+      // Determine start time
+      const baseTime = startTime || new Date();
 
       // Schedule each book with increasing time intervals
       const updates = unpublishedBooks.map((book, index) => {
-        const scheduledAt = new Date();
+        const scheduledAt = new Date(baseTime);
         scheduledAt.setMinutes(scheduledAt.getMinutes() + intervalMinutes * index);
         return supabase.from("books").update({
           scheduled_publish_at: scheduledAt.toISOString(),
@@ -300,6 +318,7 @@ export const BooksList = () => {
         queryKey: ["books"]
       });
       queryClient.invalidateQueries({ queryKey: ["books-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["today-publication-stats"] });
       toast({
         title: "✅ Zaplanowano publikacje",
         description: `${count} książek zostanie opublikowanych automatycznie`
@@ -320,9 +339,11 @@ export const BooksList = () => {
       autoPublishEnabled
     });
   };
-  const handleBulkSchedule = (intervalMinutes: number) => {
+  const handleBulkSchedule = (intervalMinutes: number, limitDays?: number, startTime?: Date) => {
     bulkScheduleMutation.mutate({
-      intervalMinutes
+      intervalMinutes,
+      limitDays,
+      startTime
     });
   };
   const cancelAllScheduledMutation = useMutation({
@@ -359,6 +380,7 @@ export const BooksList = () => {
     onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ["books"] });
       queryClient.invalidateQueries({ queryKey: ["books-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["today-publication-stats"] });
       toast({
         title: "✅ Anulowano publikacje",
         description: `Anulowano ${count} zaplanowanych publikacji`
@@ -516,7 +538,10 @@ export const BooksList = () => {
 
   const unpublishedCount = countsData?.unpublished || 0;
   const scheduledCount = countsData?.scheduled || 0;
-  return <Card>
+  return (
+    <>
+      <PublicationMonitor />
+      <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Lista książek</CardTitle>
         <div className="flex gap-2">
@@ -808,5 +833,7 @@ export const BooksList = () => {
         open={previewDialogOpen}
         onOpenChange={setPreviewDialogOpen}
       />
-    </Card>;
+    </Card>
+    </>
+  );
 };
