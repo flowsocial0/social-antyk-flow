@@ -59,6 +59,23 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
           product_url: 'https://sklep.antyk.org.pl',
           template_type: 'text'
         });
+
+        // If this is a sales post with a book reference, update the book's campaign counter
+        if (post.type === 'sales' && (post as any).bookId) {
+          const { data: bookData } = await supabase
+            .from('books')
+            .select('campaign_post_count')
+            .eq('id', (post as any).bookId)
+            .single();
+
+          await supabase
+            .from('books')
+            .update({
+              campaign_post_count: (bookData?.campaign_post_count || 0) + 1,
+              last_campaign_date: new Date().toISOString()
+            })
+            .eq('id', (post as any).bookId);
+        }
       }
 
       toast.success(`Zaplanowano ${localPosts.length} postów!`, {

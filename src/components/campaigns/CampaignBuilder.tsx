@@ -10,6 +10,7 @@ export type CampaignPost = {
   category: string;
   text: string;
   scheduledAt: string;
+  bookId?: string | null;
 };
 
 export type CampaignConfig = {

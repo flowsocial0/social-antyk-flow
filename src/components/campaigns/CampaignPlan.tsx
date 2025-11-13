@@ -75,7 +75,8 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
           type: post.type,
           category: post.category,
           text: post.text,
-          scheduledAt: postDate.toISOString()
+          scheduledAt: postDate.toISOString(),
+          bookId: post.bookId || null
         });
       });
 

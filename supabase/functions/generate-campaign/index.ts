@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -51,12 +52,12 @@ async function generateCampaignStructure(body: any, apiKey: string) {
   
   console.log("Generating campaign structure:", { totalPosts, contentPosts, salesPosts });
 
-  const systemPrompt = `Jesteś ekspertem od strategii content marketingu dla księgarni. 
-Twoim zadaniem jest stworzyć optymalny plan kampanii zgodnie z zasadą 80/20 (80% wartościowy content, 20% sprzedaż).
+  const systemPrompt = `Jesteś ekspertem od strategii content marketingu dla księgarni patriotycznej. 
+Twoim zadaniem jest stworzyć optymalny plan kampanii zgodnie z zasadą 80/20 (80% wartościowy content patriotyczny, 20% sprzedaż książek).
 
 Zasady:
 - Równomierne rozłożenie postów sprzedażowych w czasie (nie grupuj ich razem)
-- Różnorodność kategorii contentowych (ciekawostki, zagadki, wydarzenia)
+- Różnorodność kategorii contentowych patriotycznych (ciekawostki historyczne, zagadki, rocznice)
 - Strategiczne umieszczenie postów sprzedażowych (np. po ciekawych contentach)
 - Balansowanie typów postów dzień po dniu`;
 
@@ -66,10 +67,10 @@ Rozkład:
 - ${contentPosts} postów contentowych (80%)
 - ${salesPosts} postów sprzedażowych (20%)
 
-Dla postów contentowych użyj tych kategorii:
-- "trivia" (ciekawostki literackie)
-- "quiz" (zagadki, pytania quizowe)
-- "event" (wydarzenia literackie, rocznice)
+Dla postów contentowych użyj tych kategorii patriotycznych:
+- "trivia" (ciekawostki o polskich bohaterach, historii, literaturze patriotycznej)
+- "quiz" (zagadki o polskiej historii, symbolach narodowych)
+- "event" (polskie rocznice, święta narodowe, ważne wydarzenia historyczne)
 
 Dla postów sprzedażowych użyj kategorii:
 - "sales" (promocje książek)
@@ -137,14 +138,37 @@ async function generatePostsContent(body: any, apiKey: string) {
   
   console.log("Generating content for posts:", structure.length);
 
+  // Initialize Supabase client
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  // Get available books for sales posts
+  const salesPostsCount = structure.filter((item: any) => item.type === 'sales').length;
+  const { data: availableBooks, error: booksError } = await supabase
+    .from('books')
+    .select('id, title, description, sale_price, promotional_price, product_url, campaign_post_count')
+    .eq('is_product', true)
+    .order('campaign_post_count', { ascending: true })
+    .order('last_campaign_date', { ascending: true, nullsFirst: true })
+    .limit(salesPostsCount);
+
+  if (booksError) {
+    console.error("Error fetching books:", booksError);
+    throw new Error("Failed to fetch books for campaign");
+  }
+
+  console.log(`Found ${availableBooks?.length || 0} available books for ${salesPostsCount} sales posts`);
+
   const categoryPrompts: Record<string, string> = {
-    'trivia': 'Stwórz fascynującą ciekawostkę literacką. Powinna być krótka (max 240 znaków), interesująca i angażująca. Zakończ linkiem do sklepu: https://sklep.antyk.org.pl',
-    'quiz': 'Stwórz intrygującą zagadkę lub pytanie quizowe o książkach/literaturze. Zachęć do interakcji (max 240 znaków). Zakończ linkiem: https://sklep.antyk.org.pl',
-    'event': 'Napisz o wydarzeniu literackim, rocznicy lub święcie związanym z książkami (max 240 znaków). Zakończ linkiem: https://sklep.antyk.org.pl',
-    'sales': 'Stwórz atrakcyjny post promocyjny o książkach w księgarni Antyk. Zachęć do zakupu (max 240 znaków). Link: https://sklep.antyk.org.pl'
+    'trivia': 'Stwórz fascynującą ciekawostkę o polskiej historii, literaturze patriotycznej lub bohaterach narodowych. Powinna być krótka (max 240 znaków), inspirująca i budująca dumę narodową. Zakończ linkiem: https://sklep.antyk.org.pl',
+    'quiz': 'Stwórz intrygującą zagadkę o polskiej historii, symbolach narodowych lub ważnych wydarzeniach. Zachęć do interakcji (max 240 znaków). Zakończ linkiem: https://sklep.antyk.org.pl',
+    'event': 'Napisz o polskiej rocznicy, święcie narodowym lub ważnym wydarzeniu historycznym (max 240 znaków). Podkreśl znaczenie dla polskiej tożsamości. Zakończ linkiem: https://sklep.antyk.org.pl',
+    'sales': 'Promocja konkretnej książki - szczegóły zostaną dodane dynamicznie'
   };
 
   const posts = [];
+  let salesBookIndex = 0;
   
   // Generate posts in batches of 5 to avoid rate limits
   const batchSize = 5;
@@ -152,7 +176,26 @@ async function generatePostsContent(body: any, apiKey: string) {
     const batch = structure.slice(i, i + batchSize);
     
     const batchPromises = batch.map(async (item: any) => {
-      const prompt = categoryPrompts[item.category] || categoryPrompts['trivia'];
+      let prompt = categoryPrompts[item.category] || categoryPrompts['trivia'];
+      let bookData = null;
+      
+      // For sales posts, use actual book data
+      if (item.category === 'sales' && availableBooks && salesBookIndex < availableBooks.length) {
+        bookData = availableBooks[salesBookIndex];
+        salesBookIndex++;
+        
+        const price = bookData.promotional_price || bookData.sale_price;
+        prompt = `Stwórz atrakcyjny post promocyjny o tej książce patriotycznej:
+Tytuł: ${bookData.title}
+${bookData.description ? `Opis: ${bookData.description}` : ''}
+${price ? `Cena: ${price} zł` : ''}
+
+Post powinien:
+- Być krótki (max 240 znaków ŁĄCZNIE z linkiem)
+- Podkreślać wartości patriotyczne
+- Zachęcać do zakupu
+- Kończyć się linkiem: ${bookData.product_url}`;
+      }
       
       const response = await fetch('https://api.x.ai/v1/chat/completions', {
         method: 'POST',
@@ -185,7 +228,8 @@ async function generatePostsContent(body: any, apiKey: string) {
         position: item.position,
         type: item.type,
         category: item.category,
-        text: text
+        text: text,
+        bookId: bookData?.id || null
       };
     });
 
