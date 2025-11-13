@@ -90,7 +90,7 @@ Przykład: [{"position":1,"type":"content","category":"trivia"},{"position":2,"t
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'grok-2-1212',
+      model: 'grok-4-fast-reasoning',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
@@ -161,7 +161,7 @@ async function generatePostsContent(body: any, apiKey: string) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'grok-2-1212',
+          model: 'grok-4-fast-reasoning',
           messages: [
             { 
               role: 'system', 
@@ -285,7 +285,7 @@ Zwróć TYLKO tablicę JSON z postami w formacie:
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'grok-2-1212',
+      model: 'grok-4-fast-reasoning',
       messages: [
         {
           role: 'system',
