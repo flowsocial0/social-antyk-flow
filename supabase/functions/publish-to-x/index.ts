@@ -254,6 +254,46 @@ async function uploadMedia(imageUrl?: string, opts?: { arrayBuffer?: ArrayBuffer
   return mediaId;
 }
 
+async function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function sendTweetWithRetry(
+  tweetText: string, 
+  mediaIds?: string[], 
+  oauth2Token?: string,
+  maxRetries: number = 3
+): Promise<any> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await sendTweet(tweetText, mediaIds, oauth2Token);
+    } catch (error: any) {
+      lastError = error;
+      
+      // Check if it's a rate limit error (429)
+      if (error.message.includes('429')) {
+        if (attempt < maxRetries) {
+          // Exponential backoff: 15s, 30s, 60s
+          const waitTime = Math.min(15000 * Math.pow(2, attempt), 60000);
+          console.log(`Rate limited (429). Waiting ${waitTime/1000}s before retry ${attempt + 1}/${maxRetries}...`);
+          await sleep(waitTime);
+          continue;
+        } else {
+          console.error('Max retries reached for rate limit error');
+          throw new Error(`Twitter rate limit exceeded. Please wait a few minutes before trying again.`);
+        }
+      }
+      
+      // For other errors, don't retry
+      throw error;
+    }
+  }
+  
+  throw lastError || new Error('Failed to send tweet after retries');
+}
+
 async function sendTweet(tweetText: string, mediaIds?: string[], oauth2Token?: string): Promise<any> {
   const url = `${BASE_URL}/tweets`;
   const method = "POST";
@@ -453,8 +493,8 @@ Deno.serve(async (req) => {
           console.error("Failed to upload media, continuing without image:", error);
         }
 
-        // Send tweet
-        const tweetResponse = await sendTweet(tweetText, mediaIds, oauth2Token ?? undefined);
+        // Send tweet with retry logic for rate limiting
+        const tweetResponse = await sendTweetWithRetry(tweetText, mediaIds, oauth2Token ?? undefined);
         console.log("Tweet sent successfully:", tweetResponse);
 
         // Update book as published
