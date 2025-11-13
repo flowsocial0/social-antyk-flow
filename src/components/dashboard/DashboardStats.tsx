@@ -14,7 +14,9 @@ export const DashboardStats = () => {
         .select("*");
       if (error) throw error;
       return data;
-    }
+    },
+    staleTime: 300000, // 5 minutes
+    refetchInterval: 300000 // Refetch every 5 minutes
   });
 
   // Fetch scheduled posts (next 7 days)
@@ -35,7 +37,9 @@ export const DashboardStats = () => {
       
       if (error) throw error;
       return data;
-    }
+    },
+    staleTime: 180000, // 3 minutes
+    refetchInterval: 180000 // Refetch every 3 minutes
   });
 
   // Fetch published this month
@@ -53,7 +57,9 @@ export const DashboardStats = () => {
       
       if (error) throw error;
       return data;
-    }
+    },
+    staleTime: 300000, // 5 minutes
+    refetchInterval: 300000 // Refetch every 5 minutes
   });
 
   // Check Twitter connection
@@ -68,7 +74,9 @@ export const DashboardStats = () => {
       
       if (error) throw error;
       return data;
-    }
+    },
+    staleTime: 600000, // 10 minutes
+    refetchInterval: false // Don't auto-refetch, only on mount/focus
   });
 
   const totalBooks = books?.length || 0;

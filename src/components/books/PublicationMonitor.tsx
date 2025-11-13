@@ -42,7 +42,8 @@ export const PublicationMonitor = () => {
         minutesUntilNext
       };
     },
-    refetchInterval: 30000 // Refresh every 30 seconds
+    refetchInterval: 120000, // Refresh every 2 minutes
+    staleTime: 60000 // Consider data fresh for 1 minute
   });
 
   if (!todayStats || todayStats.totalScheduled === 0) {
