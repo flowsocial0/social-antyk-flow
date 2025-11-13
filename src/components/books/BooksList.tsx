@@ -5,13 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Loader2, Send, Calendar, Clock, ExternalLink, Eye, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Undo2, Sparkles } from "lucide-react";
+import { Loader2, Send, Calendar, ExternalLink, Eye, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Undo2, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { ScheduleDialog } from "./ScheduleDialog";
-import { BulkScheduleDialog } from "./BulkScheduleDialog";
 import { XPostPreviewDialog } from "./XPostPreviewDialog";
-import { PublicationMonitor } from "./PublicationMonitor";
 import type { Tables } from "@/integrations/supabase/types";
 
 type SortColumn = "code" | "title" | "stock_status" | "sale_price" | "published";
@@ -266,84 +264,11 @@ export const BooksList = () => {
       });
     }
   });
-  const bulkScheduleMutation = useMutation({
-    mutationFn: async ({
-      intervalMinutes,
-      limitDays,
-      startTime
-    }: {
-      intervalMinutes: number;
-      limitDays?: number;
-      startTime?: Date;
-    }) => {
-      // Fetch ALL unpublished books from database
-      const { data: allBooks, error: fetchError } = await supabase
-        .from("books")
-        .select("*")
-        .eq("published", false)
-        .order("code", { ascending: true });
-
-      if (fetchError) throw fetchError;
-
-      let unpublishedBooks = allBooks || [];
-
-      // Calculate how many books to schedule based on posts per day and limit days
-      if (limitDays) {
-        const postsPerDay = Math.floor((24 * 60) / intervalMinutes);
-        const maxBooks = postsPerDay * limitDays;
-        unpublishedBooks = unpublishedBooks.slice(0, maxBooks);
-      }
-
-      // Determine start time
-      const baseTime = startTime || new Date();
-
-      // Schedule each book with increasing time intervals
-      const updates = unpublishedBooks.map((book, index) => {
-        const scheduledAt = new Date(baseTime);
-        scheduledAt.setMinutes(scheduledAt.getMinutes() + intervalMinutes * index);
-        return supabase.from("books").update({
-          scheduled_publish_at: scheduledAt.toISOString(),
-          auto_publish_enabled: true
-        }).eq("id", book.id);
-      });
-      const results = await Promise.all(updates);
-      const errors = results.filter(r => r.error);
-      if (errors.length > 0) {
-        throw new Error(`Nie udało się zaplanować ${errors.length} książek`);
-      }
-      return unpublishedBooks.length;
-    },
-    onSuccess: count => {
-      queryClient.invalidateQueries({
-        queryKey: ["books"]
-      });
-      queryClient.invalidateQueries({ queryKey: ["books-counts"] });
-      queryClient.invalidateQueries({ queryKey: ["today-publication-stats"] });
-      toast({
-        title: "✅ Zaplanowano publikacje",
-        description: `${count} książek zostanie opublikowanych automatycznie`
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Błąd",
-        description: error.message || "Nie udało się zaplanować publikacji",
-        variant: "destructive"
-      });
-    }
-  });
   const handleScheduleChange = (bookId: string, scheduledAt: string | null, autoPublishEnabled: boolean) => {
     schedulePublishMutation.mutate({
       bookId,
       scheduledAt,
       autoPublishEnabled
-    });
-  };
-  const handleBulkSchedule = (intervalMinutes: number, limitDays?: number, startTime?: Date) => {
-    bulkScheduleMutation.mutate({
-      intervalMinutes,
-      limitDays,
-      startTime
     });
   };
   const cancelAllScheduledMutation = useMutation({
@@ -539,9 +464,7 @@ export const BooksList = () => {
   const unpublishedCount = countsData?.unpublished || 0;
   const scheduledCount = countsData?.scheduled || 0;
   return (
-    <>
-      <PublicationMonitor />
-      <Card>
+    <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Lista książek</CardTitle>
         <div className="flex gap-2">
@@ -573,7 +496,14 @@ export const BooksList = () => {
           >
             {generateAllAITextsMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generowanie...</> : <><Sparkles className="mr-2 h-4 w-4" />Generuj AI dla wszystkich</>}
           </Button>
-          <BulkScheduleDialog unpublishedCount={unpublishedCount} onSchedule={handleBulkSchedule} isScheduling={bulkScheduleMutation.isPending} />
+          <Button
+            variant="default"
+            onClick={() => window.location.href = '/schedule'}
+            size="sm"
+          >
+            <Calendar className="mr-2 h-4 w-4" />
+            Zaplanuj posty
+          </Button>
           <Button
             variant="outline"
             onClick={handleCancelAllScheduled}
@@ -834,6 +764,5 @@ export const BooksList = () => {
         onOpenChange={setPreviewDialogOpen}
       />
     </Card>
-    </>
   );
 };
