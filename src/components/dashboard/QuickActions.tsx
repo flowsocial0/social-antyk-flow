@@ -4,14 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Plus, Upload, Calendar, Settings, RefreshCw, Download, Sparkles } from "lucide-react";
 import { ImportCSVDialog } from "@/components/books/ImportCSVDialog";
-import { CampaignDialog } from "@/components/books/CampaignDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 export const QuickActions = () => {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [campaignDialogOpen, setCampaignDialogOpen] = useState(false);
   const navigate = useNavigate();
 
   const syncBooksMutation = useMutation({
@@ -66,9 +64,9 @@ export const QuickActions = () => {
     {
       icon: Sparkles,
       label: "Kampania AI",
-      description: "Ciekawostki, zagadki z Grok",
+      description: "Plan 80/20 z Grok AI",
       variant: "secondary" as const,
-      onClick: () => setCampaignDialogOpen(true)
+      onClick: () => navigate('/campaigns')
     },
     {
       icon: Calendar,
@@ -120,7 +118,7 @@ export const QuickActions = () => {
                   isImportAction 
                     ? () => setImportDialogOpen(true) 
                     : isCampaignAction
-                    ? () => setCampaignDialogOpen(true)
+                    ? () => navigate('/campaigns')
                     : isScheduleAction
                     ? () => navigate('/schedule')
                     : isSyncAction && action.onClick 
@@ -141,11 +139,6 @@ export const QuickActions = () => {
       <ImportCSVDialog 
         open={importDialogOpen} 
         onOpenChange={setImportDialogOpen} 
-      />
-      
-      <CampaignDialog 
-        open={campaignDialogOpen} 
-        onOpenChange={setCampaignDialogOpen}
       />
     </>
   );
