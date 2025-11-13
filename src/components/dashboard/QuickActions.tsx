@@ -2,14 +2,16 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Upload, Calendar, Settings, RefreshCw, Download } from "lucide-react";
+import { Plus, Upload, Calendar, Settings, RefreshCw, Download, Sparkles } from "lucide-react";
 import { ImportCSVDialog } from "@/components/books/ImportCSVDialog";
+import { CampaignDialog } from "@/components/books/CampaignDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 export const QuickActions = () => {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [campaignDialogOpen, setCampaignDialogOpen] = useState(false);
   const navigate = useNavigate();
 
   const syncBooksMutation = useMutation({
@@ -62,6 +64,13 @@ export const QuickActions = () => {
       variant: "secondary" as const
     },
     {
+      icon: Sparkles,
+      label: "Kampania AI",
+      description: "Ciekawostki, zagadki z Grok",
+      variant: "secondary" as const,
+      onClick: () => setCampaignDialogOpen(true)
+    },
+    {
       icon: Calendar,
       label: "Zaplanuj posty",
       description: "Zaplanuj kampanię",
@@ -99,7 +108,8 @@ export const QuickActions = () => {
           {actions.map((action, index) => {
             const Icon = action.icon;
             const isImportAction = index === 1; // "Importuj CSV" button
-            const isScheduleAction = index === 2; // "Zaplanuj posty" button
+            const isCampaignAction = index === 2; // "Kampania AI" button
+            const isScheduleAction = index === 3; // "Zaplanuj posty" button
             const isSyncAction = 'onClick' in action;
             return (
               <Button
@@ -109,6 +119,8 @@ export const QuickActions = () => {
                 onClick={
                   isImportAction 
                     ? () => setImportDialogOpen(true) 
+                    : isCampaignAction
+                    ? () => setCampaignDialogOpen(true)
                     : isScheduleAction
                     ? () => navigate('/schedule')
                     : isSyncAction && action.onClick 
@@ -129,6 +141,11 @@ export const QuickActions = () => {
       <ImportCSVDialog 
         open={importDialogOpen} 
         onOpenChange={setImportDialogOpen} 
+      />
+      
+      <CampaignDialog 
+        open={campaignDialogOpen} 
+        onOpenChange={setCampaignDialogOpen}
       />
     </>
   );

@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.generate-sales-text]
 verify_jwt = false
 
+[functions.generate-campaign]
+verify_jwt = false
+
 [functions.migrate-images-to-storage]
 verify_jwt = false
 
