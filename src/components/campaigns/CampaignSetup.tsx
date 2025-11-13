@@ -22,10 +22,16 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
     // Adjust posting times array
     const currentTimes = [...postingTimes];
     if (value > currentTimes.length) {
-      // Add more times
-      const defaultTimes = ["10:00", "14:00", "18:00", "21:00"];
+      // Add more times - generate evenly spaced times throughout the day
+      const defaultTimes = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00", "22:00"];
       for (let i = currentTimes.length; i < value; i++) {
-        currentTimes.push(defaultTimes[i] || "12:00");
+        if (i < defaultTimes.length) {
+          currentTimes.push(defaultTimes[i]);
+        } else {
+          // Generate additional times if needed
+          const hour = 8 + (i * 2) % 16; // Distribute between 8:00 and 23:00
+          currentTimes.push(`${hour.toString().padStart(2, '0')}:00`);
+        }
       }
     } else {
       // Remove excess times
@@ -82,11 +88,12 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
             <Input
               type="number"
               min={1}
-              max={4}
+              max={20}
               value={postsPerDay}
               onChange={(e) => handlePostsPerDayChange(parseInt(e.target.value) || 1)}
               className="max-w-xs"
             />
+            <p className="text-xs text-muted-foreground">Maksymalnie 20 postów dziennie</p>
           </div>
 
           {/* Start date */}
