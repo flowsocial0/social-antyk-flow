@@ -71,9 +71,9 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
           await supabase
             .from('books')
             .update({
-              campaign_post_count: (bookData?.campaign_post_count || 0) + 1,
+              campaign_post_count: ((bookData as any)?.campaign_post_count || 0) + 1,
               last_campaign_date: new Date().toISOString()
-            })
+            } as any)
             .eq('id', (post as any).bookId);
         }
       }

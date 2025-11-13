@@ -147,7 +147,7 @@ async function generatePostsContent(body: any, apiKey: string) {
   const salesPostsCount = structure.filter((item: any) => item.type === 'sales').length;
   const { data: availableBooks, error: booksError } = await supabase
     .from('books')
-    .select('id, title, description, sale_price, promotional_price, product_url, campaign_post_count')
+    .select('id, title, description, sale_price, product_url, campaign_post_count')
     .eq('is_product', true)
     .order('campaign_post_count', { ascending: true })
     .order('last_campaign_date', { ascending: true, nullsFirst: true })
@@ -184,11 +184,10 @@ async function generatePostsContent(body: any, apiKey: string) {
         bookData = availableBooks[salesBookIndex];
         salesBookIndex++;
         
-        const price = bookData.promotional_price || bookData.sale_price;
         prompt = `Stwórz atrakcyjny post promocyjny o tej książce patriotycznej:
 Tytuł: ${bookData.title}
 ${bookData.description ? `Opis: ${bookData.description}` : ''}
-${price ? `Cena: ${price} zł` : ''}
+${bookData.sale_price ? `Cena: ${bookData.sale_price} zł` : ''}
 
 Post powinien:
 - Być krótki (max 240 znaków ŁĄCZNIE z linkiem)
