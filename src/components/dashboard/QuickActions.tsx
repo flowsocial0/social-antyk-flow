@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Plus, Upload, Calendar, Settings, RefreshCw, Download } from "lucide-react";
@@ -9,6 +10,7 @@ import { toast } from "sonner";
 
 export const QuickActions = () => {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const navigate = useNavigate();
 
   const syncBooksMutation = useMutation({
     mutationFn: async () => {
@@ -97,6 +99,7 @@ export const QuickActions = () => {
           {actions.map((action, index) => {
             const Icon = action.icon;
             const isImportAction = index === 1; // "Importuj CSV" button
+            const isScheduleAction = index === 2; // "Zaplanuj posty" button
             const isSyncAction = 'onClick' in action;
             return (
               <Button
@@ -106,6 +109,8 @@ export const QuickActions = () => {
                 onClick={
                   isImportAction 
                     ? () => setImportDialogOpen(true) 
+                    : isScheduleAction
+                    ? () => navigate('/schedule')
                     : isSyncAction && action.onClick 
                     ? action.onClick 
                     : undefined
