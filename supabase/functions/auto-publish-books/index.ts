@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log('=== Starting Auto-Publish Books Job ===');
+    console.log('=== Starting Auto-Publish Job ===');
     console.log('Current time:', new Date().toISOString());
 
     // Get books that are ready to be published
@@ -43,11 +43,30 @@ Deno.serve(async (req) => {
 
     console.log(`Found ${booksToPublish?.length || 0} books ready to publish`);
 
-    if (!booksToPublish || booksToPublish.length === 0) {
+    // Get campaign posts that are ready to be published
+    const { data: campaignPostsToPublish, error: campaignFetchError } = await supabase
+      .from('campaign_posts')
+      .select(`
+        *,
+        book:books(id, code, title, image_url, sale_price, promotional_price)
+      `)
+      .eq('status', 'scheduled')
+      .lte('scheduled_at', new Date().toISOString())
+      .order('scheduled_at', { ascending: true });
+
+    if (campaignFetchError) {
+      console.error('Error fetching campaign posts:', campaignFetchError);
+      throw campaignFetchError;
+    }
+
+    console.log(`Found ${campaignPostsToPublish?.length || 0} campaign posts ready to publish`);
+
+    if ((!booksToPublish || booksToPublish.length === 0) && 
+        (!campaignPostsToPublish || campaignPostsToPublish.length === 0)) {
       return new Response(
         JSON.stringify({ 
           success: true, 
-          message: 'No books scheduled for publication',
+          message: 'No content scheduled for publication',
           published: 0 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -59,7 +78,7 @@ Deno.serve(async (req) => {
     let failCount = 0;
 
     // Publish each book
-    for (const book of booksToPublish) {
+    for (const book of booksToPublish || []) {
       console.log(`Publishing book: ${book.title} (${book.code})`);
       
       try {
@@ -71,7 +90,8 @@ Deno.serve(async (req) => {
         if (publishError) {
           console.error(`Failed to publish book ${book.id}:`, publishError);
           results.push({
-            bookId: book.id,
+            id: book.id,
+            type: 'book',
             title: book.title,
             success: false,
             error: publishError.message
@@ -80,7 +100,8 @@ Deno.serve(async (req) => {
         } else {
           console.log(`Successfully published book ${book.id}`);
           results.push({
-            bookId: book.id,
+            id: book.id,
+            type: 'book',
             title: book.title,
             success: true
           });
@@ -89,8 +110,79 @@ Deno.serve(async (req) => {
       } catch (error: any) {
         console.error(`Error publishing book ${book.id}:`, error);
         results.push({
-          bookId: book.id,
+          id: book.id,
+          type: 'book',
           title: book.title,
+          success: false,
+          error: error.message
+        });
+        failCount++;
+      }
+    }
+
+    // Publish each campaign post
+    for (const post of campaignPostsToPublish || []) {
+      console.log(`Publishing campaign post: ${post.id} (${post.category})`);
+      
+      try {
+        // Call the publish-to-x function with campaign post data
+        const { data, error: publishError } = await supabase.functions.invoke('publish-to-x', {
+          body: { 
+            campaignPostId: post.id,
+            bookId: post.book_id 
+          }
+        });
+
+        if (publishError) {
+          console.error(`Failed to publish campaign post ${post.id}:`, publishError);
+          
+          // Mark post as failed
+          await supabase
+            .from('campaign_posts')
+            .update({ status: 'failed' })
+            .eq('id', post.id);
+          
+          results.push({
+            id: post.id,
+            type: 'campaign_post',
+            title: `${post.category} - Day ${post.day}`,
+            success: false,
+            error: publishError.message
+          });
+          failCount++;
+        } else {
+          console.log(`Successfully published campaign post ${post.id}`);
+          
+          // Mark post as published
+          await supabase
+            .from('campaign_posts')
+            .update({ 
+              status: 'published',
+              published_at: new Date().toISOString()
+            })
+            .eq('id', post.id);
+          
+          results.push({
+            id: post.id,
+            type: 'campaign_post',
+            title: `${post.category} - Day ${post.day}`,
+            success: true
+          });
+          successCount++;
+        }
+      } catch (error: any) {
+        console.error(`Error publishing campaign post ${post.id}:`, error);
+        
+        // Mark post as failed
+        await supabase
+          .from('campaign_posts')
+          .update({ status: 'failed' })
+          .eq('id', post.id);
+        
+        results.push({
+          id: post.id,
+          type: 'campaign_post',
+          title: `${post.category} - Day ${post.day}`,
           success: false,
           error: error.message
         });

@@ -7,6 +7,8 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Schedule from "./pages/Schedule";
 import Campaigns from "./pages/Campaigns";
+import CampaignsNew from "./pages/CampaignsNew";
+import CampaignDetails from "./pages/CampaignDetails";
 import TwitterCallback from "./pages/TwitterCallback";
 import BookPreview from "./pages/BookPreview";
 import BookRedirect from "./pages/BookRedirect";
@@ -25,6 +27,8 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/campaigns" element={<Campaigns />} />
+          <Route path="/campaigns/new" element={<CampaignsNew />} />
+          <Route path="/campaigns/:id" element={<CampaignDetails />} />
           <Route path="/twitter-callback" element={<TwitterCallback />} />
           <Route path="/book/:id" element={<BookPreview />} />
           <Route path="/book/:id/redirect" element={<BookRedirect />} />

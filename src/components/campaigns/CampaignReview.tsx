@@ -48,17 +48,41 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
   const handleScheduleAll = async () => {
     setIsScheduling(true);
     try {
-      // Create entries in books table for scheduled posts
+      // Create campaign entry
+      const campaignName = `Kampania ${format(parseISO(config.startDate), 'dd.MM.yyyy', { locale: pl })}`;
+      const { data: campaignData, error: campaignError } = await supabase
+        .from('campaigns')
+        .insert({
+          name: campaignName,
+          description: `Kampania ${config.durationDays} dni, ${config.postsPerDay} postów dziennie`,
+          status: 'scheduled',
+          duration_days: config.durationDays,
+          posts_per_day: config.postsPerDay,
+          content_posts_count: contentPosts,
+          sales_posts_count: salesPosts,
+          start_date: config.startDate,
+          posting_times: config.postingTimes,
+        })
+        .select()
+        .single();
+
+      if (campaignError) throw campaignError;
+
+      // Create entries in campaign_posts table
       for (const post of localPosts) {
-        await supabase.from('books').insert({
-          title: `Kampania ${post.type === 'content' ? 'Content' : 'Sprzedaż'} - Dzień ${post.day}`,
-          code: `CAMPAIGN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          ai_generated_text: post.text,
-          scheduled_publish_at: post.scheduledAt,
-          auto_publish_enabled: true,
-          product_url: 'https://sklep.antyk.org.pl',
-          template_type: 'text'
+        const { error: postError } = await supabase.from('campaign_posts').insert({
+          campaign_id: campaignData.id,
+          day: post.day,
+          time: post.time,
+          type: post.type,
+          category: post.category,
+          text: post.text,
+          scheduled_at: post.scheduledAt,
+          book_id: (post as any).bookId || null,
+          status: 'scheduled'
         });
+
+        if (postError) throw postError;
 
         // If this is a sales post with a book reference, update the book's campaign counter
         if (post.type === 'sales' && (post as any).bookId) {
@@ -78,16 +102,16 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
         }
       }
 
-      toast.success(`Zaplanowano ${localPosts.length} postów!`, {
+      toast.success(`Zaplanowano kampanię z ${localPosts.length} postami!`, {
         description: "Kampania zostanie automatycznie publikowana zgodnie z harmonogramem"
       });
       
-      // Navigate to schedule page after short delay
+      // Navigate to campaign details page
       setTimeout(() => {
-        navigate('/schedule');
+        navigate(`/campaigns/${campaignData.id}`);
       }, 1500);
     } catch (error: any) {
-      console.error('Error scheduling posts:', error);
+      console.error('Error scheduling campaign:', error);
       toast.error('Błąd planowania kampanii', {
         description: error.message
       });

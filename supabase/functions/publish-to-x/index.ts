@@ -343,7 +343,7 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { bookId, bookIds, testConnection: shouldTestConnection, storageBucket, storagePath, customText } = await req.json();
+    const { bookId, bookIds, campaignPostId, testConnection: shouldTestConnection, storageBucket, storagePath, customText } = await req.json();
     
     // Fetch latest OAuth2 token once
     const oauth2Token = await getLatestOAuth2AccessToken(supabaseClient);
@@ -375,7 +375,122 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    console.log("Received request:", { bookId, bookIds });
+    console.log("Received request:", { bookId, bookIds, campaignPostId });
+
+    // Handle campaign post
+    if (campaignPostId) {
+      try {
+        // Get campaign post details
+        const { data: campaignPost, error: postError } = await supabaseClient
+          .from('campaign_posts')
+          .select(`
+            *,
+            book:books(*)
+          `)
+          .eq('id', campaignPostId)
+          .single();
+
+        if (postError) throw postError;
+        if (!campaignPost) throw new Error(`Campaign post not found: ${campaignPostId}`);
+
+        // Check if already published
+        if (campaignPost.status === 'published') {
+          console.log(`Campaign post ${campaignPostId} already published, skipping`);
+          return new Response(
+            JSON.stringify({ success: false, error: "Already published" }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Format tweet text
+        let tweetText = campaignPost.text;
+        
+        // If it's a sales post with a book, append the product URL
+        if (campaignPost.type === 'sales' && campaignPost.book?.product_url) {
+          tweetText = `${campaignPost.text}\n\n${campaignPost.book.product_url}`;
+        }
+
+        // Upload media if book has an image
+        let mediaIds: string[] = [];
+        if (campaignPost.book?.image_url || campaignPost.book?.storage_path) {
+          try {
+            if (campaignPost.book.storage_path) {
+              console.log("Uploading media from book.storage_path...");
+              const { data: storageBlob, error: storageError } = await supabaseClient.storage
+                .from('ObrazkiKsiazek')
+                .download(campaignPost.book.storage_path);
+              if (storageError) throw storageError;
+              const arrayBuffer = await storageBlob.arrayBuffer();
+              const inferType = (p: string) => {
+                const ext = p.split('.').pop()?.toLowerCase();
+                switch (ext) {
+                  case 'png': return 'image/png';
+                  case 'webp': return 'image/webp';
+                  case 'gif': return 'image/gif';
+                  case 'jpg':
+                  case 'jpeg':
+                  default: return 'image/jpeg';
+                }
+              };
+              const contentType = storageBlob.type || inferType(campaignPost.book.storage_path);
+              const mediaId = await uploadMedia(undefined, { arrayBuffer, contentType });
+              mediaIds = [mediaId];
+              console.log("Media uploaded successfully from storage_path, media_id:", mediaId);
+            } else if (campaignPost.book.image_url) {
+              console.log("Uploading media from image_url...");
+              const mediaId = await uploadMedia(campaignPost.book.image_url);
+              mediaIds = [mediaId];
+              console.log("Media uploaded successfully, media_id:", mediaId);
+            }
+          } catch (error) {
+            console.error("Failed to upload media, continuing without image:", error);
+          }
+        }
+
+        // Send tweet
+        const tweetResponse = await sendTweetWithRetry(tweetText, mediaIds, oauth2Token ?? undefined);
+        console.log("Tweet sent successfully:", tweetResponse);
+
+        // Update campaign post as published
+        const { error: updateError } = await supabaseClient
+          .from('campaign_posts')
+          .update({ 
+            status: 'published',
+            published_at: new Date().toISOString()
+          })
+          .eq('id', campaignPostId);
+
+        if (updateError) throw updateError;
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            tweetId: tweetResponse.data?.id 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+
+      } catch (error: any) {
+        console.error(`Error publishing campaign post ${campaignPostId}:`, error);
+        
+        // Mark post as failed
+        await supabaseClient
+          .from('campaign_posts')
+          .update({ status: 'failed' })
+          .eq('id', campaignPostId);
+        
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: error.message 
+          }),
+          { 
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+    }
 
     // Handle single or multiple books
     const idsToPublish = bookId ? [bookId] : bookIds;
