@@ -15,10 +15,19 @@ verify_jwt = false
 [functions.publish-to-x]
 verify_jwt = false
 
+[functions.publish-to-facebook]
+verify_jwt = false
+
 [functions.twitter-oauth-start]
 verify_jwt = false
 
 [functions.twitter-oauth-callback]
+verify_jwt = false
+
+[functions.facebook-oauth-start]
+verify_jwt = false
+
+[functions.facebook-oauth-callback]
 verify_jwt = false
 
 [functions.sync-books-from-xml]

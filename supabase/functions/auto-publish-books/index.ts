@@ -14,6 +14,15 @@ interface Book {
   promotional_price: number | null;
 }
 
+interface CampaignPost {
+  id: string;
+  text: string;
+  type: string;
+  book_id?: string;
+  scheduled_at: string;
+  platforms?: string[];
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -120,40 +129,60 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Publish each campaign post
+    // Publish each campaign post to all its target platforms
     for (const post of campaignPostsToPublish || []) {
-      console.log(`Publishing campaign post: ${post.id} (${post.category})`);
+      console.log(`Publishing campaign post ${post.id} (${post.category}) to platforms:`, post.platforms || ['x']);
       
-      try {
-        // Call the publish-to-x function with campaign post data
-        const { data, error: publishError } = await supabase.functions.invoke('publish-to-x', {
-          body: { 
-            campaignPostId: post.id,
-            bookId: post.book_id 
-          }
-        });
+      const platforms: string[] = post.platforms || ['x'];
+      const platformResults: Record<string, { success: boolean; error?: string; postId?: string }> = {};
+      let allSucceeded = true;
 
-        if (publishError) {
-          console.error(`Failed to publish campaign post ${post.id}:`, publishError);
-          
-          // Mark post as failed
-          await supabase
-            .from('campaign_posts')
-            .update({ status: 'failed' })
-            .eq('id', post.id);
-          
-          results.push({
-            id: post.id,
-            type: 'campaign_post',
-            title: `${post.category} - Day ${post.day}`,
-            success: false,
-            error: publishError.message
-          });
-          failCount++;
-        } else {
-          console.log(`Successfully published campaign post ${post.id}`);
-          
-          // Mark post as published
+      // Publish to each platform
+      for (const platform of platforms) {
+        try {
+          if (platform === 'x') {
+            const { data, error: publishError } = await supabase.functions.invoke('publish-to-x', {
+              body: { 
+                campaignPostId: post.id,
+                bookId: post.book_id 
+              }
+            });
+
+            if (publishError) {
+              throw new Error(publishError.message || 'Failed to publish to X');
+            }
+
+            platformResults[platform] = { success: true, postId: data?.postId };
+            console.log(`Successfully published to X for post ${post.id}`);
+            
+          } else if (platform === 'facebook') {
+            const { data, error: publishError } = await supabase.functions.invoke('publish-to-facebook', {
+              body: { 
+                campaignPostId: post.id,
+                bookId: post.book_id 
+              }
+            });
+
+            if (publishError) {
+              throw new Error(publishError.message || 'Failed to publish to Facebook');
+            }
+
+            platformResults[platform] = { success: true, postId: data?.postId };
+            console.log(`Successfully published to Facebook for post ${post.id}`);
+          }
+        } catch (platformError: any) {
+          console.error(`Failed to publish to ${platform} for post ${post.id}:`, platformError);
+          platformResults[platform] = { 
+            success: false, 
+            error: platformError.message || 'Unknown error' 
+          };
+          allSucceeded = false;
+        }
+      }
+
+      // Update post status based on results
+      try {
+        if (allSucceeded) {
           await supabase
             .from('campaign_posts')
             .update({ 
@@ -166,25 +195,40 @@ Deno.serve(async (req) => {
             id: post.id,
             type: 'campaign_post',
             title: `${post.category} - Day ${post.day}`,
-            success: true
+            success: true,
+            platforms: platformResults
           });
           successCount++;
+          
+        } else {
+          // Check if at least one platform succeeded
+          const anySuccess = Object.values(platformResults).some(r => r.success);
+          
+          await supabase
+            .from('campaign_posts')
+            .update({ 
+              status: anySuccess ? 'partially_published' : 'failed'
+            })
+            .eq('id', post.id);
+          
+          results.push({
+            id: post.id,
+            type: 'campaign_post',
+            title: `${post.category} - Day ${post.day}`,
+            success: false,
+            platforms: platformResults
+          });
+          failCount++;
         }
-      } catch (error: any) {
-        console.error(`Error publishing campaign post ${post.id}:`, error);
-        
-        // Mark post as failed
-        await supabase
-          .from('campaign_posts')
-          .update({ status: 'failed' })
-          .eq('id', post.id);
-        
+      } catch (updateError: any) {
+        console.error(`Failed to update campaign post ${post.id}:`, updateError);
         results.push({
           id: post.id,
           type: 'campaign_post',
           title: `${post.category} - Day ${post.day}`,
           success: false,
-          error: error.message
+          error: updateError.message || 'Failed to update status',
+          platforms: platformResults
         });
         failCount++;
       }
