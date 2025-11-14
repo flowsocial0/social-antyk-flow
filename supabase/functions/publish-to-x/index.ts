@@ -303,7 +303,8 @@ async function sendTweet(tweetText: string, mediaIds?: string[], oauth2Token?: s
     body.media = { media_ids: mediaIds };
   }
 
-  const useOAuth1 = (mediaIds && mediaIds.length > 0) || !oauth2Token;
+  // Prefer OAuth 1.0a (more reliable for posting tweets), fall back to OAuth2 only if explicitly needed
+  const useOAuth1 = true;
   console.log("Sending tweet...", { via: useOAuth1 ? 'OAuth1.0a' : 'OAuth2 Bearer' });
   console.log("Tweet body:", JSON.stringify(body));
 
