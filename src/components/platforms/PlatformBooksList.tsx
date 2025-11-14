@@ -35,37 +35,75 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
   const { data: contentData, isLoading } = useQuery({
     queryKey: ["platform-content", platform, sortColumn, sortDirection, searchQuery],
     queryFn: async () => {
+      // Fetch all books with LEFT JOIN to book_platform_content for this platform
       let query = (supabase as any)
-        .from("book_platform_content")
+        .from("books")
         .select(`
           *,
-          book:books(*)
-        `)
-        .eq("platform", platform);
+          platform_content:book_platform_content!left(*)
+        `);
 
-      if (searchQuery.trim()) {
-        // We'll need to filter by book title/code after fetching
-      }
-
-      const { data, error } = await query.order(
-        sortColumn === "published" ? "published" : `book.${sortColumn}`,
-        { ascending: sortDirection === "asc" }
-      );
+      const { data: booksData, error } = await query;
 
       if (error) throw error;
 
+      // Transform data to include platform-specific content
+      let transformedData = booksData.map((book: any) => {
+        // Find content for current platform (if exists)
+        const platformContent = book.platform_content?.find((c: any) => c.platform === platform);
+        
+        return {
+          id: platformContent?.id || `temp-${book.id}`, // temporary ID for books without content
+          book_id: book.id,
+          book: book,
+          platform: platform,
+          ai_generated_text: platformContent?.ai_generated_text || null,
+          custom_text: platformContent?.custom_text || null,
+          published: platformContent?.published || false,
+          published_at: platformContent?.published_at || null,
+          auto_publish_enabled: platformContent?.auto_publish_enabled || false,
+          scheduled_publish_at: platformContent?.scheduled_publish_at || null,
+          post_id: platformContent?.post_id || null,
+          media_urls: platformContent?.media_urls || null,
+          mentions: platformContent?.mentions || null,
+          hashtags: platformContent?.hashtags || null,
+          _hasContent: !!platformContent, // flag to know if content exists
+        };
+      });
+
       // Filter by search query if provided
       if (searchQuery.trim()) {
-        return data.filter((item: any) => {
-          const book = item.book;
+        transformedData = transformedData.filter((item: any) => {
           return (
-            book.code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            book.title?.toLowerCase().includes(searchQuery.toLowerCase())
+            item.book.code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.book.title?.toLowerCase().includes(searchQuery.toLowerCase())
           );
         });
       }
 
-      return data;
+      // Sort the data
+      transformedData.sort((a: any, b: any) => {
+        let aVal, bVal;
+        
+        if (sortColumn === "published") {
+          aVal = a.published ? 1 : 0;
+          bVal = b.published ? 1 : 0;
+        } else if (sortColumn === "code") {
+          aVal = a.book.code || "";
+          bVal = b.book.code || "";
+        } else { // title
+          aVal = a.book.title || "";
+          bVal = b.book.title || "";
+        }
+
+        if (sortDirection === "asc") {
+          return aVal > bVal ? 1 : -1;
+        } else {
+          return aVal < bVal ? 1 : -1;
+        }
+      });
+
+      return transformedData;
     },
   });
 
@@ -116,9 +154,42 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
     },
   });
 
-  const handlePublish = (contentId: string, bookId: string) => {
-    setPublishingIds((prev) => new Set(prev).add(contentId));
-    publishMutation.mutate({ contentId, bookId });
+  // Helper function to ensure content exists before actions
+  const ensureContentExists = async (bookId: string, existingContentId?: string) => {
+    if (existingContentId && !existingContentId.startsWith('temp-')) {
+      return existingContentId;
+    }
+
+    // Create new content record
+    const { data, error } = await (supabase as any)
+      .from("book_platform_content")
+      .insert({
+        book_id: bookId,
+        platform: platform,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    
+    // Invalidate queries to refresh the list
+    queryClient.invalidateQueries({ queryKey: ["platform-content"] });
+    
+    return data.id;
+  };
+
+  const handlePublish = async (contentId: string, bookId: string) => {
+    try {
+      const actualContentId = await ensureContentExists(bookId, contentId);
+      setPublishingIds((prev) => new Set(prev).add(actualContentId));
+      publishMutation.mutate({ contentId: actualContentId, bookId });
+    } catch (error) {
+      toast({
+        title: "Błąd",
+        description: "Nie udało się przygotować publikacji",
+        variant: "destructive",
+      });
+    }
   };
 
   const cancelScheduleMutation = useMutation({
@@ -150,9 +221,18 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
     setAiDialogOpen(true);
   };
 
-  const handleSchedule = (bookId: string) => {
-    setSelectedBookId(bookId);
-    setScheduleDialogOpen(true);
+  const handleSchedule = async (bookId: string, contentId: string) => {
+    try {
+      await ensureContentExists(bookId, contentId);
+      setSelectedBookId(bookId);
+      setScheduleDialogOpen(true);
+    } catch (error) {
+      toast({
+        title: "Błąd",
+        description: "Nie udało się przygotować planowania",
+        variant: "destructive",
+      });
+    }
   };
 
   const handlePreview = (bookId: string) => {
@@ -204,7 +284,8 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
           ai_generated_text: data.salesText,
         };
 
-        if (content.id) {
+        // Always ensure content exists for bulk generation
+        if (content._hasContent && !content.id.startsWith('temp-')) {
           await (supabase as any)
             .from("book_platform_content")
             .update(updateData)
@@ -376,7 +457,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleSchedule(book.id)}
+                            onClick={() => handleSchedule(book.id, content.id)}
                             disabled={!content.ai_generated_text}
                           >
                             <Calendar className="h-4 w-4" />
