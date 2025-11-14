@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Calendar, Clock, ArrowRight } from "lucide-react";
+import { Calendar, Clock, ArrowRight, Plus, X, ArrowUpDown } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import type { CampaignConfig } from "./CampaignBuilder";
@@ -96,17 +96,50 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
     setPostingTimes(newTimes);
   };
 
+  const addPostingTime = () => {
+    const lastTime = postingTimes[postingTimes.length - 1];
+    const [hours, minutes] = lastTime.split(':').map(Number);
+    const newHour = (hours + 2) % 24;
+    const newTime = `${newHour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    setPostingTimes([...postingTimes, newTime]);
+    setPostsPerDay(postingTimes.length + 1);
+  };
+
+  const removePostingTime = (index: number) => {
+    if (postingTimes.length > 1) {
+      const newTimes = postingTimes.filter((_, i) => i !== index);
+      setPostingTimes(newTimes);
+      setPostsPerDay(newTimes.length);
+    }
+  };
+
+  const sortPostingTimes = () => {
+    const sorted = [...postingTimes].sort((a, b) => {
+      const [aHours, aMinutes] = a.split(':').map(Number);
+      const [bHours, bMinutes] = b.split(':').map(Number);
+      return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
+    });
+    setPostingTimes(sorted);
+  };
+
   const totalPosts = durationDays * postsPerDay;
   const contentPosts = Math.floor(totalPosts * 0.8);
   const salesPosts = totalPosts - contentPosts;
 
   const handleSubmit = () => {
+    // Sort posting times before submitting
+    const sortedTimes = [...postingTimes].sort((a, b) => {
+      const [aHours, aMinutes] = a.split(':').map(Number);
+      const [bHours, bMinutes] = b.split(':').map(Number);
+      return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
+    });
+    
     onComplete({
       durationDays,
       postsPerDay,
       startDate,
-      startTime: postingTimes[0],
-      postingTimes,
+      startTime: sortedTimes[0],
+      postingTimes: sortedTimes,
       targetPlatforms
     });
   };
@@ -160,19 +193,55 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
 
           {/* Posting times */}
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Godziny publikacji
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Godziny publikacji
+              </Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={sortPostingTimes}
+                  className="gap-1"
+                >
+                  <ArrowUpDown className="h-3 w-3" />
+                  Sortuj
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addPostingTime}
+                  className="gap-1"
+                >
+                  <Plus className="h-3 w-3" />
+                  Dodaj
+                </Button>
+              </div>
+            </div>
             <div className="space-y-2">
               {postingTimes.map((time, index) => (
-                <Input
-                  key={index}
-                  type="time"
-                  value={time}
-                  onChange={(e) => handleTimeChange(index, e.target.value)}
-                  className="max-w-xs"
-                />
+                <div key={index} className="flex gap-2">
+                  <Input
+                    type="time"
+                    value={time}
+                    onChange={(e) => handleTimeChange(index, e.target.value)}
+                    className="max-w-xs"
+                  />
+                  {postingTimes.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removePostingTime(index)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               ))}
             </div>
           </div>
