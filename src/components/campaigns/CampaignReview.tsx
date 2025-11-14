@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { Loader2, ArrowLeft, Calendar, CheckCircle, BookOpen, TrendingUp, Edit2 } from "lucide-react";
+import { Loader2, ArrowLeft, Calendar, CheckCircle, BookOpen, TrendingUp, Edit2, Clock } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { pl } from "date-fns/locale";
 import type { CampaignPost, CampaignConfig } from "./CampaignBuilder";
@@ -105,73 +105,155 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
     return acc;
   }, {} as Record<number, CampaignPost[]>);
 
+  // Calculate date range
+  const firstPostDate = localPosts[0]?.scheduledAt ? format(parseISO(localPosts[0].scheduledAt), 'dd MMM yyyy', { locale: pl }) : '';
+  const lastPostDate = localPosts[localPosts.length - 1]?.scheduledAt ? format(parseISO(localPosts[localPosts.length - 1].scheduledAt), 'dd MMM yyyy', { locale: pl }) : '';
+
   return (
     <div className="space-y-6">
-      {/* Summary */}
       <Card className="p-6 bg-gradient-subtle border-primary/20">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-semibold">Podsumowanie kampanii</h3>
-          <Badge variant="outline" className="text-base px-4 py-1">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-foreground mb-2">Podsumowanie kampanii</h2>
+            <p className="text-muted-foreground">
+              {firstPostDate} - {lastPostDate} ({config.durationDays} dni)
+            </p>
+          </div>
+          <Badge variant="secondary" className="text-lg px-4 py-2">
             {localPosts.length} postów
           </Badge>
         </div>
-        
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center">
-              <BookOpen className="h-6 w-6 text-blue-500" />
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <Card className="p-4 bg-background/50">
+            <div className="flex items-center gap-3 mb-2">
+              <BookOpen className="w-6 h-6 text-blue-500" />
+              <span className="text-sm text-muted-foreground">Posty contentowe</span>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-blue-500">{contentPosts}</p>
-              <p className="text-sm text-muted-foreground">Posty contentowe</p>
+            <div className="text-3xl font-bold text-foreground">{contentPosts}</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {((contentPosts / localPosts.length) * 100).toFixed(0)}% kampanii
             </div>
-          </div>
+          </Card>
           
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center">
-              <TrendingUp className="h-6 w-6 text-green-500" />
+          <Card className="p-4 bg-background/50">
+            <div className="flex items-center gap-3 mb-2">
+              <TrendingUp className="w-6 h-6 text-green-500" />
+              <span className="text-sm text-muted-foreground">Posty sprzedażowe</span>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-green-500">{salesPosts}</p>
-              <p className="text-sm text-muted-foreground">Posty sprzedażowe</p>
+            <div className="text-3xl font-bold text-foreground">{salesPosts}</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {((salesPosts / localPosts.length) * 100).toFixed(0)}% kampanii
             </div>
+          </Card>
+          
+          <Card className="p-4 bg-background/50">
+            <div className="flex items-center gap-3 mb-2">
+              <Calendar className="w-6 h-6 text-purple-500" />
+              <span className="text-sm text-muted-foreground">Czas trwania</span>
+            </div>
+            <div className="text-3xl font-bold text-foreground">{config.durationDays}</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              dni kampanii
+            </div>
+          </Card>
+
+          <Card className="p-4 bg-background/50">
+            <div className="flex items-center gap-3 mb-2">
+              <Clock className="w-6 h-6 text-amber-500" />
+              <span className="text-sm text-muted-foreground">Częstotliwość</span>
+            </div>
+            <div className="text-3xl font-bold text-foreground">{config.postsPerDay}</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              postów dziennie
+            </div>
+          </Card>
+        </div>
+
+        <div className="mt-6 p-4 bg-background/30 rounded-lg">
+          <div className="text-sm font-medium text-foreground mb-2">Godziny publikacji:</div>
+          <div className="flex flex-wrap gap-2">
+            {config.postingTimes.map((time, idx) => (
+              <Badge key={idx} variant="outline" className="text-xs">
+                {time}
+              </Badge>
+            ))}
           </div>
         </div>
       </Card>
 
-      {/* Posts by day */}
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Calendar className="h-5 w-5" />
-          Harmonogram publikacji
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-bold text-foreground">Szczegółowy harmonogram</h3>
+          <Badge variant="secondary">{Object.keys(postsByDay).length} dni</Badge>
+        </div>
         
-        {Object.entries(postsByDay).map(([day, dayPosts]) => (
-          <Card key={day} className="p-4">
-            <h4 className="font-semibold mb-3 flex items-center gap-2">
-              Dzień {day}
-              <span className="text-sm text-muted-foreground font-normal">
-                ({format(parseISO(dayPosts[0].scheduledAt), 'dd MMMM yyyy', { locale: pl })})
-              </span>
-            </h4>
+        {Object.entries(postsByDay)
+          .sort(([a], [b]) => Number(a) - Number(b))
+          .map(([day, dayPosts]) => {
+            const dayDate = dayPosts[0]?.scheduledAt ? format(parseISO(dayPosts[0].scheduledAt), 'EEEE, dd MMMM yyyy', { locale: pl }) : '';
+            const dayContentPosts = dayPosts.filter(p => p.type === 'content').length;
+            const daySalesPosts = dayPosts.filter(p => p.type === 'sales').length;
             
-            <div className="space-y-3">
-              {dayPosts.map((post, idx) => {
-                const globalIndex = localPosts.findIndex(p => p === post);
-                const isEditing = editingIndex === globalIndex;
-                
-                return (
-                  <Card key={idx} className={`p-4 ${post.type === 'content' ? 'bg-blue-500/5 border-blue-500/20' : 'bg-green-500/5 border-green-500/20'}`}>
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant={post.type === 'content' ? 'secondary' : 'default'}>
-                            {post.type === 'content' ? 'Content' : 'Sprzedaż'}
-                          </Badge>
-                          <Badge variant="outline">{post.category}</Badge>
-                          <span className="text-sm text-muted-foreground">
-                            {post.time}
-                          </span>
+            return (
+              <Card key={day} className="p-5 border-primary/20">
+                <div className="flex items-start justify-between mb-4 pb-4 border-b">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Calendar className="w-5 h-5 text-primary" />
+                      <span className="text-lg font-bold text-foreground">Dzień {day}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground capitalize">{dayDate}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Badge variant="outline" className="gap-1">
+                      <BookOpen className="w-3 h-3" />
+                      {dayContentPosts}
+                    </Badge>
+                    <Badge variant="outline" className="gap-1">
+                      <TrendingUp className="w-3 h-3" />
+                      {daySalesPosts}
+                    </Badge>
+                  </div>
+                </div>
+            
+                <div className="space-y-3">
+                  {dayPosts.map((post, postIndex) => {
+                    const globalIndex = localPosts.findIndex(p => p === post);
+                    const isEditing = editingIndex === globalIndex;
+                    const postTime = post.scheduledAt ? format(parseISO(post.scheduledAt), 'HH:mm', { locale: pl }) : post.time;
+                    
+                    return (
+                      <div key={postIndex} className="p-4 bg-background rounded-lg border border-border/50 hover:border-primary/50 transition-colors">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge 
+                              variant={post.type === 'content' ? 'secondary' : 'default'}
+                              className="font-medium"
+                            >
+                              {post.type === 'content' ? '📚 Content' : '💰 Sprzedaż'}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {post.category}
+                            </Badge>
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                              <Clock className="w-3 h-3" />
+                              <span>{postTime}</span>
+                            </div>
+                            <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/20">
+                              ⏳ Zaplanowany
+                            </Badge>
+                          </div>
+                          {!isEditing && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(globalIndex)}
+                              className="shrink-0"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                         
                         {isEditing ? (
@@ -179,67 +261,72 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
                             <Textarea
                               value={editedText}
                               onChange={(e) => setEditedText(e.target.value)}
-                              rows={4}
-                              className="w-full"
+                              className="min-h-[100px]"
                             />
-                            <div className="flex gap-2">
-                              <Button size="sm" onClick={() => handleSaveEdit(globalIndex)}>
-                                Zapisz
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+                            <div className="flex gap-2 justify-end">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleCancelEdit}
+                              >
                                 Anuluj
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleSaveEdit(globalIndex)}
+                              >
+                                Zapisz
                               </Button>
                             </div>
                           </div>
                         ) : (
-                          <>
-                            <p className="text-sm whitespace-pre-wrap">{post.text}</p>
-                            <p className="text-xs text-muted-foreground mt-2">
-                              Długość: {post.text.length} znaków
+                          <div>
+                            <p className="text-sm whitespace-pre-wrap text-foreground leading-relaxed">
+                              {post.text}
                             </p>
-                          </>
+                            {(post as any).bookId && (
+                              <div className="mt-2 pt-2 border-t border-border/50">
+                                <span className="text-xs text-muted-foreground">
+                                  📖 Promowana książka: ID {(post as any).bookId.substring(0, 8)}...
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
-                      
-                      {!isEditing && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleEdit(globalIndex)}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          </Card>
-        ))}
+                    );
+                  })}
+                </div>
+              </Card>
+            );
+          })}
       </div>
 
-      {/* Actions */}
-      <div className="flex gap-3 pt-4">
-        <Button onClick={onBack} variant="outline" className="flex-1" disabled={isScheduling}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
+      <div className="flex gap-3 justify-between pt-6 border-t">
+        <Button
+          variant="outline"
+          onClick={onBack}
+          disabled={isScheduling}
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
           Wstecz
         </Button>
-        <Button 
-          onClick={handleScheduleAll} 
-          className="flex-1" 
-          size="lg"
+        
+        <Button
+          onClick={handleScheduleAll}
           disabled={isScheduling}
+          size="lg"
+          className="min-w-[200px]"
         >
           {isScheduling ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               Planowanie...
             </>
           ) : (
             <>
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Zatwierdź i zaplanuj kampanię
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Zaplanuj kampanię
             </>
           )}
         </Button>
