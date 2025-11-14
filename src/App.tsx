@@ -14,6 +14,7 @@ import TwitterCallback from "./pages/TwitterCallback";
 import BookPreview from "./pages/BookPreview";
 import BookRedirect from "./pages/BookRedirect";
 import PlatformX from "./pages/platforms/PlatformX";
+import PlatformFacebook from "./pages/platforms/PlatformFacebook";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/book/:id" element={<BookPreview />} />
           <Route path="/book/:id/redirect" element={<BookRedirect />} />
           <Route path="/platforms/x" element={<PlatformX />} />
+          <Route path="/platforms/facebook" element={<PlatformFacebook />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
