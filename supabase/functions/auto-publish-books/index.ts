@@ -14,6 +14,16 @@ interface Book {
   promotional_price: number | null;
 }
 
+interface BookPlatformContent {
+  id: string;
+  book_id: string;
+  platform: string;
+  ai_generated_text: string | null;
+  published: boolean;
+  scheduled_publish_at: string;
+  book?: Book;
+}
+
 interface CampaignPost {
   id: string;
   text: string;
@@ -36,21 +46,24 @@ Deno.serve(async (req) => {
     console.log('=== Starting Auto-Publish Job ===');
     console.log('Current time:', new Date().toISOString());
 
-    // Get books that are ready to be published
-    const { data: booksToPublish, error: fetchError } = await supabase
-      .from('books')
-      .select('*')
+    // Get book platform content that is ready to be published
+    const { data: contentToPublish, error: fetchError } = await supabase
+      .from('book_platform_content')
+      .select(`
+        *,
+        book:books(id, code, title, image_url, sale_price, promotional_price)
+      `)
       .eq('published', false)
       .eq('auto_publish_enabled', true)
       .lte('scheduled_publish_at', new Date().toISOString())
       .order('scheduled_publish_at', { ascending: true });
 
     if (fetchError) {
-      console.error('Error fetching books:', fetchError);
+      console.error('Error fetching book platform content:', fetchError);
       throw fetchError;
     }
 
-    console.log(`Found ${booksToPublish?.length || 0} books ready to publish`);
+    console.log(`Found ${contentToPublish?.length || 0} book contents ready to publish`);
 
     // Get campaign posts that are ready to be published
     const { data: campaignPostsToPublish, error: campaignFetchError } = await supabase
@@ -70,7 +83,7 @@ Deno.serve(async (req) => {
 
     console.log(`Found ${campaignPostsToPublish?.length || 0} campaign posts ready to publish`);
 
-    if ((!booksToPublish || booksToPublish.length === 0) && 
+    if ((!contentToPublish || contentToPublish.length === 0) && 
         (!campaignPostsToPublish || campaignPostsToPublish.length === 0)) {
       return new Response(
         JSON.stringify({ 
@@ -86,41 +99,86 @@ Deno.serve(async (req) => {
     let successCount = 0;
     let failCount = 0;
 
-    // Publish each book
-    for (const book of booksToPublish || []) {
-      console.log(`Publishing book: ${book.title} (${book.code})`);
+    // Publish each book platform content
+    for (const content of contentToPublish || []) {
+      const book = content.book as Book;
+      console.log(`Publishing ${content.platform} content for book: ${book.title} (${book.code})`);
       
       try {
-        // Call the publish-to-x function
-        const { data, error: publishError } = await supabase.functions.invoke('publish-to-x', {
-          body: { bookId: book.id }
+        let publishFunctionName = '';
+        
+        // Determine which publish function to call based on platform
+        switch (content.platform) {
+          case 'x':
+            publishFunctionName = 'publish-to-x';
+            break;
+          case 'facebook':
+            publishFunctionName = 'publish-to-facebook';
+            break;
+          // Add more platforms as they are implemented
+          default:
+            console.error(`No publish function for platform: ${content.platform}`);
+            results.push({
+              id: content.id,
+              type: 'book_content',
+              platform: content.platform,
+              title: book.title,
+              success: false,
+              error: `Platform ${content.platform} not supported yet`
+            });
+            failCount++;
+            continue;
+        }
+
+        // Call the appropriate publish function
+        const { data, error: publishError } = await supabase.functions.invoke(publishFunctionName, {
+          body: { 
+            bookId: book.id,
+            contentId: content.id,
+            platform: content.platform
+          }
         });
 
         if (publishError) {
-          console.error(`Failed to publish book ${book.id}:`, publishError);
+          console.error(`Failed to publish ${content.platform} content ${content.id}:`, publishError);
           results.push({
-            id: book.id,
-            type: 'book',
+            id: content.id,
+            type: 'book_content',
+            platform: content.platform,
             title: book.title,
             success: false,
             error: publishError.message
           });
           failCount++;
         } else {
-          console.log(`Successfully published book ${book.id}`);
+          console.log(`Successfully published ${content.platform} content ${content.id}`);
+          
+          // Update the book_platform_content record
+          await supabase
+            .from('book_platform_content')
+            .update({
+              published: true,
+              published_at: new Date().toISOString(),
+              post_id: data?.postId
+            })
+            .eq('id', content.id);
+
           results.push({
-            id: book.id,
-            type: 'book',
+            id: content.id,
+            type: 'book_content',
+            platform: content.platform,
             title: book.title,
-            success: true
+            success: true,
+            postId: data?.postId
           });
           successCount++;
         }
       } catch (error: any) {
-        console.error(`Error publishing book ${book.id}:`, error);
+        console.error(`Error publishing ${content.platform} content ${content.id}:`, error);
         results.push({
-          id: book.id,
-          type: 'book',
+          id: content.id,
+          type: 'book_content',
+          platform: content.platform,
           title: book.title,
           success: false,
           error: error.message
@@ -129,112 +187,77 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Publish each campaign post to all its target platforms
+    // Publish campaign posts
     for (const post of campaignPostsToPublish || []) {
-      console.log(`Publishing campaign post ${post.id} (${post.category}) to platforms:`, post.platforms || ['x']);
+      console.log(`Publishing campaign post: ${post.id}`);
       
-      const platforms: string[] = post.platforms || ['x'];
-      const platformResults: Record<string, { success: boolean; error?: string; postId?: string }> = {};
-      let allSucceeded = true;
-
-      // Publish to each platform
-      for (const platform of platforms) {
-        try {
-          if (platform === 'x') {
-            const { data, error: publishError } = await supabase.functions.invoke('publish-to-x', {
-              body: { 
-                campaignPostId: post.id,
-                bookId: post.book_id 
-              }
-            });
-
-            if (publishError) {
-              throw new Error(publishError.message || 'Failed to publish to X');
-            }
-
-            platformResults[platform] = { success: true, postId: data?.postId };
-            console.log(`Successfully published to X for post ${post.id}`);
-            
-          } else if (platform === 'facebook') {
-            const { data, error: publishError } = await supabase.functions.invoke('publish-to-facebook', {
-              body: { 
-                campaignPostId: post.id,
-                bookId: post.book_id 
-              }
-            });
-
-            if (publishError) {
-              throw new Error(publishError.message || 'Failed to publish to Facebook');
-            }
-
-            platformResults[platform] = { success: true, postId: data?.postId };
-            console.log(`Successfully published to Facebook for post ${post.id}`);
-          }
-        } catch (platformError: any) {
-          console.error(`Failed to publish to ${platform} for post ${post.id}:`, platformError);
-          platformResults[platform] = { 
-            success: false, 
-            error: platformError.message || 'Unknown error' 
-          };
-          allSucceeded = false;
-        }
-      }
-
-      // Update post status based on results
       try {
-        if (allSucceeded) {
-          await supabase
-            .from('campaign_posts')
-            .update({ 
-              status: 'published',
-              published_at: new Date().toISOString()
-            })
-            .eq('id', post.id);
+        const platforms = post.platforms || ['x'];
+        
+        for (const platform of platforms) {
+          let publishFunctionName = '';
           
-          results.push({
-            id: post.id,
-            type: 'campaign_post',
-            title: `${post.category} - Day ${post.day}`,
-            success: true,
-            platforms: platformResults
+          switch (platform) {
+            case 'x':
+              publishFunctionName = 'publish-to-x';
+              break;
+            case 'facebook':
+              publishFunctionName = 'publish-to-facebook';
+              break;
+            default:
+              console.error(`No publish function for platform: ${platform}`);
+              continue;
+          }
+
+          const { data, error: publishError } = await supabase.functions.invoke(publishFunctionName, {
+            body: { 
+              campaignPostId: post.id,
+              platform: platform
+            }
           });
-          successCount++;
-          
-        } else {
-          // Check if at least one platform succeeded
-          const anySuccess = Object.values(platformResults).some(r => r.success);
-          
-          await supabase
-            .from('campaign_posts')
-            .update({ 
-              status: anySuccess ? 'partially_published' : 'failed'
-            })
-            .eq('id', post.id);
-          
-          results.push({
-            id: post.id,
-            type: 'campaign_post',
-            title: `${post.category} - Day ${post.day}`,
-            success: false,
-            platforms: platformResults
-          });
-          failCount++;
+
+          if (publishError) {
+            console.error(`Failed to publish campaign post ${post.id} to ${platform}:`, publishError);
+            failCount++;
+          } else {
+            console.log(`Successfully published campaign post ${post.id} to ${platform}`);
+            successCount++;
+          }
         }
-      } catch (updateError: any) {
-        console.error(`Failed to update campaign post ${post.id}:`, updateError);
+
+        // Update campaign post status
+        const { error: updateError } = await supabase
+          .from('campaign_posts')
+          .update({
+            status: 'published',
+            published_at: new Date().toISOString()
+          })
+          .eq('id', post.id);
+
+        if (updateError) {
+          console.error(`Error updating campaign post status:`, updateError);
+        }
+
         results.push({
           id: post.id,
           type: 'campaign_post',
-          title: `${post.category} - Day ${post.day}`,
+          platforms: platforms,
+          success: true
+        });
+
+      } catch (error: any) {
+        console.error(`Error publishing campaign post ${post.id}:`, error);
+        results.push({
+          id: post.id,
+          type: 'campaign_post',
           success: false,
-          error: updateError.message || 'Failed to update status',
-          platforms: platformResults
+          error: error.message
         });
         failCount++;
       }
     }
 
-    console.log(`=== Auto-Publish Complete ===`);
+    console.log(`=== Auto-Publish Job Complete ===`);
     console.log(`Success: ${successCount}, Failed: ${failCount}`);
 
     return new Response(
@@ -247,13 +270,15 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error: any) {
-    console.error('Error in auto-publish-books function:', error);
+  } catch (error) {
+    console.error('Error in auto-publish function:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      }),
+      {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   }
