@@ -33,6 +33,7 @@ import PlatformLocals from "./pages/platforms/PlatformLocals";
 import PlatformGab from "./pages/platforms/PlatformGab";
 import PlatformParler from "./pages/platforms/PlatformParler";
 import ScheduleOverview from "./pages/ScheduleOverview";
+import Platforms from "./pages/Platforms";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -74,6 +75,7 @@ const App = () => (
           <Route path="/platforms/gab" element={<PlatformGab />} />
           <Route path="/platforms/parler" element={<PlatformParler />} />
           <Route path="/schedule-overview" element={<ScheduleOverview />} />
+          <Route path="/platforms" element={<Platforms />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -2,12 +2,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Plus, Upload, Calendar, Settings, RefreshCw, Download, Sparkles } from "lucide-react";
+import { Plus, Upload, Calendar, Settings, RefreshCw, Download, Sparkles, Share2 } from "lucide-react";
 import { ImportCSVDialog } from "@/components/books/ImportCSVDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { getAllPlatforms } from "@/config/platforms";
 
 export const QuickActions = () => {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -49,10 +48,14 @@ export const QuickActions = () => {
     }
   });
 
-  // Get all platforms from configuration
-  const platforms = getAllPlatforms();
-
   const actions = [
+    {
+      icon: Share2,
+      label: "Platformy społecznościowe",
+      description: "Zarządzaj wszystkimi platformami",
+      variant: "default" as const,
+      onClick: () => navigate('/platforms')
+    },
     {
       icon: Plus,
       label: "Dodaj książkę",
@@ -105,29 +108,6 @@ export const QuickActions = () => {
 
   return (
     <>
-      {/* Platform Selection */}
-      <Card className="p-6 bg-gradient-card border-border/50 shadow-card">
-        <h2 className="text-xl font-semibold mb-6">Platformy społecznościowe</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 max-h-[500px] overflow-y-auto">
-          {platforms.map((platform) => {
-            const Icon = platform.icon;
-            return (
-              <Button
-                key={platform.id}
-                variant="outline"
-                className="h-auto flex-col items-center justify-center p-6 space-y-3 hover:shadow-glow transition-all duration-300 hover:border-primary/50"
-                onClick={() => navigate(platform.path)}
-              >
-                <div className={`p-3 rounded-lg bg-gradient-to-br ${platform.gradientFrom} ${platform.gradientTo}`}>
-                  <Icon className={`h-8 w-8 ${platform.color}`} />
-                </div>
-                <span className="font-semibold text-sm text-center">{platform.name}</span>
-              </Button>
-            );
-          })}
-        </div>
-      </Card>
-
       {/* Quick Actions */}
       <Card className="p-6 bg-gradient-card border-border/50 shadow-card">
         <h2 className="text-xl font-semibold mb-6">Szybkie akcje</h2>
