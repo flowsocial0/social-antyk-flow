@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Calendar, TrendingUp, CheckCircle2, Clock, Trash2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Calendar, TrendingUp, CheckCircle2, Clock, Trash2, AlertCircle, Plus } from "lucide-react";
 import { CampaignPostCard } from "@/components/campaigns/CampaignPostCard";
 import { format } from "date-fns";
 import { pl } from "date-fns/locale";
@@ -23,12 +23,39 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const CampaignDetails = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
+  const [isAddingPost, setIsAddingPost] = useState(false);
+  const [newPost, setNewPost] = useState({
+    day: 1,
+    time: "09:00",
+    type: "content" as "content" | "sales",
+    category: "trivia",
+    text: "",
+  });
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -106,6 +133,107 @@ const CampaignDetails = () => {
     },
     onError: () => {
       toast.error("Błąd podczas usuwania kampanii");
+    },
+  });
+
+  const deletePostMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      const { error } = await (supabase as any)
+        .from('campaign_posts')
+        .delete()
+        .eq('id', postId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaign-posts', id] });
+      toast.success("Post został usunięty");
+    },
+    onError: () => {
+      toast.error("Błąd podczas usuwania posta");
+    },
+  });
+
+  const regeneratePostMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      const post = posts?.find((p: any) => p.id === postId);
+      if (!post) throw new Error("Post nie został znaleziony");
+
+      const { data, error } = await supabase.functions.invoke('generate-campaign', {
+        body: {
+          action: 'generate_posts',
+          structure: [{
+            position: post.day,
+            type: post.type,
+            category: post.category,
+          }],
+        },
+      });
+
+      if (error) throw error;
+      if (!data || !data.posts || data.posts.length === 0) {
+        throw new Error("Nie udało się wygenerować tekstu");
+      }
+
+      const newText = data.posts[0].text;
+      const { error: updateError } = await (supabase as any)
+        .from('campaign_posts')
+        .update({ text: newText } as any)
+        .eq('id', postId);
+
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaign-posts', id] });
+      toast.success("Tekst został zregenerowany");
+    },
+    onError: (error: any) => {
+      console.error("Regeneration error:", error);
+      toast.error("Błąd podczas regeneracji tekstu");
+    },
+  });
+
+  const addPostMutation = useMutation({
+    mutationFn: async () => {
+      if (!campaign) throw new Error("Kampania nie została załadowana");
+      
+      // Calculate scheduled_at based on campaign start date, day and time
+      const startDate = new Date(campaign.start_date);
+      const scheduledDate = new Date(startDate);
+      scheduledDate.setDate(scheduledDate.getDate() + newPost.day - 1);
+      const [hours, minutes] = newPost.time.split(':').map(Number);
+      scheduledDate.setHours(hours, minutes, 0, 0);
+
+      const { error } = await (supabase as any)
+        .from('campaign_posts')
+        .insert({
+          campaign_id: id,
+          day: newPost.day,
+          time: newPost.time,
+          type: newPost.type,
+          category: newPost.category,
+          text: newPost.text,
+          scheduled_at: scheduledDate.toISOString(),
+          status: 'scheduled',
+          platforms: campaign.target_platforms || ['x'],
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaign-posts', id] });
+      toast.success("Post został dodany");
+      setIsAddingPost(false);
+      setNewPost({
+        day: 1,
+        time: "09:00",
+        type: "content",
+        category: "trivia",
+        text: "",
+      });
+    },
+    onError: () => {
+      toast.error("Błąd podczas dodawania posta");
     },
   });
 
@@ -278,7 +406,105 @@ const CampaignDetails = () => {
 
         {/* Posts Schedule */}
         <div className="space-y-8">
-          <h2 className="text-2xl font-semibold">Harmonogram postów</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-semibold">Harmonogram postów</h2>
+            <Dialog open={isAddingPost} onOpenChange={setIsAddingPost}>
+              <DialogTrigger asChild>
+                <Button className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Dodaj post
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Dodaj nowy post</DialogTitle>
+                  <DialogDescription>
+                    Stwórz nowy post i dodaj go do harmonogramu kampanii
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="day">Dzień kampanii</Label>
+                      <Input
+                        id="day"
+                        type="number"
+                        min={1}
+                        max={campaign.duration_days}
+                        value={newPost.day}
+                        onChange={(e) => setNewPost({ ...newPost, day: parseInt(e.target.value) })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="time">Godzina</Label>
+                      <Input
+                        id="time"
+                        type="time"
+                        value={newPost.time}
+                        onChange={(e) => setNewPost({ ...newPost, time: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="type">Typ posta</Label>
+                      <Select
+                        value={newPost.type}
+                        onValueChange={(value: "content" | "sales") => setNewPost({ ...newPost, type: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="content">Content</SelectItem>
+                          <SelectItem value="sales">Sprzedaż</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Kategoria</Label>
+                      <Select
+                        value={newPost.category}
+                        onValueChange={(value) => setNewPost({ ...newPost, category: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="trivia">Trivia</SelectItem>
+                          <SelectItem value="quiz">Quiz</SelectItem>
+                          <SelectItem value="event">Event</SelectItem>
+                          <SelectItem value="sales">Sprzedaż</SelectItem>
+                          <SelectItem value="recommendation">Rekomendacja</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="text">Treść posta</Label>
+                    <Textarea
+                      id="text"
+                      rows={8}
+                      value={newPost.text}
+                      onChange={(e) => setNewPost({ ...newPost, text: e.target.value })}
+                      placeholder="Wpisz treść posta..."
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsAddingPost(false)}>
+                    Anuluj
+                  </Button>
+                  <Button
+                    onClick={() => addPostMutation.mutate()}
+                    disabled={!newPost.text.trim() || addPostMutation.isPending}
+                  >
+                    Dodaj post
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
 
   {Object.entries(postsByDay as Record<string, any[]>).map(([day, dayPosts]) => {
     const dayDate = new Date(campaign.start_date);
@@ -297,6 +523,12 @@ const CampaignDetails = () => {
               post={post}
               onSave={async (postId, text) => {
                 await updatePostMutation.mutateAsync({ postId, text });
+              }}
+              onRegenerate={async (postId) => {
+                await regeneratePostMutation.mutateAsync(postId);
+              }}
+              onDelete={async (postId) => {
+                await deletePostMutation.mutateAsync(postId);
               }}
             />
           ))}

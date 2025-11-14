@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Edit2, Save, X, Clock, CheckCircle2, AlertCircle, BookOpen } from "lucide-react";
+import { Edit2, Save, X, Clock, CheckCircle2, AlertCircle, BookOpen, RefreshCw, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { pl } from "date-fns/locale";
 import { PlatformBadge } from "./PlatformBadge";
@@ -30,13 +30,17 @@ type CampaignPost = {
 type CampaignPostCardProps = {
   post: CampaignPost;
   onSave?: (postId: string, newText: string) => Promise<void>;
+  onRegenerate?: (postId: string) => Promise<void>;
+  onDelete?: (postId: string) => Promise<void>;
   readOnly?: boolean;
 };
 
-export const CampaignPostCard = ({ post, onSave, readOnly = false }: CampaignPostCardProps) => {
+export const CampaignPostCard = ({ post, onSave, onRegenerate, onDelete, readOnly = false }: CampaignPostCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(post.text);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleSave = async () => {
     if (!onSave) return;
@@ -54,6 +58,29 @@ export const CampaignPostCard = ({ post, onSave, readOnly = false }: CampaignPos
   const handleCancel = () => {
     setEditedText(post.text);
     setIsEditing(false);
+  };
+
+  const handleRegenerate = async () => {
+    if (!onRegenerate) return;
+    setIsRegenerating(true);
+    try {
+      await onRegenerate(post.id);
+    } catch (error) {
+      console.error("Error regenerating post:", error);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!onDelete || !confirm('Czy na pewno chcesz usunąć ten post?')) return;
+    setIsDeleting(true);
+    try {
+      await onDelete(post.id);
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      setIsDeleting(false);
+    }
   };
 
   const getStatusBadge = () => {
@@ -175,15 +202,41 @@ export const CampaignPostCard = ({ post, onSave, readOnly = false }: CampaignPos
           )}
 
           {!readOnly && post.status === 'scheduled' && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setIsEditing(true)}
-              className="gap-1"
-            >
-              <Edit2 className="h-3 w-3" />
-              Edytuj
-            </Button>
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setIsEditing(true)}
+                className="gap-1"
+              >
+                <Edit2 className="h-3 w-3" />
+                Edytuj
+              </Button>
+              {onRegenerate && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleRegenerate}
+                  disabled={isRegenerating}
+                  className="gap-1"
+                >
+                  <RefreshCw className={`h-3 w-3 ${isRegenerating ? 'animate-spin' : ''}`} />
+                  Regeneruj AI
+                </Button>
+              )}
+              {onDelete && (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="gap-1"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Usuń
+                </Button>
+              )}
+            </div>
           )}
         </div>
       )}
