@@ -222,7 +222,16 @@ Deno.serve(async (req) => {
 
           if (publishError) {
             console.error(`Failed to publish campaign post ${post.id} to ${platform}:`, publishError);
-            platformFailCount++;
+            
+            // Check if it's a rate limit error - if so, the publish function already updated the status
+            const isRateLimitError = publishError.message?.includes('429') || 
+              publishError.message?.includes('Too Many Requests') ||
+              data?.error === 'rate_limit';
+            
+            if (!isRateLimitError) {
+              platformFailCount++;
+            }
+            // For rate limit errors, don't count as failure - let the retry mechanism handle it
           } else {
             console.log(`Successfully published campaign post ${post.id} to ${platform}`);
             platformSuccessCount++;
@@ -252,8 +261,9 @@ Deno.serve(async (req) => {
             platforms: platforms,
             success: true
           });
-        } else {
-          // Mark as failed if any platform failed
+        } else if (platformFailCount > 0) {
+          // Only mark as failed if there were actual failures (not rate limits)
+          // Rate limit errors are already handled by the publish function
           const { error: updateError } = await supabase
             .from('campaign_posts')
             .update({
