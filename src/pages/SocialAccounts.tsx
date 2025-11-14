@@ -32,7 +32,7 @@ export default function SocialAccounts() {
     }
 
     // Check Facebook connection
-    const { data: fbData } = await supabase
+    const { data: fbData } = await (supabase as any)
       .from('facebook_oauth_tokens')
       .select('*')
       .order('created_at', { ascending: false })
@@ -41,7 +41,7 @@ export default function SocialAccounts() {
 
     if (fbData) {
       setFbConnected(true);
-      setFbPageName(fbData.page_name);
+      setFbPageName((fbData as any).page_name ?? null);
     }
   };
 
@@ -105,7 +105,7 @@ export default function SocialAccounts() {
 
   const disconnectFacebook = async () => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('facebook_oauth_tokens')
         .delete()
         .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
