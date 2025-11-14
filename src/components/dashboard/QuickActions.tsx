@@ -103,9 +103,10 @@ export const QuickActions = () => {
     },
     {
       icon: Calendar,
-      label: "Zaplanuj posty",
-      description: "Zaplanuj kampanię",
-      variant: "secondary" as const
+      label: "Harmonogram zbiorczy",
+      description: "Zobacz wszystkie zaplanowane posty",
+      variant: "secondary" as const,
+      onClick: () => navigate('/schedule-overview')
     },
     {
       icon: Settings,
@@ -162,7 +163,7 @@ export const QuickActions = () => {
             const Icon = action.icon;
             const isImportAction = index === 1; // "Importuj CSV" button
             const isCampaignAction = index === 2; // "Kampania AI" button
-            const isScheduleAction = index === 3; // "Zaplanuj posty" button
+            const isScheduleAction = index === 3; // "Harmonogram zbiorczy" button
             const isSyncAction = 'onClick' in action;
             return (
               <Button
@@ -172,10 +173,6 @@ export const QuickActions = () => {
                 onClick={
                   isImportAction 
                     ? () => setImportDialogOpen(true) 
-                    : isCampaignAction
-                    ? () => navigate('/campaigns')
-                    : isScheduleAction
-                    ? () => navigate('/schedule')
                     : isSyncAction && action.onClick 
                     ? action.onClick 
                     : undefined

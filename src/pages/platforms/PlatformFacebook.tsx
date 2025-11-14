@@ -6,6 +6,7 @@ import { ArrowLeft, Facebook } from "lucide-react";
 import { PlatformBooksList } from "@/components/platforms/PlatformBooksList";
 import { PlatformConnectionStatus } from "@/components/platforms/PlatformConnectionStatus";
 import { PlatformStats } from "@/components/platforms/PlatformStats";
+import { PlatformAnalytics } from "@/components/platforms/PlatformAnalytics";
 import { useToast } from "@/hooks/use-toast";
 
 const PlatformFacebook = () => {
@@ -115,6 +116,9 @@ const PlatformFacebook = () => {
         <PlatformStats 
           platform="facebook"
         />
+
+        {/* Analytics */}
+        <PlatformAnalytics platform="facebook" />
 
         {/* Books List with Facebook-specific data */}
         <PlatformBooksList 

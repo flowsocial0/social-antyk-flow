@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Search, Youtube } from "lucide-react";
 import { PlatformConnectionStatus } from "@/components/platforms/PlatformConnectionStatus";
 import { PlatformStats } from "@/components/platforms/PlatformStats";
+import { PlatformAnalytics } from "@/components/platforms/PlatformAnalytics";
 import { PlatformBooksList } from "@/components/platforms/PlatformBooksList";
 
 const PlatformYouTube = () => {
@@ -39,6 +40,9 @@ const PlatformYouTube = () => {
           <PlatformConnectionStatus platform="youtube" />
           <PlatformStats platform="youtube" />
         </div>
+
+        {/* Analytics */}
+        <PlatformAnalytics platform="youtube" />
 
         {/* Books List */}
         <PlatformBooksList

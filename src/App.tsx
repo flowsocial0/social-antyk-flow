@@ -18,6 +18,7 @@ import PlatformFacebook from "./pages/platforms/PlatformFacebook";
 import PlatformInstagram from "./pages/platforms/PlatformInstagram";
 import PlatformYouTube from "./pages/platforms/PlatformYouTube";
 import PlatformLinkedIn from "./pages/platforms/PlatformLinkedIn";
+import ScheduleOverview from "./pages/ScheduleOverview";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,6 +45,7 @@ const App = () => (
           <Route path="/platforms/instagram" element={<PlatformInstagram />} />
           <Route path="/platforms/youtube" element={<PlatformYouTube />} />
           <Route path="/platforms/linkedin" element={<PlatformLinkedIn />} />
+          <Route path="/schedule-overview" element={<ScheduleOverview />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

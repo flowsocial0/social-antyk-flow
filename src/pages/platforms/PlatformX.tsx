@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { PlatformBooksList } from "@/components/platforms/PlatformBooksList";
 import { PlatformConnectionStatus } from "@/components/platforms/PlatformConnectionStatus";
 import { PlatformStats } from "@/components/platforms/PlatformStats";
+import { PlatformAnalytics } from "@/components/platforms/PlatformAnalytics";
 
 export default function PlatformX() {
   const navigate = useNavigate();
@@ -39,6 +40,9 @@ export default function PlatformX() {
           <PlatformConnectionStatus platform="x" />
           <PlatformStats platform="x" />
         </div>
+
+        {/* Analytics */}
+        <PlatformAnalytics platform="x" />
 
         {/* Books List */}
         <Card className="p-6">

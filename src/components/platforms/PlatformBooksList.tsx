@@ -30,6 +30,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
   const [publishingIds, setPublishingIds] = useState<Set<string>>(new Set());
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false);
 
   const { data: contentData, isLoading } = useQuery({
     queryKey: ["platform-content", platform, sortColumn, sortDirection, searchQuery],
@@ -159,6 +160,80 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
     setPreviewDialogOpen(true);
   };
 
+  const handleBulkGenerateAI = async () => {
+    if (!contentData || contentData.length === 0) {
+      toast({
+        title: "Brak książek",
+        description: "Nie ma książek do wygenerowania tekstów AI",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const booksWithoutAI = contentData.filter((c: any) => !c.ai_generated_text);
+    
+    if (booksWithoutAI.length === 0) {
+      toast({
+        title: "Wszystkie książki mają teksty AI",
+        description: "Wszystkie książki już mają wygenerowane teksty AI",
+      });
+      return;
+    }
+
+    setIsBulkGenerating(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    toast({
+      title: "Rozpoczęto generowanie",
+      description: `Generowanie tekstów AI dla ${booksWithoutAI.length} książek...`,
+    });
+
+    for (const content of booksWithoutAI) {
+      try {
+        const { data, error } = await supabase.functions.invoke("generate-sales-text", {
+          body: {
+            bookData: content.book,
+            platform,
+          },
+        });
+
+        if (error) throw error;
+
+        const updateData: any = {
+          ai_generated_text: data.salesText,
+        };
+
+        if (content.id) {
+          await (supabase as any)
+            .from("book_platform_content")
+            .update(updateData)
+            .eq("id", content.id);
+        } else {
+          await (supabase as any).from("book_platform_content").insert({
+            book_id: content.book.id,
+            platform,
+            ...updateData,
+          });
+        }
+
+        successCount++;
+      } catch (error) {
+        console.error("Error generating AI text:", error);
+        errorCount++;
+      }
+    }
+
+    setIsBulkGenerating(false);
+    queryClient.invalidateQueries({ queryKey: ["platform-content"] });
+
+    toast({
+      title: "Generowanie zakończone",
+      description: `Wygenerowano: ${successCount}, Błędy: ${errorCount}`,
+      variant: errorCount > 0 ? "destructive" : "default",
+    });
+  };
+
   const selectedBook = contentData?.find((c: any) => c.book.id === selectedBookId)?.book;
   const selectedContent = contentData?.find((c: any) => c.book.id === selectedBookId);
 
@@ -173,8 +248,21 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Książki na platformie X</h2>
+        <h2 className="text-2xl font-bold">Książki</h2>
         <div className="flex items-center gap-2">
+          <Button
+            onClick={handleBulkGenerateAI}
+            disabled={isBulkGenerating}
+            variant="outline"
+            className="gap-2"
+          >
+            {isBulkGenerating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
+            Generuj AI dla wszystkich
+          </Button>
           <div className="relative">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
