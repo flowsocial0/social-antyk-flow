@@ -6,23 +6,13 @@ import { LogOut } from "lucide-react";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { QuickActions } from "@/components/dashboard/QuickActions";
-import { BooksList } from "@/components/books/BooksList";
-import { PlatformTabs } from "@/components/dashboard/PlatformTabs";
-import { XPlatformContent } from "@/components/dashboard/platforms/XPlatformContent";
-import { FacebookPlatformContent } from "@/components/dashboard/platforms/FacebookPlatformContent";
-import { InstagramPlatformContent } from "@/components/dashboard/platforms/InstagramPlatformContent";
-import { YouTubePlatformContent } from "@/components/dashboard/platforms/YouTubePlatformContent";
-import { LinkedInPlatformContent } from "@/components/dashboard/platforms/LinkedInPlatformContent";
-import { OtherPlatformsContent } from "@/components/dashboard/platforms/OtherPlatformsContent";
+import { GeneralBooksList } from "@/components/books/GeneralBooksList";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@supabase/supabase-js";
-
-type Platform = 'x' | 'facebook' | 'instagram' | 'youtube' | 'linkedin' | 'other';
 
 const Index = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform>('x');
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -66,25 +56,6 @@ const Index = () => {
     return null;
   }
 
-  const renderPlatformContent = () => {
-    switch (selectedPlatform) {
-      case 'x':
-        return <XPlatformContent />;
-      case 'facebook':
-        return <FacebookPlatformContent />;
-      case 'instagram':
-        return <InstagramPlatformContent />;
-      case 'youtube':
-        return <YouTubePlatformContent />;
-      case 'linkedin':
-        return <LinkedInPlatformContent />;
-      case 'other':
-        return <OtherPlatformsContent />;
-      default:
-        return <XPlatformContent />;
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -105,25 +76,16 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8 space-y-8">
-        {/* Stats Overview - Wspólne dla wszystkich platform */}
+        {/* Stats Overview */}
         <DashboardStats />
 
-        {/* Quick Actions - Wspólne dla wszystkich platform */}
+        {/* Quick Actions & Platform Navigation */}
         <QuickActions />
 
-        {/* Platform Switcher */}
-        <PlatformTabs 
-          selectedPlatform={selectedPlatform} 
-          onPlatformChange={setSelectedPlatform}
-        />
+        {/* General Books List */}
+        <GeneralBooksList />
 
-        {/* Platform-Specific Content */}
-        {renderPlatformContent()}
-
-        {/* Books List - Wspólne dla wszystkich platform */}
-        <BooksList />
-
-        {/* Recent Activity - Wspólne dla wszystkich platform */}
+        {/* Recent Activity */}
         <RecentActivity />
       </main>
     </div>
