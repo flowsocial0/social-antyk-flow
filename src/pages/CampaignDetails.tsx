@@ -260,12 +260,14 @@ const CampaignDetails = () => {
       const scheduledAt = new Date();
       scheduledAt.setMinutes(scheduledAt.getMinutes() + 2);
       
+      // Keep error information but update schedule and status
       const { error } = await (supabase as any)
         .from('campaign_posts')
         .update({ 
           status: 'scheduled',
           scheduled_at: scheduledAt.toISOString(),
-          published_at: null
+          published_at: null,
+          next_retry_at: null, // Clear automatic retry time since user is manually retrying
         } as any)
         .eq('id', postId);
 

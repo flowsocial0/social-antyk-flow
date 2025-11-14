@@ -4,7 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Edit2, Save, X, Clock, CheckCircle2, AlertCircle, BookOpen, RefreshCw, Trash2, Calendar, RotateCcw } from "lucide-react";
+import { Edit2, Save, X, Clock, CheckCircle2, AlertCircle, BookOpen, RefreshCw, Trash2, Calendar, RotateCcw, Info } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { format } from "date-fns";
 import { pl } from "date-fns/locale";
 import { PlatformBadge } from "./PlatformBadge";
@@ -53,6 +58,7 @@ export const CampaignPostCard = ({ post, onSave, onRegenerate, onDelete, onUpdat
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [isErrorExpanded, setIsErrorExpanded] = useState(false);
 
   const handleSave = async () => {
     if (!onSave) return;
@@ -175,9 +181,16 @@ export const CampaignPostCard = ({ post, onSave, onRegenerate, onDelete, onUpdat
   return (
     <Card className="p-4 hover:shadow-card transition-all duration-300">
       <div className="flex justify-between items-start mb-3">
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
           {getTypeBadge()}
           {getStatusBadge()}
+          {/* Subtle retry indicator */}
+          {(post.retry_count && post.retry_count > 0) && (
+            <Badge variant="outline" className="text-xs gap-1 bg-orange-500/5 text-orange-600 border-orange-500/20">
+              <RotateCcw className="h-3 w-3" />
+              Próba {post.retry_count}
+            </Badge>
+          )}
           <Badge variant="outline" className="text-xs">{post.category}</Badge>
           {/* Platform badges */}
           {platforms.map((platform) => (
@@ -263,24 +276,58 @@ export const CampaignPostCard = ({ post, onSave, onRegenerate, onDelete, onUpdat
         <div className="space-y-3">
           <p className="text-sm whitespace-pre-wrap">{post.text}</p>
           
-          {/* Error message display */}
-          {(post.status === 'rate_limited' || post.status === 'failed') && post.error_message && (
-            <div className={`p-3 rounded-lg ${
-              post.status === 'rate_limited' 
-                ? 'bg-yellow-500/10 border border-yellow-500/20' 
-                : 'bg-red-500/10 border border-red-500/20'
-            }`}>
-              <p className={`text-sm font-medium ${
-                post.status === 'rate_limited' ? 'text-yellow-600' : 'text-red-600'
+          {/* Error message display - collapsible */}
+          {(post.status === 'rate_limited' || post.status === 'failed' || (post.status === 'scheduled' && post.error_message)) && post.error_message && (
+            <Collapsible open={isErrorExpanded} onOpenChange={setIsErrorExpanded}>
+              <div className={`rounded-lg border ${
+                post.status === 'rate_limited' 
+                  ? 'bg-yellow-500/10 border-yellow-500/20' 
+                  : post.status === 'failed'
+                  ? 'bg-red-500/10 border-red-500/20'
+                  : 'bg-orange-500/10 border-orange-500/20'
               }`}>
-                {post.error_message}
-              </p>
-              {post.next_retry_at && post.status === 'rate_limited' && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Ponowna próba: {format(new Date(post.next_retry_at), "d MMMM yyyy, HH:mm", { locale: pl })}
-                </p>
-              )}
-            </div>
+                <CollapsibleTrigger className="w-full p-3 flex items-start gap-2 hover:bg-background/5 transition-colors">
+                  <Info className={`h-4 w-4 mt-0.5 flex-shrink-0 ${
+                    post.status === 'rate_limited' ? 'text-yellow-600' : 
+                    post.status === 'failed' ? 'text-red-600' : 'text-orange-600'
+                  }`} />
+                  <div className="flex-1 text-left">
+                    <p className={`text-sm font-medium ${
+                      post.status === 'rate_limited' ? 'text-yellow-600' : 
+                      post.status === 'failed' ? 'text-red-600' : 'text-orange-600'
+                    }`}>
+                      {post.status === 'scheduled' && post.retry_count ? 
+                        `Poprzednie próby publikacji (${post.retry_count}x) - kliknij by zobaczyć szczegóły` :
+                        'Kliknij by zobaczyć szczegóły błędu'
+                      }
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="text-xs">
+                    {isErrorExpanded ? '▼' : '▶'}
+                  </Badge>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="px-3 pb-3">
+                  <div className="pt-2 border-t border-current/10">
+                    <p className={`text-sm ${
+                      post.status === 'rate_limited' ? 'text-yellow-600/90' : 
+                      post.status === 'failed' ? 'text-red-600/90' : 'text-orange-600/90'
+                    }`}>
+                      {post.error_message}
+                    </p>
+                    {post.error_code && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Kod błędu: {post.error_code}
+                      </p>
+                    )}
+                    {post.next_retry_at && post.status === 'rate_limited' && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Automatyczna ponowna próba: {format(new Date(post.next_retry_at), "d MMMM yyyy, HH:mm", { locale: pl })}
+                      </p>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
           )}
 
           {post.book && (
