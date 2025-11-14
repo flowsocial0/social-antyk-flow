@@ -2,18 +2,27 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { BookOpen, Calendar, TrendingUp, Activity, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { BooksList } from "@/components/books/BooksList";
+import { PlatformTabs } from "@/components/dashboard/PlatformTabs";
+import { XPlatformContent } from "@/components/dashboard/platforms/XPlatformContent";
+import { FacebookPlatformContent } from "@/components/dashboard/platforms/FacebookPlatformContent";
+import { InstagramPlatformContent } from "@/components/dashboard/platforms/InstagramPlatformContent";
+import { YouTubePlatformContent } from "@/components/dashboard/platforms/YouTubePlatformContent";
+import { LinkedInPlatformContent } from "@/components/dashboard/platforms/LinkedInPlatformContent";
+import { OtherPlatformsContent } from "@/components/dashboard/platforms/OtherPlatformsContent";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@supabase/supabase-js";
+
+type Platform = 'x' | 'facebook' | 'instagram' | 'youtube' | 'linkedin' | 'other';
 
 const Index = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform>('x');
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -56,7 +65,28 @@ const Index = () => {
   if (!user) {
     return null;
   }
-  return <div className="min-h-screen bg-background">
+
+  const renderPlatformContent = () => {
+    switch (selectedPlatform) {
+      case 'x':
+        return <XPlatformContent />;
+      case 'facebook':
+        return <FacebookPlatformContent />;
+      case 'instagram':
+        return <InstagramPlatformContent />;
+      case 'youtube':
+        return <YouTubePlatformContent />;
+      case 'linkedin':
+        return <LinkedInPlatformContent />;
+      case 'other':
+        return <OtherPlatformsContent />;
+      default:
+        return <XPlatformContent />;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-gradient-primary shadow-sm">
         <div className="container mx-auto px-4 py-6">
@@ -75,18 +105,29 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8 space-y-8">
-        {/* Stats Overview */}
+        {/* Stats Overview - Wspólne dla wszystkich platform */}
         <DashboardStats />
 
-        {/* Quick Actions */}
+        {/* Quick Actions - Wspólne dla wszystkich platform */}
         <QuickActions />
 
-        {/* Books List */}
+        {/* Platform Switcher */}
+        <PlatformTabs 
+          selectedPlatform={selectedPlatform} 
+          onPlatformChange={setSelectedPlatform}
+        />
+
+        {/* Platform-Specific Content */}
+        {renderPlatformContent()}
+
+        {/* Books List - Wspólne dla wszystkich platform */}
         <BooksList />
 
-        {/* Recent Activity */}
+        {/* Recent Activity - Wspólne dla wszystkich platform */}
         <RecentActivity />
       </main>
-    </div>;
+    </div>
+  );
 };
+
 export default Index;
