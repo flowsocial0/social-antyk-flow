@@ -193,6 +193,8 @@ Deno.serve(async (req) => {
       
       try {
         const platforms = post.platforms || ['x'];
+        let platformSuccessCount = 0;
+        let platformFailCount = 0;
         
         for (const platform of platforms) {
           let publishFunctionName = '';
@@ -206,6 +208,7 @@ Deno.serve(async (req) => {
               break;
             default:
               console.error(`No publish function for platform: ${platform}`);
+              platformFailCount++;
               continue;
           }
 
@@ -218,35 +221,70 @@ Deno.serve(async (req) => {
 
           if (publishError) {
             console.error(`Failed to publish campaign post ${post.id} to ${platform}:`, publishError);
-            failCount++;
+            platformFailCount++;
           } else {
             console.log(`Successfully published campaign post ${post.id} to ${platform}`);
-            successCount++;
+            platformSuccessCount++;
           }
         }
 
-        // Update campaign post status
-        const { error: updateError } = await supabase
-          .from('campaign_posts')
-          .update({
-            status: 'published',
-            published_at: new Date().toISOString()
-          })
-          .eq('id', post.id);
+        // Only update status to published if ALL platforms succeeded
+        const allPlatformsSucceeded = platformSuccessCount > 0 && platformFailCount === 0;
+        
+        if (allPlatformsSucceeded) {
+          const { error: updateError } = await supabase
+            .from('campaign_posts')
+            .update({
+              status: 'published',
+              published_at: new Date().toISOString()
+            })
+            .eq('id', post.id);
 
-        if (updateError) {
-          console.error(`Error updating campaign post status:`, updateError);
+          if (updateError) {
+            console.error(`Error updating campaign post status:`, updateError);
+          }
+          
+          successCount++;
+          results.push({
+            id: post.id,
+            type: 'campaign_post',
+            platforms: platforms,
+            success: true
+          });
+        } else {
+          // Mark as failed if any platform failed
+          const { error: updateError } = await supabase
+            .from('campaign_posts')
+            .update({
+              status: 'failed'
+            })
+            .eq('id', post.id);
+
+          if (updateError) {
+            console.error(`Error updating campaign post status to failed:`, updateError);
+          }
+          
+          failCount++;
+          results.push({
+            id: post.id,
+            type: 'campaign_post',
+            platforms: platforms,
+            success: false,
+            error: `Failed to publish to ${platformFailCount} of ${platforms.length} platforms`
+          });
         }
-
-        results.push({
-          id: post.id,
-          type: 'campaign_post',
-          platforms: platforms,
-          success: true
-        });
 
       } catch (error: any) {
         console.error(`Error publishing campaign post ${post.id}:`, error);
+        
+        // Mark post as failed
+        await supabase
+          .from('campaign_posts')
+          .update({
+            status: 'failed'
+          })
+          .eq('id', post.id);
+        
         results.push({
           id: post.id,
           type: 'campaign_post',
