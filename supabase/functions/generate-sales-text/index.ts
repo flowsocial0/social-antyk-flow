@@ -6,27 +6,123 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Platform-specific configurations
+const platformConfigs = {
+  x: {
+    name: 'X (Twitter)',
+    maxChars: 280,
+    linkLength: 23,
+    style: 'krótki, dynamiczny tekst z hashtagami',
+    requirements: [
+      'Emocjonalny hook na początku',
+      'Maksymalnie 280 znaków (uwzględniając link)',
+      'Użyj emoji do zwiększenia engagement',
+      'Dodaj 1-2 relevantne hashtagi',
+      'Call-to-action (np. "Sprawdź teraz!", "Kup dziś!")'
+    ]
+  },
+  facebook: {
+    name: 'Facebook',
+    maxChars: 2000,
+    linkLength: 50,
+    style: 'dłuższy, emocjonalny storytelling',
+    requirements: [
+      'Narracyjny, emocjonalny start',
+      'Opowiedz historię lub przedstaw problem i rozwiązanie',
+      'Możesz użyć dłuższego formatu (do 500 słów)',
+      'Użyj emoji naturalnie w tekście',
+      'Zachęć do komentarzy i udostępnień',
+      'Silny call-to-action na końcu'
+    ]
+  },
+  instagram: {
+    name: 'Instagram',
+    maxChars: 2200,
+    linkLength: 0,
+    style: 'wizualny, z dużą liczbą hashtagów',
+    requirements: [
+      'Skoncentruj się na wizualnym aspekcie',
+      'Użyj wielu odpowiednich hashtagów (10-20)',
+      'Krótki, chwytliwy tekst główny',
+      'Emoji do strukturyzacji treści',
+      'Zachęć do kliknięcia linku w bio',
+      'Możesz dodać pytanie zwiększające engagement'
+    ]
+  },
+  youtube: {
+    name: 'YouTube',
+    maxChars: 5000,
+    linkLength: 100,
+    style: 'informacyjny opis z timestampami',
+    requirements: [
+      'Rozpocznij od krótkiego podsumowania',
+      'Dodaj link do produktu w pierwszych liniach',
+      'Użyj timestampów jeśli to ma sens',
+      'Dodaj relevantne hashtagi',
+      'Zachęć do subskrypcji i dzwonka',
+      'Możesz dodać dodatkowe linki i zasoby'
+    ]
+  },
+  linkedin: {
+    name: 'LinkedIn',
+    maxChars: 3000,
+    linkLength: 50,
+    style: 'profesjonalny, biznesowy ton',
+    requirements: [
+      'Profesjonalny, biznesowy ton',
+      'Podkreśl wartość edukacyjną lub biznesową',
+      'Użyj konkretnych liczb i faktów',
+      'Możesz użyć 3-5 hashtagów profesjonalnych',
+      'Call-to-action nastawiony na rozwój zawodowy',
+      'Zachęć do dyskusji w komentarzach'
+    ]
+  },
+  tiktok: {
+    name: 'TikTok',
+    maxChars: 2200,
+    linkLength: 0,
+    style: 'casualowy, młodzieżowy język',
+    requirements: [
+      'Bardzo krótki, chwytliwy tekst',
+      'Używaj młodzieżowego, casualowego języka',
+      'Dużo emoji i trendowych hashtagów',
+      'Zachęć do sprawdzenia linku w bio',
+      'Możesz użyć formatowania z emoji jako bulletów',
+      'Stwórz intrygę lub ciekawość'
+    ]
+  }
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { bookData } = await req.json();
+    const { bookData, platform = 'x' } = await req.json();
     const grokApiKey = Deno.env.get('GROK_API_KEY');
 
     if (!grokApiKey) {
       throw new Error('GROK_API_KEY not configured');
     }
 
-    console.log('Generating sales text for book:', bookData.title);
+    console.log(`Generating sales text for book: ${bookData.title} on platform: ${platform}`);
 
-    // Calculate available characters for text (280 total - link length - spacing)
-    const linkLength = bookData.product_url ? bookData.product_url.length : 23; // Twitter shortens to ~23 chars
-    const availableChars = 280 - linkLength - 4; // -4 for "\n\n" before link
+    // Get platform-specific config
+    const platformConfig = platformConfigs[platform as keyof typeof platformConfigs] || platformConfigs.x;
+    
+    // Calculate available characters
+    const linkLength = bookData.product_url ? platformConfig.linkLength : 0;
+    const spacing = linkLength > 0 ? 4 : 0; // "\n\n" before link
+    const availableChars = platformConfig.maxChars - linkLength - spacing;
 
-    // Construct a detailed prompt for Grok
-    const prompt = `Stwórz ultra skuteczny tekst sprzedażowy dla następującej książki:
+    // Build platform-specific requirements
+    const requirementsList = platformConfig.requirements
+      .map((req, idx) => `${idx + 1}. ${req}`)
+      .join('\n');
+
+    // Construct platform-specific prompt
+    const prompt = `Stwórz ultra skuteczny tekst sprzedażowy dla platformy ${platformConfig.name} dla następującej książki:
 
 Tytuł: ${bookData.title}
 Kod produktu: ${bookData.code}
@@ -34,15 +130,15 @@ ${bookData.sale_price ? `Cena promocyjna: ${bookData.sale_price} zł` : ''}
 ${bookData.description ? `Opis: ${bookData.description}` : ''}
 ${bookData.stock_status ? `Status: ${bookData.stock_status}` : ''}
 
+PLATFORMA: ${platformConfig.name}
+STYL: ${platformConfig.style}
+
 WYMAGANIA:
-- Tekst musi mieć MAKSYMALNIE ${availableChars} znaków (bo link do sklepu zostanie dodany automatycznie na końcu)
-- Musi zawierać emocjonalny hook na początku
-- Podkreślić wartość i korzyści
-- Dodać call-to-action (np. "Sprawdź teraz!", "Kup dziś!")
-- Użyć emoji do zwiększenia engagement
+${requirementsList}
+- Tekst musi mieć MAKSYMALNIE ${availableChars} znaków${linkLength > 0 ? ' (link do sklepu zostanie dodany automatycznie na końcu)' : ''}
 - Tekst w języku polskim
 - Skupić się na unikalnej wartości oferty
-- NIE dodawaj linku ani [link] - link zostanie dodany automatycznie
+- NIE dodawaj linku ani [link] - link zostanie dodany automatycznie${linkLength > 0 ? '' : ' lub będzie w bio'}
 
 Wygeneruj TYLKO tekst posta, bez żadnych dodatkowych komentarzy ani linków.`;
 
@@ -57,7 +153,7 @@ Wygeneruj TYLKO tekst posta, bez żadnych dodatkowych komentarzy ani linków.`;
         messages: [
           {
             role: 'system',
-            content: 'Jesteś ekspertem od copywritingu i sprzedaży książek. Tworzysz przekonujące, krótkie teksty sprzedażowe które generują wysoką konwersję.'
+            content: `Jesteś ekspertem od copywritingu i sprzedaży książek na ${platformConfig.name}. Tworzysz przekonujące teksty sprzedażowe które generują wysoką konwersję. Doskonale rozumiesz specyfikę ${platformConfig.name} i potrafisz dostosować styl komunikacji do tej platformy.`
           },
           {
             role: 'user',
@@ -77,12 +173,15 @@ Wygeneruj TYLKO tekst posta, bez żadnych dodatkowych komentarzy ani linków.`;
     const data = await response.json();
     const generatedText = data.choices[0].message.content.trim();
 
-    console.log('Generated sales text:', generatedText);
+    console.log(`Generated sales text for ${platform}:`, generatedText);
 
     return new Response(
       JSON.stringify({ 
         salesText: generatedText,
-        productUrl: bookData.product_url 
+        productUrl: bookData.product_url,
+        platform: platform,
+        charCount: generatedText.length,
+        maxChars: availableChars
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
