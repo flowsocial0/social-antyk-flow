@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CampaignSetup } from "./CampaignSetup";
 import { CampaignPlan } from "./CampaignPlan";
 import { CampaignReview } from "./CampaignReview";
+import { PlatformId } from "@/config/platforms";
 
 export type CampaignPost = {
   day: number;
@@ -19,7 +20,7 @@ export type CampaignConfig = {
   startDate: string;
   startTime: string;
   postingTimes: string[];
-  targetPlatforms?: ('x' | 'facebook')[];
+  targetPlatforms?: PlatformId[];
 };
 
 export const CampaignBuilder = () => {

@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { CampaignConfig } from "./CampaignBuilder";
 import { PlatformSelector } from "./PlatformSelector";
 import { useSearchParams } from "react-router-dom";
+import { PlatformId, getAllPlatforms } from "@/config/platforms";
 
 interface CampaignSetupProps {
   onComplete: (config: CampaignConfig) => void;
@@ -16,22 +17,27 @@ interface CampaignSetupProps {
 
 export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
   const [searchParams] = useSearchParams();
-  const preSelectedPlatform = searchParams.get('platform') as 'x' | 'facebook' | null;
+  const preSelectedPlatform = searchParams.get('platform') as PlatformId | null;
   
   const [durationDays, setDurationDays] = useState(7);
   const [postsPerDay, setPostsPerDay] = useState(2);
   const [startDate, setStartDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
   const [postingTimes, setPostingTimes] = useState(["10:00", "18:00"]);
-  const [targetPlatforms, setTargetPlatforms] = useState<('x' | 'facebook')[]>(
+  const [targetPlatforms, setTargetPlatforms] = useState<PlatformId[]>(
     preSelectedPlatform ? [preSelectedPlatform] : ['x']
   );
-  const [connectedPlatforms, setConnectedPlatforms] = useState({ x: false, facebook: false });
+  const [connectedPlatforms, setConnectedPlatforms] = useState<Record<PlatformId, boolean>>(
+    {} as Record<PlatformId, boolean>
+  );
 
   useEffect(() => {
     checkConnectedPlatforms();
   }, []);
 
   const checkConnectedPlatforms = async () => {
+    const platforms = getAllPlatforms();
+    const connectionStatus: Record<string, boolean> = {};
+    
     // Check X connection
     const { data: xData } = await (supabase as any)
       .from('twitter_oauth_tokens')
@@ -46,10 +52,19 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
       .limit(1)
       .maybeSingle();
 
-    setConnectedPlatforms({
-      x: !!xData,
-      facebook: !!fbData
+    // Set connection status for all platforms
+    platforms.forEach(platform => {
+      if (platform.id === 'x') {
+        connectionStatus[platform.id] = !!xData;
+      } else if (platform.id === 'facebook') {
+        connectionStatus[platform.id] = !!fbData;
+      } else {
+        // For other platforms, mark as not connected
+        connectionStatus[platform.id] = false;
+      }
     });
+
+    setConnectedPlatforms(connectionStatus as Record<PlatformId, boolean>);
   };
 
   const handlePostsPerDayChange = (value: number) => {
