@@ -3,7 +3,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Edit2, Save, X, Clock, CheckCircle2, AlertCircle, BookOpen, RefreshCw, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Edit2, Save, X, Clock, CheckCircle2, AlertCircle, BookOpen, RefreshCw, Trash2, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { pl } from "date-fns/locale";
 import { PlatformBadge } from "./PlatformBadge";
@@ -32,12 +33,17 @@ type CampaignPostCardProps = {
   onSave?: (postId: string, newText: string) => Promise<void>;
   onRegenerate?: (postId: string) => Promise<void>;
   onDelete?: (postId: string) => Promise<void>;
+  onUpdateSchedule?: (postId: string, newScheduledAt: string) => Promise<void>;
   readOnly?: boolean;
 };
 
-export const CampaignPostCard = ({ post, onSave, onRegenerate, onDelete, readOnly = false }: CampaignPostCardProps) => {
+export const CampaignPostCard = ({ post, onSave, onRegenerate, onDelete, onUpdateSchedule, readOnly = false }: CampaignPostCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingSchedule, setIsEditingSchedule] = useState(false);
   const [editedText, setEditedText] = useState(post.text);
+  const [editedSchedule, setEditedSchedule] = useState(
+    format(new Date(post.scheduled_at), "yyyy-MM-dd'T'HH:mm")
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -81,6 +87,25 @@ export const CampaignPostCard = ({ post, onSave, onRegenerate, onDelete, readOnl
       console.error("Error deleting post:", error);
       setIsDeleting(false);
     }
+  };
+
+  const handleSaveSchedule = async () => {
+    if (!onUpdateSchedule) return;
+    setIsSaving(true);
+    try {
+      const newDate = new Date(editedSchedule);
+      await onUpdateSchedule(post.id, newDate.toISOString());
+      setIsEditingSchedule(false);
+    } catch (error) {
+      console.error("Error updating schedule:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelSchedule = () => {
+    setEditedSchedule(format(new Date(post.scheduled_at), "yyyy-MM-dd'T'HH:mm"));
+    setIsEditingSchedule(false);
   };
 
   const getStatusBadge = () => {
@@ -134,9 +159,49 @@ export const CampaignPostCard = ({ post, onSave, onRegenerate, onDelete, readOnl
             <PlatformBadge key={platform} platform={platform} status={post.status as any} />
           ))}
         </div>
-        <div className="text-sm text-muted-foreground">
-          {format(new Date(post.scheduled_at), "d MMM, HH:mm", { locale: pl })}
-        </div>
+        {isEditingSchedule ? (
+          <div className="flex gap-2 items-center">
+            <Input
+              type="datetime-local"
+              value={editedSchedule}
+              onChange={(e) => setEditedSchedule(e.target.value)}
+              className="w-auto text-sm"
+            />
+            <Button
+              size="sm"
+              onClick={handleSaveSchedule}
+              disabled={isSaving}
+              className="gap-1"
+            >
+              <Save className="h-3 w-3" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleCancelSchedule}
+              disabled={isSaving}
+              className="gap-1"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <div className="text-sm text-muted-foreground">
+              {format(new Date(post.scheduled_at), "d MMM, HH:mm", { locale: pl })}
+            </div>
+            {!readOnly && post.status === 'scheduled' && onUpdateSchedule && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setIsEditingSchedule(true)}
+                className="h-6 w-6 p-0"
+              >
+                <Calendar className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {isEditing ? (

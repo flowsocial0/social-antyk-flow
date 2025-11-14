@@ -237,6 +237,24 @@ const CampaignDetails = () => {
     },
   });
 
+  const updateScheduleMutation = useMutation({
+    mutationFn: async ({ postId, scheduledAt }: { postId: string; scheduledAt: string }) => {
+      const { error } = await (supabase as any)
+        .from('campaign_posts')
+        .update({ scheduled_at: scheduledAt } as any)
+        .eq('id', postId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaign-posts', id] });
+      toast.success("Godzina publikacji zaktualizowana");
+    },
+    onError: () => {
+      toast.error("Błąd podczas aktualizacji godziny publikacji");
+    },
+  });
+
   if (campaignLoading || postsLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -529,6 +547,9 @@ const CampaignDetails = () => {
               }}
               onDelete={async (postId) => {
                 await deletePostMutation.mutateAsync(postId);
+              }}
+              onUpdateSchedule={async (postId, scheduledAt) => {
+                await updateScheduleMutation.mutateAsync({ postId, scheduledAt });
               }}
             />
           ))}
