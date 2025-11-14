@@ -227,6 +227,17 @@ export const CampaignPostCard = ({ post, onSave, onRegenerate, onDelete, onUpdat
           <div className="flex items-center gap-2">
             <div className="text-sm text-muted-foreground">
               {format(new Date(post.scheduled_at), "d MMM, HH:mm", { locale: pl })}
+              {/* Show retry info */}
+              {(post.retry_count && post.retry_count > 0) && (
+                <div className="text-xs text-orange-600 mt-1">
+                  Próby publikacji: {post.retry_count}
+                  {post.next_retry_at && post.status === 'rate_limited' && (
+                    <span className="block">
+                      Kolejna: {format(new Date(post.next_retry_at), "d MMM, HH:mm", { locale: pl })}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
             {!readOnly && post.status === 'scheduled' && onUpdateSchedule && (
               <Button
