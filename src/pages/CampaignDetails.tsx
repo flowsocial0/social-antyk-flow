@@ -43,7 +43,7 @@ const CampaignDetails = () => {
   const { data: campaign, isLoading: campaignLoading } = useQuery({
     queryKey: ['campaign', id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('campaigns')
         .select('*')
         .eq('id', id)
@@ -57,15 +57,15 @@ const CampaignDetails = () => {
 
   const { data: posts, isLoading: postsLoading } = useQuery({
     queryKey: ['campaign-posts', id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('campaign_posts')
-        .select(`
-          *,
-          book:books(id, title, image_url, product_url)
-        `)
-        .eq('campaign_id', id)
-        .order('scheduled_at', { ascending: true });
+  queryFn: async () => {
+    const { data, error } = await (supabase as any)
+      .from('campaign_posts')
+      .select(`
+        *,
+        book:books(id, title, image_url, product_url)
+      `)
+      .eq('campaign_id', id)
+      .order('scheduled_at', { ascending: true });
 
       if (error) throw error;
       return data;
@@ -74,11 +74,11 @@ const CampaignDetails = () => {
   });
 
   const updatePostMutation = useMutation({
-    mutationFn: async ({ postId, text }: { postId: string; text: string }) => {
-      const { error } = await supabase
-        .from('campaign_posts')
-        .update({ text })
-        .eq('id', postId);
+  mutationFn: async ({ postId, text }: { postId: string; text: string }) => {
+    const { error } = await (supabase as any)
+      .from('campaign_posts')
+      .update({ text } as any)
+      .eq('id', postId);
 
       if (error) throw error;
     },
@@ -92,11 +92,11 @@ const CampaignDetails = () => {
   });
 
   const deleteCampaignMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase
-        .from('campaigns')
-        .delete()
-        .eq('id', id);
+  mutationFn: async () => {
+    const { error } = await (supabase as any)
+      .from('campaigns')
+      .delete()
+      .eq('id', id);
 
       if (error) throw error;
     },
@@ -131,14 +131,14 @@ const CampaignDetails = () => {
   const progress = posts.length > 0 ? (publishedCount / posts.length) * 100 : 0;
 
   // Group posts by day
-  const postsByDay = posts.reduce((acc, post) => {
-    const day = post.day;
+  const postsByDay = (posts as any[]).reduce((acc: Record<number, any[]>, post: any) => {
+    const day = post.day as number;
     if (!acc[day]) {
       acc[day] = [];
     }
     acc[day].push(post);
     return acc;
-  }, {} as Record<number, typeof posts>);
+  }, {} as Record<number, any[]>);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -280,30 +280,30 @@ const CampaignDetails = () => {
         <div className="space-y-8">
           <h2 className="text-2xl font-semibold">Harmonogram postów</h2>
 
-          {Object.entries(postsByDay).map(([day, dayPosts]) => {
-            const dayDate = new Date(campaign.start_date);
-            dayDate.setDate(dayDate.getDate() + parseInt(day) - 1);
+  {Object.entries(postsByDay as Record<string, any[]>).map(([day, dayPosts]) => {
+    const dayDate = new Date(campaign.start_date);
+    dayDate.setDate(dayDate.getDate() + parseInt(day) - 1);
 
-            return (
-              <Card key={day} className="p-6 bg-gradient-card border-border/50">
-                <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-primary" />
-                  Dzień {day} - {format(dayDate, "EEEE, d MMMM yyyy", { locale: pl })}
-                </h3>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {dayPosts.map((post) => (
-                    <CampaignPostCard
-                      key={post.id}
-                      post={post}
-                      onSave={async (postId, text) => {
-                        await updatePostMutation.mutateAsync({ postId, text });
-                      }}
-                    />
-                  ))}
-                </div>
-              </Card>
-            );
-          })}
+    return (
+      <Card key={day} className="p-6 bg-gradient-card border-border/50">
+        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Calendar className="h-5 w-5 text-primary" />
+          Dzień {day} - {format(dayDate, "EEEE, d MMMM yyyy", { locale: pl })}
+        </h3>
+        <div className="grid gap-4 md:grid-cols-2">
+          {(dayPosts as any[]).map((post) => (
+            <CampaignPostCard
+              key={post.id}
+              post={post}
+              onSave={async (postId, text) => {
+                await updatePostMutation.mutateAsync({ postId, text });
+              }}
+            />
+          ))}
+        </div>
+      </Card>
+    );
+  })}
         </div>
       </main>
     </div>

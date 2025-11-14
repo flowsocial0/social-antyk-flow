@@ -30,7 +30,7 @@ export const CampaignsList = () => {
   const { data: campaigns, isLoading } = useQuery({
     queryKey: ['campaigns'],
     queryFn: async () => {
-      const { data: campaignsData, error: campaignsError } = await supabase
+      const { data: campaignsData, error: campaignsError } = await (supabase as any)
         .from('campaigns')
         .select('*')
         .order('created_at', { ascending: false });
@@ -40,7 +40,7 @@ export const CampaignsList = () => {
       // Fetch post counts for each campaign
       const campaignsWithCounts = await Promise.all(
         (campaignsData || []).map(async (campaign) => {
-          const { data: posts } = await supabase
+          const { data: posts } = await (supabase as any)
             .from('campaign_posts')
             .select('status')
             .eq('campaign_id', campaign.id);

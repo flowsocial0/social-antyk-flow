@@ -50,7 +50,7 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
     try {
       // Create campaign entry
       const campaignName = `Kampania ${format(parseISO(config.startDate), 'dd.MM.yyyy', { locale: pl })}`;
-      const { data: campaignData, error: campaignError } = await supabase
+      const { data: campaignData, error: campaignError } = await (supabase as any)
         .from('campaigns')
         .insert({
           name: campaignName,
@@ -63,7 +63,7 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
           start_date: config.startDate,
           posting_times: config.postingTimes,
           target_platforms: config.targetPlatforms || ['x']
-        })
+        } as any)
         .select()
         .single();
 
@@ -71,7 +71,7 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
 
       // Create entries in campaign_posts table
       for (const post of localPosts) {
-        const { error: postError } = await supabase.from('campaign_posts').insert({
+        const { error: postError } = await (supabase as any).from('campaign_posts').insert({
           campaign_id: campaignData.id,
           day: post.day,
           time: post.time,
@@ -82,7 +82,7 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
           book_id: (post as any).bookId || null,
           status: 'scheduled',
           platforms: config.targetPlatforms || ['x']
-        });
+        } as any);
 
         if (postError) throw postError;
 

@@ -27,14 +27,14 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
 
   const checkConnectedPlatforms = async () => {
     // Check X connection
-    const { data: xData } = await supabase
+    const { data: xData } = await (supabase as any)
       .from('twitter_oauth_tokens')
       .select('id')
       .limit(1)
       .maybeSingle();
 
     // Check Facebook connection
-    const { data: fbData } = await supabase
+    const { data: fbData } = await (supabase as any)
       .from('facebook_oauth_tokens')
       .select('id')
       .limit(1)
