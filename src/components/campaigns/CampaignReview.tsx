@@ -62,6 +62,7 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
           sales_posts_count: salesPosts,
           start_date: config.startDate,
           posting_times: config.postingTimes,
+          target_platforms: config.targetPlatforms || ['x']
         })
         .select()
         .single();
@@ -79,7 +80,8 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
           text: post.text,
           scheduled_at: post.scheduledAt,
           book_id: (post as any).bookId || null,
-          status: 'scheduled'
+          status: 'scheduled',
+          platforms: config.targetPlatforms || ['x']
         });
 
         if (postError) throw postError;

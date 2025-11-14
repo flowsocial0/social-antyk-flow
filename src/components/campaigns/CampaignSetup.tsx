@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Calendar, Clock, ArrowRight } from "lucide-react";
 import { format, addDays } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 import type { CampaignConfig } from "./CampaignBuilder";
+import { PlatformSelector } from "./PlatformSelector";
 
 interface CampaignSetupProps {
   onComplete: (config: CampaignConfig) => void;
@@ -16,6 +18,33 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
   const [postsPerDay, setPostsPerDay] = useState(2);
   const [startDate, setStartDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
   const [postingTimes, setPostingTimes] = useState(["10:00", "18:00"]);
+  const [targetPlatforms, setTargetPlatforms] = useState<('x' | 'facebook')[]>(['x']);
+  const [connectedPlatforms, setConnectedPlatforms] = useState({ x: false, facebook: false });
+
+  useEffect(() => {
+    checkConnectedPlatforms();
+  }, []);
+
+  const checkConnectedPlatforms = async () => {
+    // Check X connection
+    const { data: xData } = await supabase
+      .from('twitter_oauth_tokens')
+      .select('id')
+      .limit(1)
+      .maybeSingle();
+
+    // Check Facebook connection
+    const { data: fbData } = await supabase
+      .from('facebook_oauth_tokens')
+      .select('id')
+      .limit(1)
+      .maybeSingle();
+
+    setConnectedPlatforms({
+      x: !!xData,
+      facebook: !!fbData
+    });
+  };
 
   const handlePostsPerDayChange = (value: number) => {
     setPostsPerDay(value);
@@ -56,7 +85,8 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
       postsPerDay,
       startDate,
       startTime: postingTimes[0],
-      postingTimes
+      postingTimes,
+      targetPlatforms
     });
   };
 
@@ -127,6 +157,13 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
           </div>
         </div>
       </Card>
+
+      {/* Platform Selection */}
+      <PlatformSelector
+        selected={targetPlatforms}
+        onChange={setTargetPlatforms}
+        connectedPlatforms={connectedPlatforms}
+      />
 
       {/* Summary */}
       <Card className="p-6 bg-gradient-subtle border-primary/20">
