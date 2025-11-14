@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Twitter, ArrowLeft } from "lucide-react";
+import { Twitter, ArrowLeft, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PlatformBooksList } from "@/components/platforms/PlatformBooksList";
@@ -33,6 +33,13 @@ export default function PlatformX() {
               </div>
             </div>
           </div>
+          <Button
+            onClick={() => navigate('/campaigns/new?platform=x')}
+            className="gap-2"
+          >
+            <Sparkles className="h-4 w-4" />
+            Stwórz kampanię AI
+          </Button>
         </div>
 
         {/* Connection Status & Stats */}

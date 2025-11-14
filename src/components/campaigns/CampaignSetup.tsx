@@ -8,17 +8,23 @@ import { format, addDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import type { CampaignConfig } from "./CampaignBuilder";
 import { PlatformSelector } from "./PlatformSelector";
+import { useSearchParams } from "react-router-dom";
 
 interface CampaignSetupProps {
   onComplete: (config: CampaignConfig) => void;
 }
 
 export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
+  const [searchParams] = useSearchParams();
+  const preSelectedPlatform = searchParams.get('platform') as 'x' | 'facebook' | null;
+  
   const [durationDays, setDurationDays] = useState(7);
   const [postsPerDay, setPostsPerDay] = useState(2);
   const [startDate, setStartDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
   const [postingTimes, setPostingTimes] = useState(["10:00", "18:00"]);
-  const [targetPlatforms, setTargetPlatforms] = useState<('x' | 'facebook')[]>(['x']);
+  const [targetPlatforms, setTargetPlatforms] = useState<('x' | 'facebook')[]>(
+    preSelectedPlatform ? [preSelectedPlatform] : ['x']
+  );
   const [connectedPlatforms, setConnectedPlatforms] = useState({ x: false, facebook: false });
 
   useEffect(() => {

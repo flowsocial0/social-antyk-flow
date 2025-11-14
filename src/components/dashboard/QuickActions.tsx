@@ -71,7 +71,7 @@ export const QuickActions = () => {
     {
       icon: Sparkles,
       label: "Kampania AI",
-      description: "Plan 80/20 z Grok AI",
+      description: "Plan 80/20 dla mediów społecznościowych",
       variant: "secondary" as const,
       onClick: () => navigate('/campaigns')
     },

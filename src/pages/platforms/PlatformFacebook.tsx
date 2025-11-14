@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Facebook } from "lucide-react";
+import { ArrowLeft, Facebook, Sparkles } from "lucide-react";
 import { PlatformBooksList } from "@/components/platforms/PlatformBooksList";
 import { PlatformConnectionStatus } from "@/components/platforms/PlatformConnectionStatus";
 import { PlatformStats } from "@/components/platforms/PlatformStats";
@@ -99,6 +99,14 @@ const PlatformFacebook = () => {
                 className="bg-[#1877F2] hover:bg-[#1877F2]/90 text-white"
               >
                 Połącz Facebook
+              </Button>
+              <Button
+                onClick={() => navigate('/campaigns/new?platform=facebook')}
+                className="gap-2 bg-white/10 text-white border-white/20 hover:bg-white/20"
+                variant="outline"
+              >
+                <Sparkles className="h-4 w-4" />
+                Kampania AI
               </Button>
             </div>
           </div>
