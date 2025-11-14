@@ -14,38 +14,38 @@ export const QuickActions = () => {
 
   const syncBooksMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('sync-books-from-xml');
+      const { data, error } = await supabase.functions.invoke("sync-books-from-xml");
       if (error) throw error;
       return data;
     },
     onSuccess: (data) => {
       toast.success(`Synchronizacja zakończona`, {
-        description: `Zaktualizowano ${data.stats.updated} książek z ${data.stats.xmlBooksFound} dostępnych`
+        description: `Zaktualizowano ${data.stats.updated} książek z ${data.stats.xmlBooksFound} dostępnych`,
       });
     },
     onError: (error: any) => {
       toast.error("Błąd synchronizacji", {
-        description: error.message
+        description: error.message,
       });
-    }
+    },
   });
 
   const loadXmlBooksMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('load-xml-books');
+      const { data, error } = await supabase.functions.invoke("load-xml-books");
       if (error) throw error;
       return data;
     },
     onSuccess: (data) => {
       toast.success(`Dane załadowane`, {
-        description: `Załadowano ${data.stats.booksLoaded} książek z XML`
+        description: `Załadowano ${data.stats.booksLoaded} książek z XML`,
       });
     },
     onError: (error: any) => {
       toast.error("Błąd ładowania", {
-        description: error.message
+        description: error.message,
       });
-    }
+    },
   });
 
   const actions = [
@@ -54,39 +54,39 @@ export const QuickActions = () => {
       label: "Platformy społecznościowe",
       description: "Zarządzaj wszystkimi platformami",
       variant: "default" as const,
-      onClick: () => navigate('/platforms')
+      onClick: () => navigate("/platforms"),
     },
     {
       icon: Plus,
       label: "Dodaj książkę",
       description: "Ręcznie dodaj nową książkę",
-      variant: "default" as const
+      variant: "default" as const,
     },
     {
       icon: Upload,
       label: "Importuj CSV",
       description: "Masowy import z pliku",
-      variant: "secondary" as const
+      variant: "secondary" as const,
     },
     {
       icon: Sparkles,
       label: "Kampania AI",
-      description: "Plan 80/20 dla mediów społecznościowych",
+      description: "Plan 80/20",
       variant: "secondary" as const,
-      onClick: () => navigate('/campaigns')
+      onClick: () => navigate("/campaigns"),
     },
     {
       icon: Calendar,
       label: "Harmonogram zbiorczy",
       description: "Zobacz wszystkie zaplanowane posty",
       variant: "secondary" as const,
-      onClick: () => navigate('/schedule-overview')
+      onClick: () => navigate("/schedule-overview"),
     },
     {
       icon: Settings,
       label: "Połącz platformy",
       description: "Połącz konta społecznościowe",
-      variant: "secondary" as const
+      variant: "secondary" as const,
     },
     {
       icon: Download,
@@ -94,7 +94,7 @@ export const QuickActions = () => {
       description: "Załaduj tytuły i linki z XML",
       variant: "secondary" as const,
       onClick: () => loadXmlBooksMutation.mutate(),
-      loading: loadXmlBooksMutation.isPending
+      loading: loadXmlBooksMutation.isPending,
     },
     {
       icon: RefreshCw,
@@ -102,8 +102,8 @@ export const QuickActions = () => {
       description: "Pobierz dane z XML",
       variant: "secondary" as const,
       onClick: () => syncBooksMutation.mutate(),
-      loading: syncBooksMutation.isPending
-    }
+      loading: syncBooksMutation.isPending,
+    },
   ];
 
   return (
@@ -117,22 +117,22 @@ export const QuickActions = () => {
             const isImportAction = index === 1; // "Importuj CSV" button
             const isCampaignAction = index === 2; // "Kampania AI" button
             const isScheduleAction = index === 3; // "Harmonogram zbiorczy" button
-            const isSyncAction = 'onClick' in action;
+            const isSyncAction = "onClick" in action;
             return (
               <Button
                 key={index}
                 variant={action.variant}
                 className="h-auto flex-col items-start p-6 space-y-2 hover:shadow-glow transition-all duration-300"
                 onClick={
-                  isImportAction 
-                    ? () => setImportDialogOpen(true) 
-                    : isSyncAction && action.onClick 
-                    ? action.onClick 
-                    : undefined
+                  isImportAction
+                    ? () => setImportDialogOpen(true)
+                    : isSyncAction && action.onClick
+                      ? action.onClick
+                      : undefined
                 }
                 disabled={isSyncAction && action.loading}
               >
-                <Icon className={`h-8 w-8 mb-2 ${isSyncAction && action.loading ? 'animate-spin' : ''}`} />
+                <Icon className={`h-8 w-8 mb-2 ${isSyncAction && action.loading ? "animate-spin" : ""}`} />
                 <span className="font-semibold text-base">{action.label}</span>
                 <span className="text-xs opacity-70 font-normal">{action.description}</span>
               </Button>
@@ -140,11 +140,8 @@ export const QuickActions = () => {
           })}
         </div>
       </Card>
-      
-      <ImportCSVDialog 
-        open={importDialogOpen} 
-        onOpenChange={setImportDialogOpen} 
-      />
+
+      <ImportCSVDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
     </>
   );
 };
