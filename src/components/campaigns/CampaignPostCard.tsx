@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Edit2, Save, X, Clock, CheckCircle2, AlertCircle, BookOpen } from "lucide-react";
 import { format } from "date-fns";
 import { pl } from "date-fns/locale";
+import { PlatformBadge } from "./PlatformBadge";
 
 type CampaignPost = {
   id: string;
@@ -17,6 +18,7 @@ type CampaignPost = {
   scheduled_at: string;
   published_at: string | null;
   status: string;
+  platforms?: any; // jsonb array of platforms
   book?: {
     id: string;
     title: string;
@@ -89,13 +91,21 @@ export const CampaignPostCard = ({ post, onSave, readOnly = false }: CampaignPos
     return <Badge className="bg-gradient-primary">Sprzedaż</Badge>;
   };
 
+  const platforms: ('x' | 'facebook')[] = Array.isArray(post.platforms) 
+    ? (post.platforms.filter((p: any) => p === 'x' || p === 'facebook') as ('x' | 'facebook')[])
+    : ['x'];
+
   return (
     <Card className="p-4 hover:shadow-card transition-all duration-300">
       <div className="flex justify-between items-start mb-3">
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {getTypeBadge()}
           {getStatusBadge()}
           <Badge variant="outline" className="text-xs">{post.category}</Badge>
+          {/* Platform badges */}
+          {platforms.map((platform) => (
+            <PlatformBadge key={platform} platform={platform} status={post.status as any} />
+          ))}
         </div>
         <div className="text-sm text-muted-foreground">
           {format(new Date(post.scheduled_at), "d MMM, HH:mm", { locale: pl })}

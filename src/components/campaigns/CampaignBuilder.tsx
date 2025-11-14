@@ -19,6 +19,7 @@ export type CampaignConfig = {
   startDate: string;
   startTime: string;
   postingTimes: string[];
+  targetPlatforms?: ('x' | 'facebook')[];
 };
 
 export const CampaignBuilder = () => {
