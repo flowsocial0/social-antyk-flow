@@ -21,8 +21,9 @@ Deno.serve(async (req) => {
     // Generate random state for CSRF protection
     const state = crypto.randomUUID();
 
-    // Required scopes for Facebook Page posting
-    const scopes = ['pages_manage_posts', 'pages_read_engagement'].join(',');
+    // Basic scopes that don't require app review
+    // Note: For posting to pages, you'll need 'pages_manage_posts' which requires Facebook app review
+    const scopes = ['public_profile', 'email', 'pages_show_list'].join(',');
 
     // Build Facebook OAuth URL
     const authUrl = new URL('https://www.facebook.com/v18.0/dialog/oauth');
