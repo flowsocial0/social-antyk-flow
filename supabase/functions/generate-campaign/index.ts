@@ -149,7 +149,7 @@ async function generatePostsContent(body: any, apiKey: string) {
     .from('books')
     .select('id, title, description, sale_price, product_url, campaign_post_count')
     .eq('is_product', true)
-    .order('sale_price', { ascending: false, nullsFirst: false })
+    .order('sale_price', { ascending: true, nullsFirst: false })
     .order('campaign_post_count', { ascending: true })
     .order('last_campaign_date', { ascending: true, nullsFirst: true })
     .limit(salesPostsCount);
