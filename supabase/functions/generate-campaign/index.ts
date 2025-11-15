@@ -189,18 +189,16 @@ async function generatePostsContent(body: any, apiKey: string) {
         bookData = availableBooks[salesBookIndex];
         salesBookIndex++;
 
-        // Convert price from grosze to złotych
-        const priceInZloty = bookData.sale_price ? (bookData.sale_price / 100).toFixed(2) : null;
-        
         prompt = `Stwórz atrakcyjny post promocyjny o tej książce patriotycznej:
 Tytuł: ${bookData.title}
 ${bookData.description ? `Opis: ${bookData.description}` : ""}
-${priceInZloty ? `Cena: ${priceInZloty} zł` : ""}
+${bookData.sale_price ? `Cena promocyjna: ${bookData.sale_price} zł (WAŻNE: podaj DOKŁADNIE tę cenę, bez zaokrągleń!)` : ""}
 
 Post powinien:
 - Być krótki (max 240 znaków ŁĄCZNIE z linkiem)
 - Podkreślać wartości patriotyczne
 - Zachęcać do zakupu
+- Zawierać DOKŁADNĄ cenę bez zmian i zaokrągleń
 - Kończyć się linkiem: ${bookData.product_url}`;
       }
 
