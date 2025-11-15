@@ -189,10 +189,13 @@ async function generatePostsContent(body: any, apiKey: string) {
         bookData = availableBooks[salesBookIndex];
         salesBookIndex++;
 
+        // Convert price from grosze to złotych
+        const priceInZloty = bookData.sale_price ? (bookData.sale_price / 100).toFixed(2) : null;
+        
         prompt = `Stwórz atrakcyjny post promocyjny o tej książce patriotycznej:
 Tytuł: ${bookData.title}
 ${bookData.description ? `Opis: ${bookData.description}` : ""}
-${bookData.sale_price ? `Cena: ${bookData.sale_price} zł` : ""}
+${priceInZloty ? `Cena: ${priceInZloty} zł` : ""}
 
 Post powinien:
 - Być krótki (max 240 znaków ŁĄCZNIE z linkiem)
