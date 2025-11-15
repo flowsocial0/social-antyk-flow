@@ -160,7 +160,15 @@ async function uploadMedia(imageUrl?: string, opts?: { arrayBuffer?: ArrayBuffer
     console.log("Image downloaded, size:", imageArrayBuffer.byteLength, "bytes, type:", contentType);
   }
   
-  const imageBase64 = btoa(String.fromCharCode(...new Uint8Array(imageArrayBuffer)));
+  // Convert ArrayBuffer to base64 safely without stack overflow
+  const uint8Array = new Uint8Array(imageArrayBuffer);
+  let binaryString = '';
+  const chunkSize = 8192; // Process in chunks to avoid stack overflow
+  for (let i = 0; i < uint8Array.length; i += chunkSize) {
+    const chunk = uint8Array.slice(i, i + chunkSize);
+    binaryString += String.fromCharCode.apply(null, Array.from(chunk));
+  }
+  const imageBase64 = btoa(binaryString);
 
   // First try simple upload with media_data
   try {
