@@ -24,7 +24,7 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
   const [startDate, setStartDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
   const [postingTimes, setPostingTimes] = useState(["10:00", "18:00"]);
   const [targetPlatforms, setTargetPlatforms] = useState<PlatformId[]>(
-    preSelectedPlatform ? [preSelectedPlatform] : ['x']
+    preSelectedPlatform ? [preSelectedPlatform] : ['facebook']
   );
   const [connectedPlatforms, setConnectedPlatforms] = useState<Record<PlatformId, boolean>>(
     {} as Record<PlatformId, boolean>
@@ -37,13 +37,6 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
   const checkConnectedPlatforms = async () => {
     const platforms = getAllPlatforms();
     const connectionStatus: Record<string, boolean> = {};
-    
-    // Check X connection
-    const { data: xData } = await (supabase as any)
-      .from('twitter_oauth_tokens')
-      .select('id')
-      .limit(1)
-      .maybeSingle();
 
     // Check Facebook connection
     const { data: fbData } = await (supabase as any)
@@ -54,9 +47,7 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
 
     // Set connection status for all platforms
     platforms.forEach(platform => {
-      if (platform.id === 'x') {
-        connectionStatus[platform.id] = !!xData;
-      } else if (platform.id === 'facebook') {
+      if (platform.id === 'facebook') {
         connectionStatus[platform.id] = !!fbData;
       } else {
         // For other platforms, mark as not connected

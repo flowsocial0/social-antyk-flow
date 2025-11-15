@@ -1,30 +1,24 @@
 import { 
-  Twitter, Facebook, Instagram, Youtube, Linkedin, 
-  Video, Image, MessageCircle, Send, Camera, 
-  Users, Globe, Tv, DollarSign, Map, Shield,
+  Facebook, Instagram, Youtube, Linkedin, 
+  Video, Image, MessageCircle, Send, Globe,
   LucideIcon
 } from "lucide-react";
 
 export type PlatformId = 
-  | 'x' 
   | 'facebook' 
   | 'instagram' 
   | 'youtube' 
+  | 'linkedin'
   | 'tiktok'
-  | 'linkedin' 
   | 'pinterest' 
   | 'reddit' 
   | 'telegram' 
   | 'threads' 
-  | 'bereal' 
-  | 'mewe'
   | 'bluesky' 
   | 'mastodon' 
-  | 'rumble' 
-  | 'onlyfans' 
-  | 'locals' 
-  | 'gab' 
-  | 'parler';
+  | 'gab';
+
+export type ContentType = 'text' | 'image' | 'video' | 'mixed';
 
 export interface PlatformConfig {
   id: PlatformId;
@@ -35,21 +29,14 @@ export interface PlatformConfig {
   gradientTo: string;
   path: string;
   status: 'active' | 'coming-soon' | 'planned';
-  priority: number; // Lower number = higher priority in UI
+  priority: number;
+  characterLimit: number;
+  contentTypes: ContentType[];
+  requiresAuth: boolean;
+  supportsScheduling: boolean;
 }
 
 export const platformConfigs: Record<PlatformId, PlatformConfig> = {
-  x: {
-    id: 'x',
-    name: 'X (Twitter)',
-    icon: Twitter,
-    color: 'text-blue-500',
-    gradientFrom: 'from-blue-500/20',
-    gradientTo: 'to-blue-600/20',
-    path: '/platforms/x',
-    status: 'active',
-    priority: 1,
-  },
   facebook: {
     id: 'facebook',
     name: 'Facebook',
@@ -59,7 +46,11 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientTo: 'to-blue-700/20',
     path: '/platforms/facebook',
     status: 'active',
-    priority: 2,
+    priority: 1,
+    characterLimit: 63206,
+    contentTypes: ['text', 'image', 'video', 'mixed'],
+    requiresAuth: true,
+    supportsScheduling: true,
   },
   instagram: {
     id: 'instagram',
@@ -70,7 +61,11 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientTo: 'to-purple-600/20',
     path: '/platforms/instagram',
     status: 'coming-soon',
-    priority: 3,
+    priority: 2,
+    characterLimit: 2200,
+    contentTypes: ['image', 'video', 'mixed'],
+    requiresAuth: true,
+    supportsScheduling: true,
   },
   youtube: {
     id: 'youtube',
@@ -81,7 +76,11 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientTo: 'to-red-600/20',
     path: '/platforms/youtube',
     status: 'coming-soon',
-    priority: 4,
+    priority: 3,
+    characterLimit: 5000,
+    contentTypes: ['video'],
+    requiresAuth: true,
+    supportsScheduling: true,
   },
   linkedin: {
     id: 'linkedin',
@@ -92,7 +91,11 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientTo: 'to-blue-800/20',
     path: '/platforms/linkedin',
     status: 'coming-soon',
-    priority: 5,
+    priority: 4,
+    characterLimit: 3000,
+    contentTypes: ['text', 'image', 'video', 'mixed'],
+    requiresAuth: true,
+    supportsScheduling: true,
   },
   tiktok: {
     id: 'tiktok',
@@ -103,7 +106,11 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientTo: 'to-pink-500/20',
     path: '/platforms/tiktok',
     status: 'coming-soon',
-    priority: 6,
+    priority: 5,
+    characterLimit: 2200,
+    contentTypes: ['video'],
+    requiresAuth: true,
+    supportsScheduling: true,
   },
   pinterest: {
     id: 'pinterest',
@@ -113,8 +120,12 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-red-600/20',
     gradientTo: 'to-red-700/20',
     path: '/platforms/pinterest',
-    status: 'planned',
-    priority: 7,
+    status: 'coming-soon',
+    priority: 6,
+    characterLimit: 500,
+    contentTypes: ['image'],
+    requiresAuth: true,
+    supportsScheduling: true,
   },
   reddit: {
     id: 'reddit',
@@ -124,8 +135,12 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-orange-500/20',
     gradientTo: 'to-orange-600/20',
     path: '/platforms/reddit',
-    status: 'planned',
-    priority: 8,
+    status: 'coming-soon',
+    priority: 7,
+    characterLimit: 40000,
+    contentTypes: ['text', 'image', 'video', 'mixed'],
+    requiresAuth: true,
+    supportsScheduling: true,
   },
   telegram: {
     id: 'telegram',
@@ -135,8 +150,12 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-sky-500/20',
     gradientTo: 'to-sky-600/20',
     path: '/platforms/telegram',
-    status: 'planned',
-    priority: 9,
+    status: 'coming-soon',
+    priority: 8,
+    characterLimit: 4096,
+    contentTypes: ['text', 'image', 'video', 'mixed'],
+    requiresAuth: true,
+    supportsScheduling: true,
   },
   threads: {
     id: 'threads',
@@ -146,30 +165,12 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-slate-800/20',
     gradientTo: 'to-slate-900/20',
     path: '/platforms/threads',
-    status: 'planned',
-    priority: 10,
-  },
-  bereal: {
-    id: 'bereal',
-    name: 'BeReal',
-    icon: Camera,
-    color: 'text-slate-900',
-    gradientFrom: 'from-slate-900/20',
-    gradientTo: 'to-yellow-500/20',
-    path: '/platforms/bereal',
-    status: 'planned',
-    priority: 11,
-  },
-  mewe: {
-    id: 'mewe',
-    name: 'MeWe',
-    icon: Users,
-    color: 'text-indigo-600',
-    gradientFrom: 'from-indigo-600/20',
-    gradientTo: 'to-indigo-700/20',
-    path: '/platforms/mewe',
-    status: 'planned',
-    priority: 12,
+    status: 'coming-soon',
+    priority: 9,
+    characterLimit: 500,
+    contentTypes: ['text', 'image', 'mixed'],
+    requiresAuth: true,
+    supportsScheduling: true,
   },
   bluesky: {
     id: 'bluesky',
@@ -179,8 +180,12 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-sky-600/20',
     gradientTo: 'to-sky-700/20',
     path: '/platforms/bluesky',
-    status: 'planned',
-    priority: 13,
+    status: 'coming-soon',
+    priority: 10,
+    characterLimit: 300,
+    contentTypes: ['text', 'image', 'mixed'],
+    requiresAuth: true,
+    supportsScheduling: true,
   },
   mastodon: {
     id: 'mastodon',
@@ -190,41 +195,12 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-purple-600/20',
     gradientTo: 'to-purple-700/20',
     path: '/platforms/mastodon',
-    status: 'planned',
-    priority: 14,
-  },
-  rumble: {
-    id: 'rumble',
-    name: 'Rumble',
-    icon: Tv,
-    color: 'text-green-600',
-    gradientFrom: 'from-green-600/20',
-    gradientTo: 'to-green-700/20',
-    path: '/platforms/rumble',
-    status: 'planned',
-    priority: 15,
-  },
-  onlyfans: {
-    id: 'onlyfans',
-    name: 'OnlyFans',
-    icon: DollarSign,
-    color: 'text-blue-400',
-    gradientFrom: 'from-blue-400/20',
-    gradientTo: 'to-blue-500/20',
-    path: '/platforms/onlyfans',
-    status: 'planned',
-    priority: 16,
-  },
-  locals: {
-    id: 'locals',
-    name: 'Locals',
-    icon: Map,
-    color: 'text-emerald-600',
-    gradientFrom: 'from-emerald-600/20',
-    gradientTo: 'to-emerald-700/20',
-    path: '/platforms/locals',
-    status: 'planned',
-    priority: 17,
+    status: 'coming-soon',
+    priority: 11,
+    characterLimit: 500,
+    contentTypes: ['text', 'image', 'video', 'mixed'],
+    requiresAuth: true,
+    supportsScheduling: true,
   },
   gab: {
     id: 'gab',
@@ -234,19 +210,12 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-green-700/20',
     gradientTo: 'to-green-800/20',
     path: '/platforms/gab',
-    status: 'planned',
-    priority: 18,
-  },
-  parler: {
-    id: 'parler',
-    name: 'Parler',
-    icon: Shield,
-    color: 'text-rose-600',
-    gradientFrom: 'from-rose-600/20',
-    gradientTo: 'to-rose-700/20',
-    path: '/platforms/parler',
-    status: 'planned',
-    priority: 19,
+    status: 'coming-soon',
+    priority: 12,
+    characterLimit: 3000,
+    contentTypes: ['text', 'image', 'video', 'mixed'],
+    requiresAuth: true,
+    supportsScheduling: true,
   },
 };
 

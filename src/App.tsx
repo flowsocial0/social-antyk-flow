@@ -13,7 +13,6 @@ import SocialAccounts from "./pages/SocialAccounts";
 import TwitterCallback from "./pages/TwitterCallback";
 import BookPreview from "./pages/BookPreview";
 import BookRedirect from "./pages/BookRedirect";
-import PlatformX from "./pages/platforms/PlatformX";
 import PlatformFacebook from "./pages/platforms/PlatformFacebook";
 import PlatformInstagram from "./pages/platforms/PlatformInstagram";
 import PlatformYouTube from "./pages/platforms/PlatformYouTube";
@@ -23,15 +22,9 @@ import PlatformPinterest from "./pages/platforms/PlatformPinterest";
 import PlatformReddit from "./pages/platforms/PlatformReddit";
 import PlatformTelegram from "./pages/platforms/PlatformTelegram";
 import PlatformThreads from "./pages/platforms/PlatformThreads";
-import PlatformBeReal from "./pages/platforms/PlatformBeReal";
-import PlatformMeWe from "./pages/platforms/PlatformMeWe";
 import PlatformBluesky from "./pages/platforms/PlatformBluesky";
 import PlatformMastodon from "./pages/platforms/PlatformMastodon";
-import PlatformRumble from "./pages/platforms/PlatformRumble";
-import PlatformOnlyFans from "./pages/platforms/PlatformOnlyFans";
-import PlatformLocals from "./pages/platforms/PlatformLocals";
 import PlatformGab from "./pages/platforms/PlatformGab";
-import PlatformParler from "./pages/platforms/PlatformParler";
 import ScheduleOverview from "./pages/ScheduleOverview";
 import Platforms from "./pages/Platforms";
 import NotFound from "./pages/NotFound";
@@ -55,7 +48,6 @@ const App = () => (
           <Route path="/twitter-callback" element={<TwitterCallback />} />
           <Route path="/book/:id" element={<BookPreview />} />
           <Route path="/book/:id/redirect" element={<BookRedirect />} />
-          <Route path="/platforms/x" element={<PlatformX />} />
           <Route path="/platforms/facebook" element={<PlatformFacebook />} />
           <Route path="/platforms/instagram" element={<PlatformInstagram />} />
           <Route path="/platforms/youtube" element={<PlatformYouTube />} />
@@ -65,15 +57,9 @@ const App = () => (
           <Route path="/platforms/reddit" element={<PlatformReddit />} />
           <Route path="/platforms/telegram" element={<PlatformTelegram />} />
           <Route path="/platforms/threads" element={<PlatformThreads />} />
-          <Route path="/platforms/bereal" element={<PlatformBeReal />} />
-          <Route path="/platforms/mewe" element={<PlatformMeWe />} />
           <Route path="/platforms/bluesky" element={<PlatformBluesky />} />
           <Route path="/platforms/mastodon" element={<PlatformMastodon />} />
-          <Route path="/platforms/rumble" element={<PlatformRumble />} />
-          <Route path="/platforms/onlyfans" element={<PlatformOnlyFans />} />
-          <Route path="/platforms/locals" element={<PlatformLocals />} />
           <Route path="/platforms/gab" element={<PlatformGab />} />
-          <Route path="/platforms/parler" element={<PlatformParler />} />
           <Route path="/schedule-overview" element={<ScheduleOverview />} />
           <Route path="/platforms" element={<Platforms />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
