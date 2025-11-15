@@ -59,15 +59,20 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
 
       // Step 3: Schedule posts
       const scheduledPosts: CampaignPost[] = [];
-      const startDate = parse(config.startDate, 'yyyy-MM-dd', new Date());
+      // Parse date in UTC to avoid timezone issues
+      const [year, month, day] = config.startDate.split('-').map(Number);
+      const startDate = new Date(Date.UTC(year, month - 1, day));
 
       generatedPosts.forEach((post: any, index: number) => {
         const dayIndex = Math.floor(index / config.postsPerDay);
         const timeIndex = index % config.postsPerDay;
-        const postDate = addDays(startDate, dayIndex);
+        
+        // Calculate date in UTC
+        const postDate = new Date(startDate);
+        postDate.setUTCDate(postDate.getUTCDate() + dayIndex);
         
         const [hours, minutes] = config.postingTimes[timeIndex].split(':').map(Number);
-        postDate.setHours(hours, minutes, 0, 0);
+        postDate.setUTCHours(hours, minutes, 0, 0);
 
         scheduledPosts.push({
           day: dayIndex + 1,
