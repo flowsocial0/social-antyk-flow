@@ -16,15 +16,9 @@ export type PlatformId =
   | 'reddit' 
   | 'telegram' 
   | 'threads' 
-  | 'bereal' 
-  | 'mewe'
   | 'bluesky' 
   | 'mastodon' 
-  | 'rumble' 
-  | 'onlyfans' 
-  | 'locals' 
-  | 'gab' 
-  | 'parler';
+  | 'gab';
 
 export interface PlatformConfig {
   id: PlatformId;
@@ -149,28 +143,6 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     status: 'planned',
     priority: 10,
   },
-  bereal: {
-    id: 'bereal',
-    name: 'BeReal',
-    icon: Camera,
-    color: 'text-slate-900',
-    gradientFrom: 'from-slate-900/20',
-    gradientTo: 'to-yellow-500/20',
-    path: '/platforms/bereal',
-    status: 'planned',
-    priority: 11,
-  },
-  mewe: {
-    id: 'mewe',
-    name: 'MeWe',
-    icon: Users,
-    color: 'text-indigo-600',
-    gradientFrom: 'from-indigo-600/20',
-    gradientTo: 'to-indigo-700/20',
-    path: '/platforms/mewe',
-    status: 'planned',
-    priority: 12,
-  },
   bluesky: {
     id: 'bluesky',
     name: 'Bluesky',
@@ -180,7 +152,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientTo: 'to-sky-700/20',
     path: '/platforms/bluesky',
     status: 'planned',
-    priority: 13,
+    priority: 11,
   },
   mastodon: {
     id: 'mastodon',
@@ -191,40 +163,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientTo: 'to-purple-700/20',
     path: '/platforms/mastodon',
     status: 'planned',
-    priority: 14,
-  },
-  rumble: {
-    id: 'rumble',
-    name: 'Rumble',
-    icon: Tv,
-    color: 'text-green-600',
-    gradientFrom: 'from-green-600/20',
-    gradientTo: 'to-green-700/20',
-    path: '/platforms/rumble',
-    status: 'planned',
-    priority: 15,
-  },
-  onlyfans: {
-    id: 'onlyfans',
-    name: 'OnlyFans',
-    icon: DollarSign,
-    color: 'text-blue-400',
-    gradientFrom: 'from-blue-400/20',
-    gradientTo: 'to-blue-500/20',
-    path: '/platforms/onlyfans',
-    status: 'planned',
-    priority: 16,
-  },
-  locals: {
-    id: 'locals',
-    name: 'Locals',
-    icon: Map,
-    color: 'text-emerald-600',
-    gradientFrom: 'from-emerald-600/20',
-    gradientTo: 'to-emerald-700/20',
-    path: '/platforms/locals',
-    status: 'planned',
-    priority: 17,
+    priority: 12,
   },
   gab: {
     id: 'gab',
@@ -235,18 +174,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientTo: 'to-green-800/20',
     path: '/platforms/gab',
     status: 'planned',
-    priority: 18,
-  },
-  parler: {
-    id: 'parler',
-    name: 'Parler',
-    icon: Shield,
-    color: 'text-rose-600',
-    gradientFrom: 'from-rose-600/20',
-    gradientTo: 'to-rose-700/20',
-    path: '/platforms/parler',
-    status: 'planned',
-    priority: 19,
+    priority: 13,
   },
 };
 
