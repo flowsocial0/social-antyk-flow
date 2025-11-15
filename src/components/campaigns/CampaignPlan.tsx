@@ -48,7 +48,8 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
       const contentResponse = await supabase.functions.invoke('generate-campaign', {
         body: {
           action: 'generate_posts',
-          structure
+          structure,
+          targetPlatforms: config.targetPlatforms
         }
       });
 

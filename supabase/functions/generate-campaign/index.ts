@@ -136,9 +136,17 @@ Przykład: [{"position":1,"type":"content","category":"trivia"},{"position":2,"t
 }
 
 async function generatePostsContent(body: any, apiKey: string) {
-  const { structure } = body;
+  const { structure, targetPlatforms } = body;
 
   console.log("Generating content for posts:", structure.length);
+  console.log("Target platforms:", targetPlatforms);
+  
+  // Check if Facebook is in target platforms
+  const hasFacebook = targetPlatforms && targetPlatforms.some((p: any) => p.id === 'facebook' || p === 'facebook');
+  const hasX = targetPlatforms && targetPlatforms.some((p: any) => p.id === 'x' || p === 'x');
+  
+  // Determine text limits based on platforms
+  const maxTextLength = hasFacebook && !hasX ? 1800 : (hasFacebook && hasX ? 240 : 240);
 
   // Initialize Supabase client
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -163,14 +171,44 @@ async function generatePostsContent(body: any, apiKey: string) {
 
   console.log(`Found ${availableBooks?.length || 0} available books for ${salesPostsCount} sales posts`);
 
-  const categoryPrompts: Record<string, string> = {
-    trivia:
-      "Stwórz fascynującą ciekawostkę o polskiej historii, literaturze patriotycznej lub bohaterach narodowych. Powinna być krótka (max 240 znaków), inspirująca i budująca dumę narodową. Zakończ linkiem: https://sklep.antyk.org.pl",
-    quiz: "Stwórz intrygującą zagadkę o polskiej historii, symbolach narodowych lub ważnych wydarzeniach. Zachęć do interakcji (max 240 znaków). Zakończ linkiem: https://sklep.antyk.org.pl",
-    event:
-      "Napisz o polskiej rocznicy, święcie narodowym lub ważnym wydarzeniu historycznym (max 240 znaków). Podkreśl znaczenie dla polskiej tożsamości. Zakończ linkiem: https://sklep.antyk.org.pl",
+  // Platform-specific prompts
+  const getFacebookPrompts = (): Record<string, string> => ({
+    trivia: `Stwórz bogatą w treść ciekawostkę o polskiej historii, literaturze patriotycznej lub bohaterach narodowych. 
+Post może mieć do ${maxTextLength} znaków, więc wykorzystaj przestrzeń na:
+- Szczegółowy opis historyczny z konkretnymi datami i faktami
+- Ciekawe anegdoty i mniej znane szczegóły
+- Emocjonalne połączenie z polską tożsamością
+- Storytelling - opowiedz historię w angażujący sposób
+- Zachęcenie do komentowania i dzielenia się własnymi przemyśleniami
+Zakończ linkiem: https://sklep.antyk.org.pl`,
+    quiz: `Stwórz rozbudowaną zagadkę o polskiej historii, symbolach narodowych lub ważnych wydarzeniach.
+Post może mieć do ${maxTextLength} znaków, więc:
+- Stwórz intrygujące wprowadzenie do zagadki
+- Dodaj kontekst historyczny
+- Podaj kilka wskazówek lub ciekawych faktów związanych z tematem
+- Zachęć do dyskusji i dzielenia się odpowiedziami w komentarzach
+- Stwórz atmosferę przyjaźnie rywalizacji
+Zakończ linkiem: https://sklep.antyk.org.pl`,
+    event: `Napisz bogaty w szczegóły post o polskiej rocznicy, święcie narodowym lub ważnym wydarzeniu historycznym.
+Post może mieć do ${maxTextLength} znaków, więc możesz:
+- Przedstawić szeroki kontekst historyczny wydarzenia
+- Opowiedzieć o konkretnych postaciach i ich rolach
+- Dodać mniej znane fakty i ciekawostki
+- Pokazać znaczenie tego wydarzenia dla współczesności
+- Zachęcić do refleksji i dyskusji
+- Zaproponować sposoby uczczenia tej rocznicy
+Zakończ linkiem: https://sklep.antyk.org.pl`,
     sales: "Promocja konkretnej książki - szczegóły zostaną dodane dynamicznie",
-  };
+  });
+
+  const getXPrompts = (): Record<string, string> => ({
+    trivia: "Stwórz fascynującą ciekawostkę o polskiej historii, literaturze patriotycznej lub bohaterach narodowych. Powinna być krótka (max 240 znaków), inspirująca i budująca dumę narodową. Zakończ linkiem: https://sklep.antyk.org.pl",
+    quiz: "Stwórz intrygującą zagadkę o polskiej historii, symbolach narodowych lub ważnych wydarzeniach. Zachęć do interakcji (max 240 znaków). Zakończ linkiem: https://sklep.antyk.org.pl",
+    event: "Napisz o polskiej rocznicy, święcie narodowym lub ważnym wydarzeniu historycznym (max 240 znaków). Podkreśl znaczenie dla polskiej tożsamości. Zakończ linkiem: https://sklep.antyk.org.pl",
+    sales: "Promocja konkretnej książki - szczegóły zostaną dodane dynamicznie",
+  });
+
+  const categoryPrompts: Record<string, string> = hasFacebook && !hasX ? getFacebookPrompts() : getXPrompts();
 
   const posts = [];
   let salesBookIndex = 0;
@@ -189,7 +227,29 @@ async function generatePostsContent(body: any, apiKey: string) {
         bookData = availableBooks[salesBookIndex];
         salesBookIndex++;
 
-        prompt = `Stwórz atrakcyjny post promocyjny o tej książce patriotycznej:
+        if (hasFacebook && !hasX) {
+          // Rich Facebook post for sales
+          prompt = `Stwórz bogaty w treść post promocyjny o tej książce patriotycznej:
+Tytuł: ${bookData.title}
+${bookData.description ? `Opis: ${bookData.description}` : ""}
+${bookData.sale_price ? `Cena promocyjna: ${bookData.sale_price} zł (WAŻNE: podaj DOKŁADNIE tę cenę, bez zaokrągleń!)` : ""}
+
+Post może mieć do ${maxTextLength} znaków, więc wykorzystaj przestrzeń na:
+- Rozbudowane wprowadzenie - dlaczego ta książka jest wyjątkowa
+- Szczegółowy opis treści i wartości patriotycznych, które niesie
+- Kim jest autor i dlaczego warto mu zaufać
+- Dla kogo jest ta książka (docelowy czytelnik)
+- Jakie konkretne korzyści odniesie czytelnik
+- Storytelling - opowiedz historię związaną z książką lub jej tematem
+- Emocjonalne połączenie z polską tożsamością i wartościami
+- Wyraźne call-to-action zachęcające do zakupu
+- Zawierać DOKŁADNĄ cenę bez zmian i zaokrągleń
+- Kończyć się linkiem: ${bookData.product_url}
+
+Pisz w sposób angażujący, osobisty i przekonujący. To ma być mini-recenzja i zachęta, nie tylko suchy opis.`;
+        } else {
+          // Short post for X or mixed platforms
+          prompt = `Stwórz atrakcyjny post promocyjny o tej książce patriotycznej:
 Tytuł: ${bookData.title}
 ${bookData.description ? `Opis: ${bookData.description}` : ""}
 ${bookData.sale_price ? `Cena promocyjna: ${bookData.sale_price} zł (WAŻNE: podaj DOKŁADNIE tę cenę, bez zaokrągleń!)` : ""}
@@ -200,6 +260,7 @@ Post powinien:
 - Zachęcać do zakupu
 - Zawierać DOKŁADNĄ cenę bez zmian i zaokrągleń
 - Kończyć się linkiem: ${bookData.product_url}`;
+        }
       }
 
       const response = await fetch("https://api.x.ai/v1/chat/completions", {
@@ -213,8 +274,9 @@ Post powinien:
           messages: [
             {
               role: "system",
-              content:
-                "Jesteś ekspertem od content marketingu dla księgarni. Piszesz krótkie, angażujące posty na Twitter/X.",
+              content: hasFacebook && !hasX
+                ? "Jesteś ekspertem od content marketingu dla księgarni. Piszesz bogate w treść, angażujące posty na Facebook, które łączą storytelling z wartościami patriotycznymi. Twoje posty są szczegółowe, emocjonalne i zachęcają do interakcji."
+                : "Jesteś ekspertem od content marketingu dla księgarni. Piszesz krótkie, angażujące posty na Twitter/X.",
             },
             { role: "user", content: prompt },
           ],
