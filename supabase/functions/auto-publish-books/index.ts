@@ -288,21 +288,31 @@ Deno.serve(async (req) => {
       } catch (error: any) {
         console.error(`Error publishing campaign post ${post.id}:`, error);
         
-        // Mark post as failed
-        await supabase
-          .from('campaign_posts')
-          .update({
-            status: 'failed'
-          })
-          .eq('id', post.id);
+        // Check if it's a rate limit error - if so, don't override status (publish function already handled it)
+        const isRateLimitError = error.message?.includes('429') || 
+          error.message?.includes('Too Many Requests') ||
+          error.message?.includes('rate limit');
+        
+        if (!isRateLimitError) {
+          // Mark post as failed only for non-rate-limit errors
+          await supabase
+            .from('campaign_posts')
+            .update({
+              status: 'failed',
+              error_message: error.message
+            })
+            .eq('id', post.id);
+          
+          failCount++;
+        }
         
         results.push({
           id: post.id,
           type: 'campaign_post',
           success: false,
-          error: error.message
+          error: error.message,
+          is_rate_limit: isRateLimitError
         });
-        failCount++;
       }
     }
 

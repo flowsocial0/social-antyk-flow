@@ -527,7 +527,7 @@ Deno.serve(async (req) => {
           const nextRetryAt = new Date(Date.now() + delayMinutes * 60 * 1000).toISOString();
           
           // Update with rate limit info
-          await supabaseClient
+          const { error: rateLimitUpdateError } = await supabaseClient
             .from('campaign_posts')
             .update({ 
               status: 'rate_limited',
@@ -538,7 +538,11 @@ Deno.serve(async (req) => {
             })
             .eq('id', campaignPostId);
           
-          console.log(`Rate limited. Retry ${retryCount} scheduled for: ${nextRetryAt}`);
+          if (rateLimitUpdateError) {
+            console.error(`Failed to update campaign post with rate limit info:`, rateLimitUpdateError);
+          } else {
+            console.log(`✅ Rate limit info saved. Retry ${retryCount} scheduled for: ${nextRetryAt}`);
+          }
           
           return new Response(
             JSON.stringify({ 
