@@ -27,7 +27,10 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { code, state } = await req.json();
+    // Get code and state from query parameters (Facebook sends them via GET)
+    const url = new URL(req.url);
+    const code = url.searchParams.get('code');
+    const state = url.searchParams.get('state');
 
     if (!code) {
       throw new Error('Missing authorization code');
@@ -121,26 +124,30 @@ Deno.serve(async (req) => {
 
     console.log('Successfully stored Facebook Page token');
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        page_name: pageName,
-        page_id: pageId
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    );
+    // Redirect user back to the application
+    const redirectUrl = new URL('https://c4157687-6f8a-4875-aa6d-ac0c6ad3fb78.lovableproject.com/platforms/facebook');
+    redirectUrl.searchParams.set('connected', 'true');
+    redirectUrl.searchParams.set('page_name', pageName);
+    
+    return new Response(null, {
+      status: 302,
+      headers: {
+        'Location': redirectUrl.toString(),
+      },
+    });
   } catch (error) {
     console.error('Facebook OAuth callback error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      }
-    );
+    
+    // Redirect back to app with error
+    const redirectUrl = new URL('https://c4157687-6f8a-4875-aa6d-ac0c6ad3fb78.lovableproject.com/platforms/facebook');
+    redirectUrl.searchParams.set('error', errorMessage);
+    
+    return new Response(null, {
+      status: 302,
+      headers: {
+        'Location': redirectUrl.toString(),
+      },
+    });
   }
 });

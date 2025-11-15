@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,31 @@ const PlatformFacebook = () => {
   const { toast } = useToast();
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Check for OAuth callback params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get('connected');
+    const error = params.get('error');
+    const pageName = params.get('page_name');
+
+    if (connected === 'true') {
+      toast({
+        title: "✅ Połączono z Facebook",
+        description: pageName ? `Połączono jako strona: ${pageName}` : "Konto Facebook zostało pomyślnie połączone",
+      });
+      // Clean URL
+      window.history.replaceState({}, '', '/platforms/facebook');
+    } else if (error) {
+      toast({
+        title: "❌ Błąd połączenia Facebook",
+        description: error,
+        variant: "destructive"
+      });
+      // Clean URL
+      window.history.replaceState({}, '', '/platforms/facebook');
+    }
+  }, [toast]);
 
   const handleTestConnection = async () => {
     setIsTestingConnection(true);
