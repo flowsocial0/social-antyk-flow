@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
 
     // Basic scopes that don't require app review
     // Note: For posting to pages, you'll need 'pages_manage_posts' which requires Facebook app review
-    const scopes = ['public_profile', 'email', 'pages_show_list'].join(',');
+    const scopes = ['public_profile', 'pages_show_list'].join(',');
 
     // Build Facebook OAuth URL
     const authUrl = new URL('https://www.facebook.com/v18.0/dialog/oauth');
