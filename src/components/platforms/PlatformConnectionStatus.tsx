@@ -39,10 +39,11 @@ export const PlatformConnectionStatus = ({ platform }: PlatformConnectionStatusP
       return data;
     },
     onSuccess: (data: any) => {
-      const isOk = data?.oauth1?.ok || data?.oauth2?.ok;
+      const isOk = !!(data?.connected ?? data?.success ?? data?.oauth1?.ok ?? data?.oauth2?.ok);
+      const pageName = data?.pageName || data?.page_name;
       toast({
         title: isOk ? "✅ Połączenie działa" : "❌ Problem z połączeniem",
-        description: isOk ? "Konto jest prawidłowo połączone" : "Sprawdź ustawienia połączenia",
+        description: isOk ? (pageName ? `Połączono jako: ${pageName}` : "Konto jest prawidłowo połączone") : "Sprawdź ustawienia połączenia",
         variant: isOk ? "default" : "destructive",
       });
     },
