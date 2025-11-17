@@ -48,11 +48,21 @@ export default function SocialAccounts() {
   const connectX = async () => {
     setIsLoadingX(true);
     try {
-      const { data, error } = await supabase.functions.invoke('twitter-oauth-start');
+      const redirectUri = `${window.location.origin}/twitter-callback`;
+      const { data, error } = await supabase.functions.invoke('twitter-oauth-start', {
+        body: { redirectUri }
+      });
       
       if (error) throw error;
       
       if (data?.url) {
+        // Store code verifier for callback
+        if (data.codeVerifier) {
+          sessionStorage.setItem('twitter_code_verifier', data.codeVerifier);
+        }
+        if (data.state) {
+          sessionStorage.setItem('twitter_state', data.state);
+        }
         window.location.href = data.url;
       }
     } catch (error: any) {
@@ -68,11 +78,17 @@ export default function SocialAccounts() {
   const connectFacebook = async () => {
     setIsLoadingFB(true);
     try {
-      const { data, error } = await supabase.functions.invoke('facebook-oauth-start');
+      const redirectUri = `${window.location.origin}/oauth/facebook/callback`;
+      const { data, error } = await supabase.functions.invoke('facebook-oauth-start', {
+        body: { redirectUri }
+      });
       
       if (error) throw error;
       
       if (data?.url) {
+        if (data.state) {
+          sessionStorage.setItem('facebook_state', data.state);
+        }
         window.location.href = data.url;
       }
     } catch (error: any) {

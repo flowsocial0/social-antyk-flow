@@ -71,11 +71,17 @@ const PlatformFacebook = () => {
 
   const handleConnectFacebook = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('facebook-oauth-start');
+      const redirectUri = `${window.location.origin}/oauth/facebook/callback`;
+      const { data, error } = await supabase.functions.invoke('facebook-oauth-start', {
+        body: { redirectUri }
+      });
       
       if (error) throw error;
       
       if (data?.url) {
+        if (data.state) {
+          sessionStorage.setItem('facebook_state', data.state);
+        }
         window.location.href = data.url;
       }
     } catch (error: any) {

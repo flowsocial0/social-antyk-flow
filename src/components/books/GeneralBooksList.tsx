@@ -34,14 +34,7 @@ export const GeneralBooksList = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
-      setCurrentPage(1); // Reset to first page on search
-      
-      // Restore focus and move cursor to end after debounce
-      if (searchInputRef.current) {
-        searchInputRef.current.focus();
-        const length = searchQuery.length;
-        searchInputRef.current.setSelectionRange(length, length);
-      }
+      setCurrentPage(1);
     }, 500);
 
     return () => clearTimeout(timer);
@@ -73,6 +66,15 @@ export const GeneralBooksList = () => {
   const books = booksData?.books;
   const totalCount = booksData?.totalCount || 0;
   const totalPages = Math.ceil(totalCount / itemsPerPage);
+
+  // Restore focus after search completes
+  useEffect(() => {
+    if (debouncedSearchQuery && searchInputRef.current && !isLoading) {
+      searchInputRef.current.focus();
+      const length = searchQuery.length;
+      searchInputRef.current.setSelectionRange(length, length);
+    }
+  }, [debouncedSearchQuery, isLoading, searchQuery.length]);
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
