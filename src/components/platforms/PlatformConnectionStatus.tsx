@@ -8,9 +8,10 @@ import { CheckCircle2, XCircle, Loader2, RefreshCw, Link as LinkIcon } from "luc
 
 interface PlatformConnectionStatusProps {
   platform: string;
+  onConnect?: () => void;
 }
 
-export const PlatformConnectionStatus = ({ platform }: PlatformConnectionStatusProps) => {
+export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnectionStatusProps) => {
   const { toast } = useToast();
 
   const { data: tokenData, isLoading } = useQuery({
@@ -57,7 +58,9 @@ export const PlatformConnectionStatus = ({ platform }: PlatformConnectionStatusP
   });
 
   const handleConnect = async () => {
-    if (platform === "x" || platform === "facebook") {
+    if (onConnect) {
+      onConnect();
+    } else if (platform === "x" || platform === "facebook") {
       // Start OAuth flow
       window.location.href = "/settings/social-accounts";
     } else {

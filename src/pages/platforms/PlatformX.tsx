@@ -7,10 +7,50 @@ import { PlatformBooksList } from "@/components/platforms/PlatformBooksList";
 import { PlatformConnectionStatus } from "@/components/platforms/PlatformConnectionStatus";
 import { PlatformStats } from "@/components/platforms/PlatformStats";
 import { PlatformAnalytics } from "@/components/platforms/PlatformAnalytics";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export default function PlatformX() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+
+  const handleConnectX = async () => {
+    try {
+      console.log("Starting X OAuth flow...");
+      const redirectUri = `${window.location.origin}/twitter-callback`;
+      console.log("Redirect URI:", redirectUri);
+      
+      const { data, error } = await supabase.functions.invoke('twitter-oauth-start', {
+        body: { redirectUri }
+      });
+      
+      console.log("OAuth response:", data, error);
+      
+      if (error) throw error;
+      
+      if (data?.authUrl) {
+        // Store code verifier for callback
+        if (data.codeVerifier) {
+          sessionStorage.setItem('twitter_code_verifier', data.codeVerifier);
+        }
+        if (data.state) {
+          sessionStorage.setItem('twitter_state', data.state);
+        }
+        console.log("Redirecting to:", data.authUrl);
+        window.location.href = data.authUrl;
+      } else {
+        throw new Error("No authorization URL received");
+      }
+    } catch (error: any) {
+      console.error("Error connecting X:", error);
+      toast({
+        title: "Błąd podczas łączenia z X",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -44,7 +84,7 @@ export default function PlatformX() {
 
         {/* Connection Status & Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <PlatformConnectionStatus platform="x" />
+          <PlatformConnectionStatus platform="x" onConnect={handleConnectX} />
           <PlatformStats platform="x" />
         </div>
 
