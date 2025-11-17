@@ -153,12 +153,13 @@ async function generatePostsContent(body: any, apiKey: string) {
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // Get available books for sales posts
+  // Get available books for sales posts (exclude frozen books)
   const salesPostsCount = structure.filter((item: any) => item.type === "sales").length;
   const { data: availableBooks, error: booksError } = await supabase
     .from("books")
     .select("id, title, description, sale_price, product_url, campaign_post_count")
     .eq("is_product", true)
+    .eq("exclude_from_campaigns", false)
     .order("sale_price", { ascending: false, nullsFirst: false })
     .order("campaign_post_count", { ascending: true })
     .order("last_campaign_date", { ascending: true, nullsFirst: true })
@@ -170,6 +171,25 @@ async function generatePostsContent(body: any, apiKey: string) {
   }
 
   console.log(`Found ${availableBooks?.length || 0} available books for ${salesPostsCount} sales posts`);
+
+  // Fetch all books with descriptions for content context
+  const { data: allBooksWithDescriptions, error: allBooksError } = await supabase
+    .from("books")
+    .select("title, description")
+    .eq("exclude_from_campaigns", false)
+    .not("description", "is", null)
+    .limit(100);
+
+  if (allBooksError) {
+    console.error("Error fetching books descriptions:", allBooksError);
+  }
+
+  // Build book context for content generation
+  const booksContext = (allBooksWithDescriptions || [])
+    .map((book: any) => `- ${book.title}: ${book.description}`)
+    .join('\n');
+
+  console.log(`Loaded ${allBooksWithDescriptions?.length || 0} book descriptions for content context`);
 
   // Fetch content history for deduplication (last 6 months)
   const sixMonthsAgo = new Date();
@@ -292,6 +312,11 @@ Post powinien:
 WAŻNE: NIE dodawaj informacji o liczbie znaków do treści posta.`;
         }
       } else if (item.type === 'content') {
+        // Add book context for content posts
+        const booksContextNote = booksContext 
+          ? `\n\nKONTEKST KSIĘGARNI - dostępne książki patriotyczne:\n${booksContext}\n\nWAŻNE: Twórz ciekawostki, quizy i eventy, które NATURALNIE nawiązują do tematyki naszych książek patriotycznych. Nie wspominaj bezpośrednio tytułów książek, ale inspiruj się ich tematyką (historia Polski, bohaterowie narodowi, wydarzenia patriotyczne). Dzięki temu treść będzie spójna z ofertą księgarni.\n`
+          : '';
+
         // Add deduplication instruction for content posts
         let deduplicationNote = '\n\n';
         
@@ -307,7 +332,9 @@ WAŻNE: NIE dodawaj informacji o liczbie znaków do treści posta.`;
         }
         
         if (deduplicationNote.trim()) {
-          prompt += deduplicationNote + 'Wygeneruj całkowicie NOWY, UNIKALNY temat, który nie pokrywa się z powyższymi.';
+          prompt += booksContextNote + deduplicationNote + 'Wygeneruj całkowicie NOWY, UNIKALNY temat, który nie pokrywa się z powyższymi.';
+        } else {
+          prompt += booksContextNote;
         }
       }
 

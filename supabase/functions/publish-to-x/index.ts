@@ -414,7 +414,7 @@ Deno.serve(async (req) => {
         }
 
         // Format tweet text - text already contains URL for sales posts from campaign generation
-        let tweetText = campaignPost.text;
+        let tweetText = campaignPost.text + '\n\n(ai)';
 
         // Upload media if book has an image (REQUIRED for sales posts)
         let mediaIds: string[] = [];
@@ -613,11 +613,11 @@ Deno.serve(async (req) => {
         let tweetText;
         if (book.ai_generated_text) {
           // Use AI-generated text from database
-          tweetText = `${book.ai_generated_text}\n\n${book.product_url}`;
+          tweetText = `${book.ai_generated_text}\n\n${book.product_url}\n\n(ai)`;
           console.log("Using AI-generated text from database");
         } else if (customText) {
           // Fallback to custom text parameter (for backwards compatibility)
-          tweetText = customText;
+          tweetText = `${customText}\n\n(ai)`;
           console.log("Using custom text parameter");
         } else {
           // Use default visual template
@@ -636,7 +636,7 @@ Deno.serve(async (req) => {
             tweetText += `${truncatedDesc}\n\n`;
           }
           
-          tweetText += `🔥 Kup teraz:\n👉 ${book.product_url}`;
+          tweetText += `🔥 Kup teraz:\n👉 ${book.product_url}\n\n(ai)`;
         }
 
         console.log("Tweet to send:", tweetText);

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, Upload, Calendar, RefreshCw, Download, Sparkles, Share2, ChevronDown, FileDown } from "lucide-react";
+import { Plus, Upload, Calendar, RefreshCw, Download, Sparkles, Share2, ChevronDown, FileDown, Zap } from "lucide-react";
 import { ImportCSVDialog } from "@/components/books/ImportCSVDialog";
 import { AddBookDialog } from "@/components/books/AddBookDialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -65,7 +65,118 @@ export const QuickActions = () => {
     toast.success("Szablon XML został pobrany");
   };
 
+  const launchExpressCampaign = async () => {
+    try {
+      // Check connected platforms
+      const { data: xData } = await supabase.from('twitter_oauth_tokens').select('id').limit(1).maybeSingle();
+      const { data: fbData } = await supabase.from('facebook_oauth_tokens').select('id').limit(1).maybeSingle();
+      
+      if (!xData && !fbData) {
+        toast.error("Brak połączonych platform", {
+          description: "Połącz najpierw X lub Facebook aby uruchomić kampanię"
+        });
+        return;
+      }
+
+      toast.loading("Tworzenie kampanii Express...", { id: "express-campaign" });
+
+      // Calculate dates
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() + 1); // Start tomorrow
+      startDate.setHours(8, 0, 0, 0);
+
+      const campaigns = [];
+
+      // Create X campaign if connected
+      if (xData) {
+        const xPostingTimes = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00", "22:00", "00:00"];
+        const xTotalPosts = 9 * 30; // 9 posts/day * 30 days
+        const xContentPosts = Math.floor(xTotalPosts * 0.8);
+        const xSalesPosts = xTotalPosts - xContentPosts;
+
+        const xCampaignData = {
+          name: `Kampania Express X - ${new Date().toLocaleDateString('pl-PL')}`,
+          description: "Automatycznie wygenerowana kampania miesięczna dla platformy X",
+          duration_days: 30,
+          posts_per_day: 9,
+          content_posts_count: xContentPosts,
+          sales_posts_count: xSalesPosts,
+          posting_times: xPostingTimes,
+          start_date: startDate.toISOString(),
+          target_platforms: ["x"],
+          status: "draft"
+        };
+
+        const { data: xCampaign, error: xError } = await supabase
+          .from('campaigns')
+          .insert(xCampaignData)
+          .select()
+          .single();
+
+        if (!xError && xCampaign) {
+          campaigns.push({ id: xCampaign.id, platform: 'x', postsPerDay: 9 });
+        }
+      }
+
+      // Create Facebook campaign if connected
+      if (fbData) {
+        const fbPostingTimes = Array.from({length: 24}, (_, i) => `${i.toString().padStart(2, '0')}:00`);
+        const fbTotalPosts = 24 * 30; // 24 posts/day * 30 days
+        const fbContentPosts = Math.floor(fbTotalPosts * 0.8);
+        const fbSalesPosts = fbTotalPosts - fbContentPosts;
+
+        const fbCampaignData = {
+          name: `Kampania Express Facebook - ${new Date().toLocaleDateString('pl-PL')}`,
+          description: "Automatycznie wygenerowana kampania miesięczna dla Facebooka",
+          duration_days: 30,
+          posts_per_day: 24,
+          content_posts_count: fbContentPosts,
+          sales_posts_count: fbSalesPosts,
+          posting_times: fbPostingTimes,
+          start_date: startDate.toISOString(),
+          target_platforms: ["facebook"],
+          status: "draft"
+        };
+
+        const { data: fbCampaign, error: fbError } = await supabase
+          .from('campaigns')
+          .insert(fbCampaignData)
+          .select()
+          .single();
+
+        if (!fbError && fbCampaign) {
+          campaigns.push({ id: fbCampaign.id, platform: 'facebook', postsPerDay: 24 });
+        }
+      }
+
+      if (campaigns.length === 0) {
+        toast.error("Nie udało się utworzyć kampanii", { id: "express-campaign" });
+        return;
+      }
+
+      toast.success(`Utworzono ${campaigns.length} kampanię/kampanie Express`, {
+        id: "express-campaign",
+        description: campaigns.map(c => `${c.platform.toUpperCase()}: ${c.postsPerDay} postów/dzień przez miesiąc`).join(', ')
+      });
+
+      navigate("/campaigns");
+    } catch (error) {
+      console.error("Error creating express campaign:", error);
+      toast.error("Błąd podczas tworzenia kampanii", {
+        id: "express-campaign",
+        description: error instanceof Error ? error.message : "Nieznany błąd"
+      });
+    }
+  };
+
   const actions = [
+    {
+      icon: Zap,
+      label: "Kampania Express",
+      description: "Miesiąc na wszystkich platformach",
+      variant: "default" as const,
+      onClick: launchExpressCampaign,
+    },
     {
       icon: Share2,
       label: "Platformy społecznościowe",

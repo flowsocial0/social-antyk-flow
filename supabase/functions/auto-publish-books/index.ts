@@ -47,14 +47,17 @@ Deno.serve(async (req) => {
     console.log('Current time:', new Date().toISOString());
 
     // Get book platform content that is ready to be published
+    // Get book platform content that should be published now
+    // Exclude books that are frozen from campaigns
     const { data: contentToPublish, error: fetchError } = await supabase
       .from('book_platform_content')
       .select(`
         *,
-        book:books(id, code, title, image_url, sale_price, promotional_price)
+        book:books!inner(id, code, title, image_url, sale_price, promotional_price, exclude_from_campaigns)
       `)
       .eq('published', false)
       .eq('auto_publish_enabled', true)
+      .eq('book.exclude_from_campaigns', false)
       .lte('scheduled_publish_at', new Date().toISOString())
       .order('scheduled_publish_at', { ascending: true });
 
