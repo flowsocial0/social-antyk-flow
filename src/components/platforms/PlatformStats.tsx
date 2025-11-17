@@ -11,29 +11,58 @@ export const PlatformStats = ({ platform }: PlatformStatsProps) => {
   const { data: stats, isLoading } = useQuery({
     queryKey: ["platform-stats", platform],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      // Fetch book platform content stats
+      const { data: bookContentData, error: bookError } = await (supabase as any)
         .from("book_platform_content")
         .select("*")
         .eq("platform", platform);
 
-      if (error) throw error;
+      if (bookError) throw bookError;
 
-      const total = data.length;
-      const published = data.filter((c: any) => c.published).length;
-      const scheduled = data.filter((c: any) => c.auto_publish_enabled && !c.published).length;
-      const withAI = data.filter((c: any) => c.ai_generated_text).length;
+      // Fetch campaign posts stats - check if platform is in the platforms jsonb array
+      const { data: campaignData, error: campaignError } = await (supabase as any)
+        .from("campaign_posts")
+        .select("*");
 
-      // Get last published
-      const lastPublished = data
+      if (campaignError) throw campaignError;
+
+      // Filter campaign posts that include this platform in their platforms array
+      const campaignPostsForPlatform = (campaignData || []).filter((post: any) => {
+        const platforms = post.platforms || [];
+        return platforms.includes(platform);
+      });
+
+      const bookTotal = bookContentData.length;
+      const bookPublished = bookContentData.filter((c: any) => c.published).length;
+      const bookScheduled = bookContentData.filter((c: any) => c.auto_publish_enabled && !c.published).length;
+      const bookWithAI = bookContentData.filter((c: any) => c.ai_generated_text).length;
+
+      const campaignTotal = campaignPostsForPlatform.length;
+      const campaignPublished = campaignPostsForPlatform.filter((c: any) => c.status === 'published').length;
+      const campaignScheduled = campaignPostsForPlatform.filter((c: any) => c.status === 'scheduled').length;
+
+      // Get last published from both sources
+      const bookLastPublished = bookContentData
         .filter((c: any) => c.published && c.published_at)
         .sort((a: any, b: any) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())[0];
 
+      const campaignLastPublished = campaignPostsForPlatform
+        .filter((c: any) => c.published_at)
+        .sort((a: any, b: any) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())[0];
+
+      let lastPublished = bookLastPublished?.published_at;
+      if (campaignLastPublished?.published_at) {
+        if (!lastPublished || new Date(campaignLastPublished.published_at) > new Date(lastPublished)) {
+          lastPublished = campaignLastPublished.published_at;
+        }
+      }
+
       return {
-        total,
-        published,
-        scheduled,
-        withAI,
-        lastPublished: lastPublished?.published_at,
+        total: bookTotal + campaignTotal,
+        published: bookPublished + campaignPublished,
+        scheduled: bookScheduled + campaignScheduled,
+        withAI: bookWithAI,
+        lastPublished,
       };
     },
   });

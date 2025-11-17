@@ -136,6 +136,11 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Add AI disclaimer for Facebook
+    if (postText) {
+      postText += '\n\nTekst wygenerowany przez sztuczny algorytm';
+    }
+
     console.log('Post text:', postText);
     console.log('Product URL:', productUrl);
 
