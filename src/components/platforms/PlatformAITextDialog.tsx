@@ -113,6 +113,12 @@ export const PlatformAITextDialog = ({
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      // Validate book ID is a proper UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!book?.id || !uuidRegex.test(book.id)) {
+        throw new Error("Nieprawidłowy ID książki. Odśwież stronę i spróbuj ponownie.");
+      }
+
       if (existingContent) {
         // Update existing content
         const { error } = await (supabase as any)
