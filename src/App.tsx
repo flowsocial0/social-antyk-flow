@@ -34,6 +34,7 @@ import PlatformGab from "./pages/platforms/PlatformGab";
 import PlatformParler from "./pages/platforms/PlatformParler";
 import ScheduleOverview from "./pages/ScheduleOverview";
 import Platforms from "./pages/Platforms";
+import ExpressCampaignLaunch from "./pages/ExpressCampaignLaunch";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,7 @@ const App = () => (
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/campaigns" element={<Campaigns />} />
           <Route path="/campaigns/new" element={<CampaignsNew />} />
+          <Route path="/express-campaign-launch" element={<ExpressCampaignLaunch />} />
           <Route path="/campaigns/:id" element={<CampaignDetails />} />
           <Route path="/settings/social-accounts" element={<SocialAccounts />} />
           <Route path="/twitter-callback" element={<TwitterCallback />} />

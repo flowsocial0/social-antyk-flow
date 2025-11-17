@@ -156,10 +156,12 @@ export const QuickActions = () => {
 
       toast.success(`Utworzono ${campaigns.length} kampanię/kampanie Express`, {
         id: "express-campaign",
-        description: campaigns.map(c => `${c.platform.toUpperCase()}: ${c.postsPerDay} postów/dzień przez miesiąc`).join(', ')
+        description: "Przekierowywanie do automatycznego uruchomienia..."
       });
 
-      navigate("/campaigns");
+      // Redirect to launch page with campaign IDs
+      const campaignIdsParam = campaigns.map(c => c.id).join(',');
+      navigate(`/express-campaign-launch?campaigns=${campaignIdsParam}`);
     } catch (error) {
       console.error("Error creating express campaign:", error);
       toast.error("Błąd podczas tworzenia kampanii", {
