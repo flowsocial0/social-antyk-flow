@@ -84,6 +84,7 @@ export type Database = {
           code: string
           created_at: string
           description: string | null
+          exclude_from_campaigns: boolean | null
           id: string
           image_url: string | null
           is_product: boolean | null
@@ -107,6 +108,7 @@ export type Database = {
           code: string
           created_at?: string
           description?: string | null
+          exclude_from_campaigns?: boolean | null
           id?: string
           image_url?: string | null
           is_product?: boolean | null
@@ -130,6 +132,7 @@ export type Database = {
           code?: string
           created_at?: string
           description?: string | null
+          exclude_from_campaigns?: boolean | null
           id?: string
           image_url?: string | null
           is_product?: boolean | null

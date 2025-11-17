@@ -5,38 +5,51 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Loader2, ExternalLink, Eye, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, ExternalLink, Eye, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Snowflake } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Tables } from "@/integrations/supabase/types";
+import { useToast } from "@/hooks/use-toast";
 
 type SortColumn = "code" | "title" | "sale_price";
 type SortDirection = "asc" | "desc";
 
 export const GeneralBooksList = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [sortColumn, setSortColumn] = useState<SortColumn>("code");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
   const [pageInput, setPageInput] = useState<string>("1");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>("");
 
   useEffect(() => {
     setPageInput(String(currentPage));
   }, [currentPage]);
 
-  const { data: booksData, isLoading } = useQuery({
-    queryKey: ["general-books", sortColumn, sortDirection, currentPage, searchQuery],
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setCurrentPage(1); // Reset to first page on search
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const { data: booksData, isLoading, refetch } = useQuery({
+    queryKey: ["general-books", sortColumn, sortDirection, currentPage, debouncedSearchQuery],
     queryFn: async () => {
       const from = (currentPage - 1) * itemsPerPage;
       const to = from + itemsPerPage - 1;
 
       let query = supabase.from("books").select("*", { count: "exact" });
 
-      if (searchQuery.trim()) {
+      if (debouncedSearchQuery.trim()) {
         query = query.or(
-          `code.ilike.%${searchQuery}%,title.ilike.%${searchQuery}%,sale_price.eq.${parseFloat(searchQuery) || 0}`,
+          `code.ilike.%${debouncedSearchQuery}%,title.ilike.%${debouncedSearchQuery}%,sale_price.eq.${parseFloat(debouncedSearchQuery) || 0}`,
         );
       }
 
@@ -84,6 +97,33 @@ export const GeneralBooksList = () => {
       setCurrentPage(page);
     } else {
       setPageInput(String(currentPage));
+    }
+  };
+
+  const toggleExcludeFromCampaigns = async (bookId: string, currentValue: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("books")
+        .update({ exclude_from_campaigns: !currentValue })
+        .eq("id", bookId);
+
+      if (error) throw error;
+
+      toast({
+        title: !currentValue ? "Książka zamrożona" : "Książka odmrożona",
+        description: !currentValue 
+          ? "Książka nie będzie uczestniczyć w publikacjach i kampaniach" 
+          : "Książka może uczestniczyć w publikacjach i kampaniach",
+      });
+
+      refetch();
+    } catch (error) {
+      console.error("Error toggling exclude_from_campaigns:", error);
+      toast({
+        title: "Błąd",
+        description: "Nie udało się zmienić statusu książki",
+        variant: "destructive",
+      });
     }
   };
 
@@ -153,6 +193,7 @@ export const GeneralBooksList = () => {
                     <SortIcon column="sale_price" />
                   </Button>
                 </TableHead>
+                <TableHead className="text-center">Publikacja</TableHead>
                 <TableHead className="text-right">Akcje</TableHead>
               </TableRow>
             </TableHeader>
@@ -180,6 +221,17 @@ export const GeneralBooksList = () => {
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        variant={book.exclude_from_campaigns ? "destructive" : "ghost"}
+                        size="sm"
+                        onClick={() => toggleExcludeFromCampaigns(book.id, book.exclude_from_campaigns || false)}
+                        title={book.exclude_from_campaigns ? "Odmroź - włącz publikację" : "Zamroź - wyłącz publikację"}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Snowflake className={`h-4 w-4 ${book.exclude_from_campaigns ? 'fill-current' : ''}`} />
+                      </Button>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         {book.product_url && (
@@ -206,7 +258,7 @@ export const GeneralBooksList = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     {searchQuery ? "Nie znaleziono książek pasujących do wyszukiwania" : "Brak książek w bazie"}
                   </TableCell>
                 </TableRow>
