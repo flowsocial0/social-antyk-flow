@@ -119,8 +119,10 @@ export const PlatformAITextDialog = ({
         throw new Error("Nieprawidłowy ID książki. Odśwież stronę i spróbuj ponownie.");
       }
 
-      if (existingContent) {
-        // Update existing content
+      const isExistingValid = typeof existingContent?.id === 'string' && uuidRegex.test(existingContent.id);
+
+      if (isExistingValid) {
+        // Update existing content (only when existingContent.id is a valid UUID)
         const { error } = await (supabase as any)
           .from("book_platform_content")
           .update({
@@ -130,7 +132,7 @@ export const PlatformAITextDialog = ({
           .eq("id", existingContent.id);
         if (error) throw error;
       } else {
-        // Create new content
+        // Create new content when there is no valid existing record (handles temp-* IDs)
         const { error } = await (supabase as any)
           .from("book_platform_content")
           .insert({
