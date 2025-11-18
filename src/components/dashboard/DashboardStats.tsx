@@ -105,7 +105,7 @@ export const DashboardStats = () => {
       value: `2/13`,
       icon: Activity,
       description: "Połączone",
-      trend: "Facebook, X, Instagram",
+      trend: "X, Facebook",
     },
   ];
 
