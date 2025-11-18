@@ -9,14 +9,12 @@ export const DashboardStats = () => {
   const { data: books } = useQuery({
     queryKey: ["books"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("books")
-        .select("*");
+      const { data, error } = await supabase.from("books").select("*");
       if (error) throw error;
       return data;
     },
     staleTime: 300000, // 5 minutes
-    refetchInterval: 300000 // Refetch every 5 minutes
+    refetchInterval: 300000, // Refetch every 5 minutes
   });
 
   // Fetch scheduled posts (next 7 days)
@@ -34,12 +32,12 @@ export const DashboardStats = () => {
         .eq("auto_publish_enabled", true)
         .gte("scheduled_publish_at", now.toISOString())
         .lte("scheduled_publish_at", next7Days.toISOString());
-      
+
       if (error) throw error;
       return data;
     },
     staleTime: 180000, // 3 minutes
-    refetchInterval: 180000 // Refetch every 3 minutes
+    refetchInterval: 180000, // Refetch every 3 minutes
   });
 
   // Fetch published this month
@@ -54,29 +52,25 @@ export const DashboardStats = () => {
         .select("*")
         .eq("published", true)
         .gte("updated_at", startOfMonth.toISOString());
-      
+
       if (error) throw error;
       return data;
     },
     staleTime: 300000, // 5 minutes
-    refetchInterval: 300000 // Refetch every 5 minutes
+    refetchInterval: 300000, // Refetch every 5 minutes
   });
 
   // Check Twitter connection
   const { data: twitterTokens } = useQuery({
     queryKey: ["twitter-tokens"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("twitter_oauth_tokens")
-        .select("*")
-        .limit(1)
-        .maybeSingle();
-      
+      const { data, error } = await supabase.from("twitter_oauth_tokens").select("*").limit(1).maybeSingle();
+
       if (error) throw error;
       return data;
     },
     staleTime: 600000, // 10 minutes
-    refetchInterval: false // Don't auto-refetch, only on mount/focus
+    refetchInterval: false, // Don't auto-refetch, only on mount/focus
   });
 
   const totalBooks = books?.length || 0;
@@ -90,29 +84,29 @@ export const DashboardStats = () => {
       value: totalBooks.toString(),
       icon: BookOpen,
       description: "W bibliotece",
-      trend: "+0 w tym tygodniu"
+      trend: "+0 w tym tygodniu",
     },
     {
       title: "Zaplanowane posty",
       value: scheduledCount.toString(),
       icon: Calendar,
       description: "Następne 7 dni",
-      trend: "0 dzisiaj"
+      trend: "0 dzisiaj",
     },
     {
       title: "Opublikowane",
       value: publishedCount.toString(),
       icon: TrendingUp,
       description: "W tym miesiącu",
-      trend: "+0% vs. ostatni miesiąc"
+      trend: "+0% vs. ostatni miesiąc",
     },
     {
       title: "Aktywne platformy",
-      value: `${connectedPlatforms}/3`,
+      value: `2/13`,
       icon: Activity,
       description: "Połączone",
-      trend: "Facebook, X, Instagram"
-    }
+      trend: "Facebook, X, Instagram",
+    },
   ];
 
   return (
@@ -120,16 +114,14 @@ export const DashboardStats = () => {
       {stats.map((stat, index) => {
         const Icon = stat.icon;
         return (
-          <Card 
-            key={index} 
+          <Card
+            key={index}
             className="p-6 bg-gradient-card border-border/50 hover:shadow-card transition-all duration-300 hover:scale-105"
           >
             <div className="flex items-start justify-between">
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">{stat.title}</p>
-                <h3 className="text-3xl font-bold bg-gradient-accent bg-clip-text text-transparent">
-                  {stat.value}
-                </h3>
+                <h3 className="text-3xl font-bold bg-gradient-accent bg-clip-text text-transparent">{stat.value}</h3>
                 <p className="text-xs text-muted-foreground">{stat.description}</p>
               </div>
               <div className="p-3 rounded-lg bg-primary/10">
