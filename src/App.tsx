@@ -36,6 +36,7 @@ import ScheduleOverview from "./pages/ScheduleOverview";
 import Platforms from "./pages/Platforms";
 import ExpressCampaignLaunch from "./pages/ExpressCampaignLaunch";
 import NotFound from "./pages/NotFound";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 const queryClient = new QueryClient();
 
@@ -78,6 +79,7 @@ const App = () => (
           <Route path="/platforms/parler" element={<PlatformParler />} />
           <Route path="/schedule-overview" element={<ScheduleOverview />} />
           <Route path="/platforms" element={<Platforms />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
