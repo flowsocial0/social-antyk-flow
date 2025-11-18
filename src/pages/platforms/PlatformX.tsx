@@ -18,11 +18,26 @@ export default function PlatformX() {
   const handleConnectX = async () => {
     try {
       console.log("Starting X OAuth flow...");
+      
+      // Get current user session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Musisz być zalogowany",
+          description: "Zaloguj się, aby połączyć konto X",
+          variant: "destructive"
+        });
+        return;
+      }
+
       const redirectUri = `${window.location.origin}/twitter-callback`;
       console.log("Redirect URI:", redirectUri);
       
       const { data, error } = await supabase.functions.invoke('twitter-oauth-start', {
-        body: { redirectUri }
+        body: { redirectUri },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
       });
       
       console.log("OAuth response:", data, error);

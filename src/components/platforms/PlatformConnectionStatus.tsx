@@ -17,13 +17,16 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
   const { data: tokenData, isLoading } = useQuery({
     queryKey: ["oauth-token", platform],
     queryFn: async () => {
+      // Get current user session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return null;
+
       const tableName = platform === "x" ? "twitter_oauth_tokens" : `${platform}_oauth_tokens`;
       const { data, error } = await (supabase as any)
         .from(tableName)
         .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
+        .eq("user_id", session.user.id)
+        .maybeSingle();
 
       if (error && error.code !== "PGRST116") throw error;
       return data;
@@ -32,9 +35,18 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
 
   const testConnectionMutation = useMutation({
     mutationFn: async () => {
+      // Get current user session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Musisz być zalogowany');
+      }
+
       const functionName = platform === "x" ? "publish-to-x" : `publish-to-${platform}`;
       const { data, error } = await supabase.functions.invoke(functionName, {
         body: { testConnection: true },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
       });
       if (error) throw error;
       return data;

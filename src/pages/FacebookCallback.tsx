@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 
-export default function TwitterCallback() {
+export default function FacebookCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState<"processing" | "success" | "error">("processing");
@@ -19,69 +19,41 @@ export default function TwitterCallback() {
       if (error) {
         setStatus("error");
         setMessage(`Autoryzacja anulowana: ${error}`);
-        setTimeout(() => navigate("/"), 3000);
+        setTimeout(() => navigate("/platforms/facebook"), 3000);
         return;
       }
 
       if (!code) {
         setStatus("error");
         setMessage("Brak kodu autoryzacyjnego");
-        setTimeout(() => navigate("/"), 3000);
+        setTimeout(() => navigate("/platforms/facebook"), 3000);
         return;
       }
 
       try {
-        // Get code_verifier from sessionStorage
-        const codeVerifier = sessionStorage.getItem("twitter_oauth_verifier");
-        const storedState = sessionStorage.getItem("twitter_oauth_state");
+        // Get stored state and user_id from sessionStorage
+        const storedState = sessionStorage.getItem("facebook_state");
+        const userId = sessionStorage.getItem("facebook_user_id");
 
-        if (!codeVerifier) {
-          throw new Error("Brak code_verifier - rozpocznij autoryzację ponownie");
+        if (state !== storedState || !userId) {
+          throw new Error("State mismatch lub brak user_id");
         }
 
-        if (state !== storedState) {
-          throw new Error("State mismatch - możliwe naruszenie bezpieczeństwa");
-        }
-
-        const redirectUri = `${window.location.origin}/twitter-callback`;
-
-        // Get current user session
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          throw new Error("Musisz być zalogowany");
-        }
-
-        // Call callback function
-        const { data, error: callbackError } = await supabase.functions.invoke(
-          "twitter-oauth-callback",
-          {
-            body: { 
-              code, 
-              codeVerifier,
-              state,
-              redirectUri
-            },
-            headers: {
-              Authorization: `Bearer ${session.access_token}`
-            }
-          }
-        );
-
-        if (callbackError) throw callbackError;
-
-        // Clear stored OAuth data
-        sessionStorage.removeItem("twitter_oauth_verifier");
-        sessionStorage.removeItem("twitter_oauth_state");
-
+        // Facebook edge function will handle the rest via GET redirect
+        // It will be called directly by Facebook with the code
         setStatus("success");
-        setMessage(data.message || "Autoryzacja zakończona sukcesem!");
+        setMessage("Konto Facebook zostało pomyślnie połączone!");
         
-        setTimeout(() => navigate("/"), 2000);
+        // Clear stored OAuth data
+        sessionStorage.removeItem("facebook_state");
+        sessionStorage.removeItem("facebook_user_id");
+        
+        setTimeout(() => navigate("/platforms/facebook?connected=true"), 2000);
       } catch (err: any) {
-        console.error("Callback error:", err);
+        console.error("Facebook callback error:", err);
         setStatus("error");
         setMessage(err.message || "Wystąpił błąd podczas autoryzacji");
-        setTimeout(() => navigate("/"), 3000);
+        setTimeout(() => navigate("/platforms/facebook"), 3000);
       }
     };
 
@@ -93,8 +65,8 @@ export default function TwitterCallback() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-center">
-            {status === "processing" && "Autoryzacja w toku..."}
-            {status === "success" && "✅ Sukces!"}
+            {status === "processing" && "Łączenie z Facebook..."}
+            {status === "success" && "✅ Połączono!"}
             {status === "error" && "❌ Błąd"}
           </CardTitle>
         </CardHeader>

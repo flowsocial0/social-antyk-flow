@@ -18,12 +18,15 @@ export default function SocialAccounts() {
   }, []);
 
   const checkConnections = async () => {
+    // Get current user session
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
     // Check X connection
     const { data: xData } = await supabase
       .from('twitter_oauth_tokens')
       .select('*')
-      .order('created_at', { ascending: false })
-      .limit(1)
+      .eq('user_id', session.user.id)
       .maybeSingle();
 
     if (xData) {
@@ -35,8 +38,7 @@ export default function SocialAccounts() {
     const { data: fbData } = await (supabase as any)
       .from('facebook_oauth_tokens')
       .select('*')
-      .order('created_at', { ascending: false })
-      .limit(1)
+      .eq('user_id', session.user.id)
       .maybeSingle();
 
     if (fbData) {
@@ -48,9 +50,22 @@ export default function SocialAccounts() {
   const connectX = async () => {
     setIsLoadingX(true);
     try {
+      // Get current user session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Musisz być zalogowany', {
+          description: 'Zaloguj się, aby połączyć konto X'
+        });
+        setIsLoadingX(false);
+        return;
+      }
+
       const redirectUri = `${window.location.origin}/twitter-callback`;
       const { data, error } = await supabase.functions.invoke('twitter-oauth-start', {
-        body: { redirectUri }
+        body: { redirectUri },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
       });
       
       if (error) throw error;
@@ -78,9 +93,19 @@ export default function SocialAccounts() {
   const connectFacebook = async () => {
     setIsLoadingFB(true);
     try {
+      // Get current user session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Musisz być zalogowany', {
+          description: 'Zaloguj się, aby połączyć konto Facebook'
+        });
+        setIsLoadingFB(false);
+        return;
+      }
+
       const redirectUri = `${window.location.origin}/oauth/facebook/callback`;
       const { data, error } = await supabase.functions.invoke('facebook-oauth-start', {
-        body: { redirectUri }
+        body: { redirectUri, userId: session.user.id }
       });
       
       if (error) throw error;
@@ -88,6 +113,7 @@ export default function SocialAccounts() {
       if (data?.url) {
         if (data.state) {
           sessionStorage.setItem('facebook_state', data.state);
+          sessionStorage.setItem('facebook_user_id', session.user.id);
         }
         window.location.href = data.url;
       }

@@ -11,6 +11,7 @@ import CampaignsNew from "./pages/CampaignsNew";
 import CampaignDetails from "./pages/CampaignDetails";
 import SocialAccounts from "./pages/SocialAccounts";
 import TwitterCallback from "./pages/TwitterCallback";
+import FacebookCallback from "./pages/FacebookCallback";
 import BookPreview from "./pages/BookPreview";
 import BookRedirect from "./pages/BookRedirect";
 import PlatformX from "./pages/platforms/PlatformX";
@@ -56,6 +57,7 @@ const App = () => (
           <Route path="/campaigns/:id" element={<CampaignDetails />} />
           <Route path="/settings/social-accounts" element={<SocialAccounts />} />
           <Route path="/twitter-callback" element={<TwitterCallback />} />
+          <Route path="/oauth/facebook/callback" element={<FacebookCallback />} />
           <Route path="/book/:id" element={<BookPreview />} />
           <Route path="/book/:id/redirect" element={<BookRedirect />} />
           <Route path="/platforms/x" element={<PlatformX />} />

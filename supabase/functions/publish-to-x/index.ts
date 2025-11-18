@@ -78,18 +78,18 @@ const corsHeaders = {
 const BASE_URL = "https://api.x.com/2";
 const UPLOAD_URL = "https://upload.twitter.com/1.1/media/upload.json";
 
-async function getLatestOAuth2AccessToken(supabaseClient: any): Promise<string | null> {
+async function getLatestOAuth2AccessToken(supabaseClient: any, userId: string): Promise<string | null> {
   const { data, error } = await supabaseClient
     .from('twitter_oauth_tokens')
     .select('access_token, created_at')
-    .order('created_at', { ascending: false })
-    .limit(1);
+    .eq('user_id', userId)
+    .maybeSingle();
 
   if (error) {
     console.error('Failed to fetch OAuth2 token:', error);
     return null;
   }
-  return data && data.length > 0 ? data[0].access_token : null;
+  return data ? data.access_token : null;
 }
 
 async function testConnectionWithOAuth2(bearerToken: string): Promise<any> {
@@ -347,6 +347,26 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Get user_id from Authorization header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
+    }
+
+    // Create Supabase client with user token to get user_id
+    const supabaseAnon = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: userError } = await supabaseAnon.auth.getUser();
+    if (userError || !user) {
+      throw new Error('Failed to get user from token');
+    }
+
+    const userId = user.id;
+    
     validateEnvironmentVariables();
     
     const supabaseClient = createClient(
@@ -356,8 +376,8 @@ Deno.serve(async (req) => {
 
     const { bookId, bookIds, campaignPostId, testConnection: shouldTestConnection, storageBucket, storagePath, customText } = await req.json();
     
-    // Fetch latest OAuth2 token once
-    const oauth2Token = await getLatestOAuth2AccessToken(supabaseClient);
+    // Fetch latest OAuth2 token for this user
+    const oauth2Token = await getLatestOAuth2AccessToken(supabaseClient, userId);
     
     // Test connection endpoint
     if (shouldTestConnection) {

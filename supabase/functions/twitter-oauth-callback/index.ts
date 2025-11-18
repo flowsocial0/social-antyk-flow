@@ -47,6 +47,29 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Get user_id from Authorization header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
+    }
+
+    // Extract JWT token from Bearer header
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Create Supabase client with user token to get user_id
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    if (userError || !user) {
+      throw new Error('Failed to get user from token');
+    }
+
+    const userId = user.id;
+
     // Get parameters from request body
     const body = await req.json().catch(() => ({}));
     const { code, codeVerifier, state, redirectUri } = body;
@@ -79,20 +102,23 @@ Deno.serve(async (req) => {
       ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
       : null;
 
-    // Store token in database
-    const supabaseClient = createClient(
+    // Store token in database - use service role for upsert
+    const supabaseService = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { error: dbError } = await supabaseClient
+    const { error: dbError } = await supabaseService
       .from('twitter_oauth_tokens')
-      .insert({
+      .upsert({
+        user_id: userId,
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
         token_type: tokenData.token_type,
         expires_at: expiresAt,
         scope: tokenData.scope,
+      }, {
+        onConflict: 'user_id'
       });
 
     if (dbError) {

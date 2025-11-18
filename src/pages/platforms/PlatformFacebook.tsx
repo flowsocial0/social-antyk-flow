@@ -71,9 +71,15 @@ const PlatformFacebook = () => {
 
   const handleConnectFacebook = async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({ title: "Musisz być zalogowany", variant: "destructive" });
+        return;
+      }
+
       const redirectUri = `${window.location.origin}/oauth/facebook/callback`;
       const { data, error } = await supabase.functions.invoke('facebook-oauth-start', {
-        body: { redirectUri }
+        body: { redirectUri, userId: session.user.id }
       });
       
       if (error) throw error;
@@ -81,15 +87,12 @@ const PlatformFacebook = () => {
       if (data?.url) {
         if (data.state) {
           sessionStorage.setItem('facebook_state', data.state);
+          sessionStorage.setItem('facebook_user_id', session.user.id);
         }
         window.location.href = data.url;
       }
     } catch (error: any) {
-      toast({
-        title: "Błąd podczas łączenia z Facebook",
-        description: error.message,
-        variant: "destructive"
-      });
+      toast({ title: "Błąd podczas łączenia z Facebook", description: error.message, variant: "destructive" });
     }
   };
 

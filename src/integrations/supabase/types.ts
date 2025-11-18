@@ -323,6 +323,7 @@ export type Database = {
           scope: string | null
           token_type: string
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           access_token: string
@@ -334,6 +335,7 @@ export type Database = {
           scope?: string | null
           token_type?: string
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           access_token?: string
@@ -345,6 +347,7 @@ export type Database = {
           scope?: string | null
           token_type?: string
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -358,6 +361,7 @@ export type Database = {
           scope: string | null
           token_type: string
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           access_token: string
@@ -368,6 +372,7 @@ export type Database = {
           scope?: string | null
           token_type: string
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           access_token?: string
@@ -378,6 +383,7 @@ export type Database = {
           scope?: string | null
           token_type?: string
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }

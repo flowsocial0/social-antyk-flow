@@ -22,6 +22,26 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Get user_id from Authorization header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
+    }
+
+    // Create Supabase client with user token to get user_id
+    const supabaseAnon = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: userError } = await supabaseAnon.auth.getUser();
+    if (userError || !user) {
+      throw new Error('Failed to get user from token');
+    }
+
+    const userId = user.id;
+
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
@@ -46,12 +66,11 @@ Deno.serve(async (req) => {
     const isTest = Boolean(testConnection) || (!text && !bookId && !campaignPostId);
 
 
-    // Get Facebook Page Access Token
+    // Get Facebook Page Access Token for this user
     const { data: tokenData, error: tokenError } = await supabase
       .from('facebook_oauth_tokens')
       .select('*')
-      .order('created_at', { ascending: false })
-      .limit(1)
+      .eq('user_id', userId)
       .maybeSingle();
 
     if (tokenError || !tokenData) {

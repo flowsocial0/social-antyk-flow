@@ -11,6 +11,23 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Get user_id from state parameter
+    const url = new URL(req.url);
+    const state = url.searchParams.get('state');
+    
+    if (!state) {
+      throw new Error('Missing state parameter');
+    }
+    
+    // Extract userId from state (format: userId_randomString)
+    const userId = state.split('_')[0];
+    if (!userId) {
+      throw new Error('Invalid state - missing user_id');
+    }
+
+    // Get code from query parameters
+    const code = url.searchParams.get('code');
+
     const FACEBOOK_APP_ID = Deno.env.get('FACEBOOK_APP_ID');
     const FACEBOOK_APP_SECRET = Deno.env.get('FACEBOOK_APP_SECRET');
     const FACEBOOK_REDIRECT_URI = Deno.env.get('FACEBOOK_REDIRECT_URI');
@@ -100,19 +117,19 @@ Deno.serve(async (req) => {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 60);
 
-    // Delete existing tokens (only one active token at a time)
-    await supabase.from('facebook_oauth_tokens').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-
-    // Store Page Access Token
+    // Store Page Access Token (upsert based on user_id)
     const { data: tokenRecord, error: insertError } = await supabase
       .from('facebook_oauth_tokens')
-      .insert({
+      .upsert({
+        user_id: userId,
         access_token: pageAccessToken,
         token_type: 'Bearer',
         expires_at: expiresAt.toISOString(),
         page_id: pageId,
         page_name: pageName,
         scope: 'pages_manage_posts,pages_read_engagement'
+      }, {
+        onConflict: 'user_id'
       })
       .select()
       .single();
