@@ -11,8 +11,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Get user_id from state parameter
+    // Get code and state from query parameters (Facebook sends them via GET)
     const url = new URL(req.url);
+    const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
     
     if (!state) {
@@ -25,8 +26,9 @@ Deno.serve(async (req) => {
       throw new Error('Invalid state - missing user_id');
     }
 
-    // Get code from query parameters
-    const code = url.searchParams.get('code');
+    if (!code) {
+      throw new Error('Missing authorization code');
+    }
 
     const FACEBOOK_APP_ID = Deno.env.get('FACEBOOK_APP_ID');
     const FACEBOOK_APP_SECRET = Deno.env.get('FACEBOOK_APP_SECRET');
@@ -43,15 +45,6 @@ Deno.serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-    // Get code and state from query parameters (Facebook sends them via GET)
-    const url = new URL(req.url);
-    const code = url.searchParams.get('code');
-    const state = url.searchParams.get('state');
-
-    if (!code) {
-      throw new Error('Missing authorization code');
-    }
 
     console.log('Exchanging Facebook code for token...');
 
