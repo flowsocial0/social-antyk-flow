@@ -20,18 +20,18 @@ Deno.serve(async (req) => {
       throw new Error('Missing FACEBOOK_APP_ID or FACEBOOK_REDIRECT_URI environment variables');
     }
 
-    // Read userId and redirectUri from request body
-    const body = await req.json();
-    const { userId, redirectUri } = body;
+    // Read userId from request body (redirect URI is fixed to the edge function callback)
+    const body = await req.json().catch(() => ({}));
+    const { userId } = body as { userId?: string };
     
-    console.log('Request body:', { userId: userId ? 'present' : 'missing', redirectUri });
+    console.log('Request body:', { userId: userId ? 'present' : 'missing' });
 
     if (!userId) {
       throw new Error('Missing userId in request body');
     }
 
-    // Use redirectUri from body if provided, otherwise fall back to env var
-    const finalRedirectUri = redirectUri || FACEBOOK_REDIRECT_URI;
+    // Always use the configured Facebook redirect URI (edge function callback)
+    const finalRedirectUri = FACEBOOK_REDIRECT_URI;
     console.log('Using redirect URI:', finalRedirectUri);
 
     // Generate state with userId embedded (format: userId_randomString)
