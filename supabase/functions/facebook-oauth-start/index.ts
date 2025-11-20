@@ -11,6 +11,8 @@ Deno.serve(async (req) => {
   }
 
   try {
+    console.log('=== Facebook OAuth Start ===');
+    
     const FACEBOOK_APP_ID = Deno.env.get('FACEBOOK_APP_ID');
     const FACEBOOK_REDIRECT_URI = Deno.env.get('FACEBOOK_REDIRECT_URI');
 
@@ -18,8 +20,23 @@ Deno.serve(async (req) => {
       throw new Error('Missing FACEBOOK_APP_ID or FACEBOOK_REDIRECT_URI environment variables');
     }
 
-    // Generate random state for CSRF protection
-    const state = crypto.randomUUID();
+    // Read userId and redirectUri from request body
+    const body = await req.json();
+    const { userId, redirectUri } = body;
+    
+    console.log('Request body:', { userId: userId ? 'present' : 'missing', redirectUri });
+
+    if (!userId) {
+      throw new Error('Missing userId in request body');
+    }
+
+    // Use redirectUri from body if provided, otherwise fall back to env var
+    const finalRedirectUri = redirectUri || FACEBOOK_REDIRECT_URI;
+    console.log('Using redirect URI:', finalRedirectUri);
+
+    // Generate state with userId embedded (format: userId_randomString)
+    const state = `${userId}_${crypto.randomUUID()}`;
+    console.log('Generated state (userId embedded):', state);
 
     // Basic scopes that don't require app review
     // Note: For posting to pages, you'll need 'pages_manage_posts' which requires Facebook app review
@@ -28,7 +45,7 @@ Deno.serve(async (req) => {
     // Build Facebook OAuth URL
     const authUrl = new URL('https://www.facebook.com/v18.0/dialog/oauth');
     authUrl.searchParams.set('client_id', FACEBOOK_APP_ID);
-    authUrl.searchParams.set('redirect_uri', FACEBOOK_REDIRECT_URI);
+    authUrl.searchParams.set('redirect_uri', finalRedirectUri);
     authUrl.searchParams.set('scope', scopes);
     authUrl.searchParams.set('state', state);
     authUrl.searchParams.set('response_type', 'code');

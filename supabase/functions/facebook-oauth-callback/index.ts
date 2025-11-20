@@ -11,10 +11,17 @@ Deno.serve(async (req) => {
   }
 
   try {
+    console.log('=== Facebook OAuth Callback ===');
+    
     // Get code and state from query parameters (Facebook sends them via GET)
     const url = new URL(req.url);
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
+    
+    console.log('Received params:', { 
+      code: code ? 'present' : 'missing', 
+      state: state || 'missing' 
+    });
     
     if (!state) {
       throw new Error('Missing state parameter');
@@ -22,6 +29,8 @@ Deno.serve(async (req) => {
     
     // Extract userId from state (format: userId_randomString)
     const userId = state.split('_')[0];
+    console.log('Extracted userId from state:', userId);
+    
     if (!userId) {
       throw new Error('Invalid state - missing user_id');
     }
@@ -111,6 +120,8 @@ Deno.serve(async (req) => {
     expiresAt.setDate(expiresAt.getDate() + 60);
 
     // Store Page Access Token (upsert based on user_id)
+    console.log('Storing token for userId:', userId, 'pageId:', pageId, 'pageName:', pageName);
+    
     const { data: tokenRecord, error: insertError } = await supabase
       .from('facebook_oauth_tokens')
       .upsert({
@@ -129,10 +140,10 @@ Deno.serve(async (req) => {
 
     if (insertError) {
       console.error('Error storing Facebook token:', insertError);
-      throw new Error('Failed to store Facebook token');
+      throw new Error('Failed to store Facebook token: ' + insertError.message);
     }
 
-    console.log('Successfully stored Facebook Page token');
+    console.log('Successfully stored Facebook Page token:', tokenRecord);
 
     // Redirect user back to the application
     const redirectUrl = new URL('https://c4157687-6f8a-4875-aa6d-ac0c6ad3fb78.lovableproject.com/platforms/facebook');

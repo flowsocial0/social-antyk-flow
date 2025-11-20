@@ -22,8 +22,13 @@ Deno.serve(async (req) => {
   }
 
   try {
+    console.log('=== Publish to Facebook Request ===');
+    console.log('Method:', req.method);
+    
     // Get user_id from Authorization header
     const authHeader = req.headers.get('authorization');
+    console.log('Authorization header:', authHeader ? 'present' : 'MISSING');
+    
     if (!authHeader) {
       throw new Error('Missing authorization header');
     }
@@ -37,10 +42,12 @@ Deno.serve(async (req) => {
 
     const { data: { user }, error: userError } = await supabaseAnon.auth.getUser();
     if (userError || !user) {
+      console.error('Failed to get user from token:', userError);
       throw new Error('Failed to get user from token');
     }
 
     const userId = user.id;
+    console.log('User ID:', userId);
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -58,27 +65,38 @@ Deno.serve(async (req) => {
         testConnection: boolean | undefined;
     try {
       ({ text, bookId, campaignPostId, imageUrl, testConnection } = await req.json());
+      console.log('Request body:', { text: text ? 'present' : undefined, bookId, campaignPostId, imageUrl: imageUrl ? 'present' : undefined, testConnection });
     } catch (_) {
       // No/invalid JSON body – treat as test connection if nothing else is provided
       testConnection = true;
+      console.log('No valid JSON body, treating as test connection');
     }
 
     const isTest = Boolean(testConnection) || (!text && !bookId && !campaignPostId);
+    console.log('Is test connection:', isTest);
 
 
     // Get Facebook Page Access Token for this user
+    console.log('Fetching Facebook token for user:', userId);
+    
     const { data: tokenData, error: tokenError } = await supabase
       .from('facebook_oauth_tokens')
       .select('*')
       .eq('user_id', userId)
       .maybeSingle();
 
-    if (tokenError || !tokenData) {
+    if (tokenError) {
       console.error('Error fetching Facebook token:', tokenError);
+      throw new Error('Error fetching Facebook token: ' + tokenError.message);
+    }
+    
+    if (!tokenData) {
+      console.error('No Facebook token found for user:', userId);
       throw new Error('Facebook not connected. Please connect your Facebook account first.');
     }
 
     const { access_token, page_id, page_name, expires_at } = tokenData;
+    console.log('Found Facebook token:', { page_id, page_name, expires_at });
 
     // Check if token is expired
     if (expires_at && new Date(expires_at) < new Date()) {
@@ -185,7 +203,7 @@ Deno.serve(async (req) => {
         access_token: access_token,
       };
 
-      console.log('Publishing photo to Facebook...');
+      console.log('Publishing photo to Facebook...', { photosUrl, page_id });
       const photoResponse = await fetch(photosUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -193,6 +211,7 @@ Deno.serve(async (req) => {
       });
 
       const photoResult = await photoResponse.json();
+      console.log('Facebook photo API response:', { status: photoResponse.status, result: photoResult });
 
       if (!photoResponse.ok || photoResult.error) {
         console.error('Facebook photo API error:', photoResult);
@@ -202,7 +221,7 @@ Deno.serve(async (req) => {
       fbPostId = photoResult.id || photoResult.post_id;
       console.log('Published photo to Facebook, post ID:', fbPostId);
     } else {
-      console.log('Publishing text post to Facebook...');
+      console.log('Publishing text post to Facebook...', { fbApiUrl, page_id });
       const postResponse = await fetch(fbApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -210,6 +229,7 @@ Deno.serve(async (req) => {
       });
 
       const postResult = await postResponse.json();
+      console.log('Facebook API response:', { status: postResponse.status, result: postResult });
 
       if (!postResponse.ok || postResult.error) {
         console.error('Facebook API error:', postResult);

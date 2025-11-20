@@ -347,8 +347,13 @@ Deno.serve(async (req) => {
   }
 
   try {
+    console.log('=== Publish to X Request ===');
+    console.log('Method:', req.method);
+    
     // Get user_id from Authorization header
     const authHeader = req.headers.get('authorization');
+    console.log('Authorization header:', authHeader ? 'present' : 'MISSING');
+    
     if (!authHeader) {
       throw new Error('Missing authorization header');
     }
@@ -362,10 +367,12 @@ Deno.serve(async (req) => {
 
     const { data: { user }, error: userError } = await supabaseAnon.auth.getUser();
     if (userError || !user) {
+      console.error('Failed to get user from token:', userError);
       throw new Error('Failed to get user from token');
     }
 
     const userId = user.id;
+    console.log('User ID:', userId);
     
     validateEnvironmentVariables();
     
@@ -375,9 +382,11 @@ Deno.serve(async (req) => {
     );
 
     const { bookId, bookIds, campaignPostId, testConnection: shouldTestConnection, storageBucket, storagePath, customText } = await req.json();
+    console.log('Request body:', { bookId, bookIds: bookIds ? `${bookIds.length} items` : undefined, campaignPostId, testConnection: shouldTestConnection, storageBucket, storagePath });
     
     // Fetch latest OAuth2 token for this user
     const oauth2Token = await getLatestOAuth2AccessToken(supabaseClient, userId);
+    console.log('OAuth2 token for user:', oauth2Token ? 'found' : 'not found');
     
     // Test connection endpoint
     if (shouldTestConnection) {

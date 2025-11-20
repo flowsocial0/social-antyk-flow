@@ -129,22 +129,44 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
 
   const publishMutation = useMutation({
     mutationFn: async ({ contentId, bookId }: { contentId: string; bookId: string }) => {
-      const { data, error } = await supabase.functions.invoke("publish-to-x", {
+      // Get current session for Authorization header
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Musisz być zalogowany aby publikować');
+      }
+
+      // Select the correct function based on platform
+      const functionName = platform === 'x' ? 'publish-to-x' : 
+                          platform === 'facebook' ? 'publish-to-facebook' : 
+                          'publish-to-x'; // fallback to X for other platforms
+
+      const { data, error } = await supabase.functions.invoke(functionName, {
         body: { contentId, bookId, platform },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
+      
       if (error) throw error;
+      
+      // Check if the response indicates failure
+      if (data && !data.success && data.error) {
+        throw new Error(data.error);
+      }
+      
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["platform-content"] });
+      const platformName = platform === 'x' ? 'X' : platform === 'facebook' ? 'Facebooku' : platform;
       toast({
-        title: "Opublikowano pomyślnie",
-        description: "Post został opublikowany na X",
+        title: "✅ Opublikowano pomyślnie",
+        description: `Post został opublikowany na ${platformName}`,
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Błąd publikacji",
+        title: "❌ Błąd publikacji",
         description: error.message || "Nie udało się opublikować",
         variant: "destructive",
       });
