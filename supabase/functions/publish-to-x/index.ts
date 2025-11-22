@@ -140,7 +140,11 @@ async function verifyOAuth1(): Promise<{ ok: boolean; user?: any; status?: numbe
   }
 }
 
-async function uploadMedia(imageUrl?: string, opts?: { arrayBuffer?: ArrayBuffer; contentType?: string; oauth2Token?: string }): Promise<string> {
+async function uploadMedia(imageUrl?: string, opts?: { arrayBuffer?: ArrayBuffer; contentType?: string }): Promise<string> {
+  // CRITICAL: Always use OAuth 1.0a for media uploads
+  // X API v1.1 media endpoint does NOT support OAuth 2.0
+  console.log("📤 Uploading media with OAuth 1.0a (X API v1.1 requirement)");
+  
   const hasBuffer = !!opts?.arrayBuffer;
   let contentType = opts?.contentType || "image/jpeg";
   let imageArrayBuffer: ArrayBuffer;
@@ -170,21 +174,15 @@ async function uploadMedia(imageUrl?: string, opts?: { arrayBuffer?: ArrayBuffer
   }
   const imageBase64 = btoa(binaryString);
 
-  // First try simple upload with media_data
+  // First try simple upload with media_data (always OAuth 1.0a)
   try {
     const method = "POST";
     const formData = new FormData();
     formData.append("media_data", imageBase64);
     
-    // Use OAuth2 Bearer token if provided (user's account), otherwise OAuth 1.0a (fixed account)
-    const headers: Record<string, string> = {};
-    if (opts?.oauth2Token) {
-      headers.Authorization = `Bearer ${opts.oauth2Token}`;
-      console.log("📤 Uploading media with user's OAuth2 token (from connected account)");
-    } else {
-      headers.Authorization = generateOAuthHeader(method, UPLOAD_URL);
-      console.log("📤 Uploading media with OAuth 1.0a (fixed account - fallback)");
-    }
+    const headers: Record<string, string> = {
+      Authorization: generateOAuthHeader(method, UPLOAD_URL)
+    };
     
     const response = await fetch(UPLOAD_URL, {
       method,
@@ -206,18 +204,12 @@ async function uploadMedia(imageUrl?: string, opts?: { arrayBuffer?: ArrayBuffer
     console.warn("Simple media upload threw, will try chunked upload:", e);
   }
 
-  // Fallback: Chunked upload (INIT -> APPEND -> FINALIZE)
+  // Fallback: Chunked upload (INIT -> APPEND -> FINALIZE) - always OAuth 1.0a
   console.log("📦 Using chunked upload (INIT -> APPEND -> FINALIZE)");
   
-  // Use OAuth2 Bearer token if provided, otherwise OAuth 1.0a
-  const headers: Record<string, string> = {};
-  if (opts?.oauth2Token) {
-    headers.Authorization = `Bearer ${opts.oauth2Token}`;
-    console.log("📤 Chunked upload with user's OAuth2 token");
-  } else {
-    headers.Authorization = generateOAuthHeader("POST", UPLOAD_URL);
-    console.log("📤 Chunked upload with OAuth 1.0a (fallback)");
-  }
+  const headers: Record<string, string> = {
+    Authorization: generateOAuthHeader("POST", UPLOAD_URL)
+  };
 
   // INIT
   const initForm = new FormData();
@@ -380,7 +372,6 @@ Deno.serve(async (req) => {
     console.log('=== Publish to X Request ===');
     console.log('Method:', req.method);
     
-    // Get user_id from Authorization header
     const authHeader = req.headers.get('authorization');
     console.log('Authorization header:', authHeader ? 'present' : 'MISSING');
     
@@ -388,28 +379,51 @@ Deno.serve(async (req) => {
       throw new Error('Missing authorization header');
     }
 
-    // Create Supabase client with user token to get user_id
-    const supabaseAnon = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    
+    // Check if this is a service role call (from auto-publish-books cron job)
+    const isServiceRole = authHeader.includes(supabaseServiceKey);
+    let userId: string;
+    
+    if (isServiceRole) {
+      console.log('🔧 Service role call detected (from auto-publish-books cron)');
+      // For service role calls, get userId from the first available OAuth token
+      // The cron job runs without user context, so we use any connected account
+      const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
+      const { data: tokenData, error: tokenError } = await serviceSupabase
+        .from('twitter_oauth_tokens')
+        .select('user_id')
+        .limit(1)
+        .single();
+      
+      if (tokenError || !tokenData?.user_id) {
+        throw new Error('No X OAuth token found. Please connect your X account first.');
+      }
+      
+      userId = tokenData.user_id;
+      console.log('Using user_id from OAuth tokens:', userId);
+    } else {
+      console.log('👤 User call detected');
+      // Regular user call - get userId from JWT
+      const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } }
+      });
 
-    const { data: { user }, error: userError } = await supabaseAnon.auth.getUser();
-    if (userError || !user) {
-      console.error('Failed to get user from token:', userError);
-      throw new Error('Failed to get user from token');
+      const { data: { user }, error: userError } = await supabaseAnon.auth.getUser();
+      if (userError || !user) {
+        console.error('Failed to get user from token:', userError);
+        throw new Error('Failed to get user from token');
+      }
+
+      userId = user.id;
+      console.log('User ID:', userId);
     }
-
-    const userId = user.id;
-    console.log('User ID:', userId);
     
     validateEnvironmentVariables();
     
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 
     const { bookId, bookIds, campaignPostId, testConnection: shouldTestConnection, storageBucket, storagePath, customText } = await req.json();
     console.log('Request body:', { bookId, bookIds: bookIds ? `${bookIds.length} items` : undefined, campaignPostId, testConnection: shouldTestConnection, storageBucket, storagePath });
@@ -522,13 +536,13 @@ Deno.serve(async (req) => {
               const contentType = storageBlob.type || inferType(campaignPost.book.storage_path);
               console.log(`📸 Uploading to X.com with content type: ${contentType}`);
               
-              // Pass arrayBuffer, contentType, and oauth2Token as options object
-              const mediaId = await uploadMedia(undefined, { arrayBuffer, contentType, oauth2Token });
+              // Upload media using OAuth 1.0a (X API v1.1 requirement)
+              const mediaId = await uploadMedia(undefined, { arrayBuffer, contentType });
               mediaIds = [mediaId];
               console.log("✅ Media uploaded successfully from storage_path, media_id:", mediaId);
             } else if (campaignPost.book.image_url) {
               console.log(`📤 Uploading media from image_url: ${campaignPost.book.image_url}`);
-              const mediaId = await uploadMedia(campaignPost.book.image_url, { oauth2Token });
+              const mediaId = await uploadMedia(campaignPost.book.image_url);
               mediaIds = [mediaId];
               console.log("✅ Media uploaded successfully from image_url, media_id:", mediaId);
             }
@@ -744,7 +758,7 @@ Deno.serve(async (req) => {
               }
             };
             const contentType = storageBlob.type || inferType(book.storage_path);
-            const mediaId = await uploadMedia(undefined, { arrayBuffer, contentType, oauth2Token });
+            const mediaId = await uploadMedia(undefined, { arrayBuffer, contentType });
             mediaIds = [mediaId];
             console.log("Media uploaded successfully from book.storage_path, media_id:", mediaId);
           } else if (storageBucket && storagePath) {
@@ -766,12 +780,12 @@ Deno.serve(async (req) => {
               }
             };
             const contentType = storageBlob.type || inferType(storagePath);
-            const mediaId = await uploadMedia(undefined, { arrayBuffer, contentType, oauth2Token });
+            const mediaId = await uploadMedia(undefined, { arrayBuffer, contentType });
             mediaIds = [mediaId];
             console.log("Media uploaded successfully from storage override, media_id:", mediaId);
           } else if (book.image_url) {
             console.log("Uploading media from image_url...");
-            const mediaId = await uploadMedia(book.image_url, { oauth2Token });
+            const mediaId = await uploadMedia(book.image_url);
             mediaIds = [mediaId];
             console.log("Media uploaded successfully, media_id:", mediaId);
           }
