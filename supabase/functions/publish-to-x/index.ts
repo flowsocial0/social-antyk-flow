@@ -140,7 +140,7 @@ async function verifyOAuth1(): Promise<{ ok: boolean; user?: any; status?: numbe
   }
 }
 
-async function uploadMedia(imageUrl?: string, opts?: { arrayBuffer?: ArrayBuffer; contentType?: string }): Promise<string> {
+async function uploadMedia(imageUrl?: string, opts?: { arrayBuffer?: ArrayBuffer; contentType?: string; oauth2Token?: string }): Promise<string> {
   const hasBuffer = !!opts?.arrayBuffer;
   let contentType = opts?.contentType || "image/jpeg";
   let imageArrayBuffer: ArrayBuffer;
@@ -173,13 +173,22 @@ async function uploadMedia(imageUrl?: string, opts?: { arrayBuffer?: ArrayBuffer
   // First try simple upload with media_data
   try {
     const method = "POST";
-    const oauthHeader = generateOAuthHeader(method, UPLOAD_URL);
     const formData = new FormData();
     formData.append("media_data", imageBase64);
     
+    // Use OAuth2 Bearer token if provided (user's account), otherwise OAuth 1.0a (fixed account)
+    const headers: Record<string, string> = {};
+    if (opts?.oauth2Token) {
+      headers.Authorization = `Bearer ${opts.oauth2Token}`;
+      console.log("📤 Uploading media with user's OAuth2 token (from connected account)");
+    } else {
+      headers.Authorization = generateOAuthHeader(method, UPLOAD_URL);
+      console.log("📤 Uploading media with OAuth 1.0a (fixed account - fallback)");
+    }
+    
     const response = await fetch(UPLOAD_URL, {
       method,
-      headers: { Authorization: oauthHeader },
+      headers,
       body: formData,
     });
     
@@ -198,7 +207,17 @@ async function uploadMedia(imageUrl?: string, opts?: { arrayBuffer?: ArrayBuffer
   }
 
   // Fallback: Chunked upload (INIT -> APPEND -> FINALIZE)
-  const oauthHeader = generateOAuthHeader("POST", UPLOAD_URL);
+  console.log("📦 Using chunked upload (INIT -> APPEND -> FINALIZE)");
+  
+  // Use OAuth2 Bearer token if provided, otherwise OAuth 1.0a
+  const headers: Record<string, string> = {};
+  if (opts?.oauth2Token) {
+    headers.Authorization = `Bearer ${opts.oauth2Token}`;
+    console.log("📤 Chunked upload with user's OAuth2 token");
+  } else {
+    headers.Authorization = generateOAuthHeader("POST", UPLOAD_URL);
+    console.log("📤 Chunked upload with OAuth 1.0a (fallback)");
+  }
 
   // INIT
   const initForm = new FormData();
@@ -208,7 +227,7 @@ async function uploadMedia(imageUrl?: string, opts?: { arrayBuffer?: ArrayBuffer
 
   const initResp = await fetch(UPLOAD_URL, {
     method: "POST",
-    headers: { Authorization: oauthHeader },
+    headers,
     body: initForm,
   });
   const initText = await initResp.text();
@@ -232,7 +251,7 @@ async function uploadMedia(imageUrl?: string, opts?: { arrayBuffer?: ArrayBuffer
 
   const appendResp = await fetch(UPLOAD_URL, {
     method: "POST",
-    headers: { Authorization: oauthHeader },
+    headers,
     body: appendForm,
   });
   const appendText = await appendResp.text();
@@ -249,7 +268,7 @@ async function uploadMedia(imageUrl?: string, opts?: { arrayBuffer?: ArrayBuffer
 
   const finalizeResp = await fetch(UPLOAD_URL, {
     method: "POST",
-    headers: { Authorization: oauthHeader },
+    headers,
     body: finalizeForm,
   });
   const finalizeText = await finalizeResp.text();
@@ -503,13 +522,13 @@ Deno.serve(async (req) => {
               const contentType = storageBlob.type || inferType(campaignPost.book.storage_path);
               console.log(`📸 Uploading to X.com with content type: ${contentType}`);
               
-              // Pass arrayBuffer and contentType as options object
-              const mediaId = await uploadMedia(undefined, { arrayBuffer, contentType });
+              // Pass arrayBuffer, contentType, and oauth2Token as options object
+              const mediaId = await uploadMedia(undefined, { arrayBuffer, contentType, oauth2Token });
               mediaIds = [mediaId];
               console.log("✅ Media uploaded successfully from storage_path, media_id:", mediaId);
             } else if (campaignPost.book.image_url) {
               console.log(`📤 Uploading media from image_url: ${campaignPost.book.image_url}`);
-              const mediaId = await uploadMedia(campaignPost.book.image_url);
+              const mediaId = await uploadMedia(campaignPost.book.image_url, { oauth2Token });
               mediaIds = [mediaId];
               console.log("✅ Media uploaded successfully from image_url, media_id:", mediaId);
             }
@@ -725,7 +744,7 @@ Deno.serve(async (req) => {
               }
             };
             const contentType = storageBlob.type || inferType(book.storage_path);
-            const mediaId = await uploadMedia(undefined, { arrayBuffer, contentType });
+            const mediaId = await uploadMedia(undefined, { arrayBuffer, contentType, oauth2Token });
             mediaIds = [mediaId];
             console.log("Media uploaded successfully from book.storage_path, media_id:", mediaId);
           } else if (storageBucket && storagePath) {
@@ -747,12 +766,12 @@ Deno.serve(async (req) => {
               }
             };
             const contentType = storageBlob.type || inferType(storagePath);
-            const mediaId = await uploadMedia(undefined, { arrayBuffer, contentType });
+            const mediaId = await uploadMedia(undefined, { arrayBuffer, contentType, oauth2Token });
             mediaIds = [mediaId];
             console.log("Media uploaded successfully from storage override, media_id:", mediaId);
           } else if (book.image_url) {
             console.log("Uploading media from image_url...");
-            const mediaId = await uploadMedia(book.image_url);
+            const mediaId = await uploadMedia(book.image_url, { oauth2Token });
             mediaIds = [mediaId];
             console.log("Media uploaded successfully, media_id:", mediaId);
           }
