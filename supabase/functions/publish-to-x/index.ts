@@ -313,16 +313,18 @@ async function sendTweet(tweetText: string, mediaIds?: string[], oauth2Token?: s
     body.media = { media_ids: mediaIds };
   }
 
-  // Prefer OAuth 1.0a (more reliable for posting tweets), fall back to OAuth2 only if explicitly needed
-  const useOAuth1 = true;
-  console.log("Sending tweet...", { via: useOAuth1 ? 'OAuth1.0a' : 'OAuth2 Bearer' });
+  // Use OAuth2 user token (posts from the connected user's account)
+  if (!oauth2Token) {
+    throw new Error('No OAuth2 token provided - user must connect their X account');
+  }
+
+  console.log("Sending tweet with user's OAuth2 token (will post from connected account)");
   console.log("Tweet body:", JSON.stringify(body));
 
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  headers.Authorization = useOAuth1
-    ? generateOAuthHeader(method, url)
-    : `Bearer ${oauth2Token}`;
-
+  const headers: Record<string, string> = { 
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${oauth2Token}`
+  };
 
   const response = await fetch(url, {
     method,
@@ -342,7 +344,7 @@ async function sendTweet(tweetText: string, mediaIds?: string[], oauth2Token?: s
   }
 
   const responseData = JSON.parse(responseText);
-  console.log("✅ Tweet published successfully:", {
+  console.log("✅ Tweet published successfully from user's account:", {
     tweetId: responseData.data?.id,
     text: responseData.data?.text
   });
@@ -396,6 +398,21 @@ Deno.serve(async (req) => {
     // Fetch latest OAuth2 token for this user
     const oauth2Token = await getLatestOAuth2AccessToken(supabaseClient, userId);
     console.log('OAuth2 token for user:', oauth2Token ? 'found' : 'not found');
+    
+    // Require OAuth2 token - user must connect their X account
+    if (!oauth2Token) {
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'No X account connected. Please connect your X account first in Social Accounts settings.',
+          requiresConnection: true
+        }),
+        { 
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
     
     // Test connection endpoint
     if (shouldTestConnection) {
@@ -517,8 +534,8 @@ Deno.serve(async (req) => {
 
         console.log(`🐦 Sending tweet with ${mediaIds.length} media attachments`);
 
-        // Send tweet
-        const tweetResponse = await sendTweetWithRetry(tweetText, mediaIds, oauth2Token ?? undefined);
+        // Send tweet using user's OAuth2 token
+        const tweetResponse = await sendTweetWithRetry(tweetText, mediaIds, oauth2Token);
         console.log("Tweet sent successfully:", tweetResponse);
 
         // Update campaign post as published
@@ -743,8 +760,8 @@ Deno.serve(async (req) => {
           console.error("Failed to upload media, continuing without image:", error);
         }
 
-        // Send tweet with retry logic for rate limiting
-        const tweetResponse = await sendTweetWithRetry(tweetText, mediaIds, oauth2Token ?? undefined);
+        // Send tweet with retry logic for rate limiting (using user's OAuth2 token)
+        const tweetResponse = await sendTweetWithRetry(tweetText, mediaIds, oauth2Token);
         console.log("Tweet sent successfully:", tweetResponse);
 
         // Get or create platform content record
