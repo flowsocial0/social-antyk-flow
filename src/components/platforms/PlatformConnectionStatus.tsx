@@ -21,7 +21,20 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return null;
 
-      const tableName = platform === "x" ? "twitter_oauth_tokens" : `${platform}_oauth_tokens`;
+      // For X platform, check OAuth 1.0a tokens
+      if (platform === "x") {
+        const { data, error } = await supabase
+          .from("twitter_oauth1_tokens")
+          .select("*")
+          .eq("user_id", session.user.id)
+          .maybeSingle();
+
+        if (error && error.code !== "PGRST116") throw error;
+        return data;
+      }
+
+      // For other platforms, check OAuth2 tokens
+      const tableName = `${platform}_oauth_tokens`;
       const { data, error } = await (supabase as any)
         .from(tableName)
         .select("*")

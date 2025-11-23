@@ -17,7 +17,7 @@ export default function PlatformX() {
 
   const handleConnectX = async () => {
     try {
-      console.log("Starting X OAuth flow...");
+      console.log("Starting X OAuth 1.0a flow...");
       
       // Get current user session
       const { data: { session } } = await supabase.auth.getSession();
@@ -33,24 +33,22 @@ export default function PlatformX() {
       const redirectUri = `${window.location.origin}/twitter-callback`;
       console.log("Redirect URI:", redirectUri);
       
-      const { data, error } = await supabase.functions.invoke('twitter-oauth-start', {
+      // Call OAuth 1.0a start endpoint
+      const { data, error } = await supabase.functions.invoke('twitter-oauth1-start', {
         body: { redirectUri },
         headers: {
           Authorization: `Bearer ${session.access_token}`
         }
       });
       
-      console.log("OAuth response:", data, error);
+      console.log("OAuth 1.0a response:", data, error);
       
       if (error) throw error;
       
       if (data?.authUrl) {
-        // Store code verifier for callback
-        if (data.codeVerifier) {
-          sessionStorage.setItem('twitter_oauth_verifier', data.codeVerifier);
-        }
+        // Store state for callback verification
         if (data.state) {
-          sessionStorage.setItem('twitter_oauth_state', data.state);
+          sessionStorage.setItem('twitter_oauth1_state', data.state);
         }
         console.log("Redirecting to:", data.authUrl);
         window.location.href = data.authUrl;

@@ -24,6 +24,12 @@ verify_jwt = false
 [functions.twitter-oauth-callback]
 verify_jwt = false
 
+[functions.twitter-oauth1-start]
+verify_jwt = false
+
+[functions.twitter-oauth1-callback]
+verify_jwt = false
+
 [functions.facebook-oauth-start]
 verify_jwt = false
 

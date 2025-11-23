@@ -387,6 +387,69 @@ export type Database = {
         }
         Relationships: []
       }
+      twitter_oauth1_requests: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          oauth_token: string
+          oauth_token_secret: string
+          state: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          oauth_token: string
+          oauth_token_secret: string
+          state: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          oauth_token?: string
+          oauth_token_secret?: string
+          state?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      twitter_oauth1_tokens: {
+        Row: {
+          created_at: string | null
+          id: string
+          oauth_token: string
+          oauth_token_secret: string
+          screen_name: string | null
+          updated_at: string | null
+          user_id: string
+          x_user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          oauth_token: string
+          oauth_token_secret: string
+          screen_name?: string | null
+          updated_at?: string | null
+          user_id: string
+          x_user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          oauth_token?: string
+          oauth_token_secret?: string
+          screen_name?: string | null
+          updated_at?: string | null
+          user_id?: string
+          x_user_id?: string | null
+        }
+        Relationships: []
+      }
       xml_books: {
         Row: {
           created_at: string

@@ -3,14 +3,10 @@ import { createHmac } from "node:crypto";
 
 const API_KEY = Deno.env.get("TWITTER_CONSUMER_KEY")?.trim();
 const API_SECRET = Deno.env.get("TWITTER_CONSUMER_SECRET")?.trim();
-const ACCESS_TOKEN = Deno.env.get("TWITTER_ACCESS_TOKEN")?.trim();
-const ACCESS_TOKEN_SECRET = Deno.env.get("TWITTER_ACCESS_TOKEN_SECRET")?.trim();
 
 function validateEnvironmentVariables() {
   if (!API_KEY) throw new Error("Missing TWITTER_CONSUMER_KEY environment variable");
   if (!API_SECRET) throw new Error("Missing TWITTER_CONSUMER_SECRET environment variable");
-  if (!ACCESS_TOKEN) throw new Error("Missing TWITTER_ACCESS_TOKEN environment variable");
-  if (!ACCESS_TOKEN_SECRET) throw new Error("Missing TWITTER_ACCESS_TOKEN_SECRET environment variable");
 }
 
 function generateOAuthSignature(
@@ -20,7 +16,6 @@ function generateOAuthSignature(
   consumerSecret: string,
   tokenSecret: string
 ): string {
-  // Sort parameters alphabetically by key
   const sortedParams = Object.entries(params)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
@@ -35,13 +30,18 @@ function generateOAuthSignature(
   return signature;
 }
 
-function generateOAuthHeader(method: string, url: string): string {
+function generateOAuthHeader(
+  method: string, 
+  url: string, 
+  userAccessToken: string, 
+  userAccessTokenSecret: string
+): string {
   const oauthParams = {
     oauth_consumer_key: API_KEY!,
     oauth_nonce: Math.random().toString(36).substring(2),
     oauth_signature_method: "HMAC-SHA1",
     oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
-    oauth_token: ACCESS_TOKEN!,
+    oauth_token: userAccessToken,
     oauth_version: "1.0",
   };
 
@@ -50,7 +50,7 @@ function generateOAuthHeader(method: string, url: string): string {
     url,
     oauthParams,
     API_SECRET!,
-    ACCESS_TOKEN_SECRET!
+    userAccessTokenSecret
   );
 
   const signedOAuthParams = {
@@ -78,72 +78,27 @@ const corsHeaders = {
 const BASE_URL = "https://api.x.com/2";
 const UPLOAD_URL = "https://upload.twitter.com/1.1/media/upload.json";
 
-async function getLatestOAuth2AccessToken(supabaseClient: any, userId: string): Promise<string | null> {
+async function getLatestOAuth1Token(supabaseClient: any, userId: string): Promise<{ oauth_token: string; oauth_token_secret: string; screen_name?: string } | null> {
   const { data, error } = await supabaseClient
-    .from('twitter_oauth_tokens')
-    .select('access_token, created_at')
+    .from('twitter_oauth1_tokens')
+    .select('oauth_token, oauth_token_secret, screen_name')
     .eq('user_id', userId)
     .maybeSingle();
 
   if (error) {
-    console.error('Failed to fetch OAuth2 token:', error);
+    console.error('Failed to fetch OAuth1 token:', error);
     return null;
   }
-  return data ? data.access_token : null;
+  return data;
 }
 
-async function testConnectionWithOAuth2(bearerToken: string): Promise<any> {
-  const url = `${BASE_URL}/users/me`;
-  const method = "GET";
-
-  console.log("=== Testing Twitter OAuth 2.0 Connection ===");
-
-  const response = await fetch(url, {
-    method,
-    headers: {
-      Authorization: `Bearer ${bearerToken}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  const responseText = await response.text();
-  console.log("Test Connection - Response Status:", response.status);
-  console.log("Test Connection - Response Body:", responseText);
-
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}, body: ${responseText}`);
-  }
-
-  return JSON.parse(responseText);
-}
-
-// Verify OAuth 1.0a credentials by calling v1.1 endpoint
-async function verifyOAuth1(): Promise<{ ok: boolean; user?: any; status?: number; body?: string; error?: string }> {
-  const url = "https://api.twitter.com/1.1/account/verify_credentials.json";
-  const method = "GET";
-  const oauthHeader = generateOAuthHeader(method, url);
-  console.log("=== Testing Twitter OAuth 1.0a Connection ===");
-  const response = await fetch(url, {
-    method,
-    headers: { Authorization: oauthHeader }
-  });
-  const responseText = await response.text();
-  console.log("OAuth1 Verify - Status:", response.status);
-  console.log("OAuth1 Verify - Body:", responseText);
-  if (!response.ok) {
-    return { ok: false, status: response.status, body: responseText };
-  }
-  try {
-    return { ok: true, user: JSON.parse(responseText) };
-  } catch (_e) {
-    return { ok: true };
-  }
-}
-
-async function uploadMedia(imageUrl?: string, opts?: { arrayBuffer?: ArrayBuffer; contentType?: string }): Promise<string> {
-  // CRITICAL: Always use OAuth 1.0a for media uploads
-  // X API v1.1 media endpoint does NOT support OAuth 2.0
-  console.log("📤 Uploading media with OAuth 1.0a (X API v1.1 requirement)");
+async function uploadMedia(
+  imageUrl: string | undefined, 
+  userAccessToken: string,
+  userAccessTokenSecret: string,
+  opts?: { arrayBuffer?: ArrayBuffer; contentType?: string }
+): Promise<string> {
+  console.log("📤 Uploading media with OAuth 1.0a");
   
   const hasBuffer = !!opts?.arrayBuffer;
   let contentType = opts?.contentType || "image/jpeg";
@@ -164,24 +119,24 @@ async function uploadMedia(imageUrl?: string, opts?: { arrayBuffer?: ArrayBuffer
     console.log("Image downloaded, size:", imageArrayBuffer.byteLength, "bytes, type:", contentType);
   }
   
-  // Convert ArrayBuffer to base64 safely without stack overflow
+  // Convert ArrayBuffer to base64 safely
   const uint8Array = new Uint8Array(imageArrayBuffer);
   let binaryString = '';
-  const chunkSize = 8192; // Process in chunks to avoid stack overflow
+  const chunkSize = 8192;
   for (let i = 0; i < uint8Array.length; i += chunkSize) {
     const chunk = uint8Array.slice(i, i + chunkSize);
     binaryString += String.fromCharCode.apply(null, Array.from(chunk));
   }
   const imageBase64 = btoa(binaryString);
 
-  // First try simple upload with media_data (always OAuth 1.0a)
+  // Try simple upload first
   try {
     const method = "POST";
     const formData = new FormData();
     formData.append("media_data", imageBase64);
     
     const headers: Record<string, string> = {
-      Authorization: generateOAuthHeader(method, UPLOAD_URL)
+      Authorization: generateOAuthHeader(method, UPLOAD_URL, userAccessToken, userAccessTokenSecret)
     };
     
     const response = await fetch(UPLOAD_URL, {
@@ -204,11 +159,11 @@ async function uploadMedia(imageUrl?: string, opts?: { arrayBuffer?: ArrayBuffer
     console.warn("Simple media upload threw, will try chunked upload:", e);
   }
 
-  // Fallback: Chunked upload (INIT -> APPEND -> FINALIZE) - always OAuth 1.0a
+  // Fallback: Chunked upload
   console.log("📦 Using chunked upload (INIT -> APPEND -> FINALIZE)");
   
   const headers: Record<string, string> = {
-    Authorization: generateOAuthHeader("POST", UPLOAD_URL)
+    Authorization: generateOAuthHeader("POST", UPLOAD_URL, userAccessToken, userAccessTokenSecret)
   };
 
   // INIT
@@ -234,7 +189,7 @@ async function uploadMedia(imageUrl?: string, opts?: { arrayBuffer?: ArrayBuffer
     throw new Error("INIT did not return media_id_string");
   }
 
-  // APPEND (single chunk)
+  // APPEND
   const appendForm = new FormData();
   appendForm.append("command", "APPEND");
   appendForm.append("media_id", mediaId);
@@ -278,23 +233,22 @@ async function sleep(ms: number) {
 }
 
 async function sendTweetWithRetry(
-  tweetText: string, 
-  mediaIds?: string[], 
-  oauth2Token?: string,
+  tweetText: string,
+  userAccessToken: string,
+  userAccessTokenSecret: string,
+  mediaIds?: string[],
   maxRetries: number = 3
 ): Promise<any> {
   let lastError: Error | null = null;
   
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await sendTweet(tweetText, mediaIds, oauth2Token);
+      return await sendTweet(tweetText, userAccessToken, userAccessTokenSecret, mediaIds);
     } catch (error: any) {
       lastError = error;
       
-      // Check if it's a rate limit error (429)
       if (error.message.includes('429')) {
         if (attempt < maxRetries) {
-          // Exponential backoff: 15s, 30s, 60s
           const waitTime = Math.min(15000 * Math.pow(2, attempt), 60000);
           console.log(`Rate limited (429). Waiting ${waitTime/1000}s before retry ${attempt + 1}/${maxRetries}...`);
           await sleep(waitTime);
@@ -307,7 +261,6 @@ async function sendTweetWithRetry(
         }
       }
       
-      // For other errors, don't retry
       throw error;
     }
   }
@@ -315,7 +268,12 @@ async function sendTweetWithRetry(
   throw lastError || new Error('Failed to send tweet after retries');
 }
 
-async function sendTweet(tweetText: string, mediaIds?: string[], oauth2Token?: string): Promise<any> {
+async function sendTweet(
+  tweetText: string,
+  userAccessToken: string,
+  userAccessTokenSecret: string,
+  mediaIds?: string[]
+): Promise<any> {
   const url = `${BASE_URL}/tweets`;
   const method = "POST";
 
@@ -324,14 +282,12 @@ async function sendTweet(tweetText: string, mediaIds?: string[], oauth2Token?: s
     body.media = { media_ids: mediaIds };
   }
 
-  // CRITICAL: Use OAuth 1.0a for tweeting to match media upload authentication
-  // This ensures media and tweet come from the same account
-  console.log("Sending tweet with OAuth 1.0a (same account as media)");
+  console.log("Sending tweet with OAuth 1.0a");
   console.log("Tweet body:", JSON.stringify(body));
 
   const headers: Record<string, string> = { 
     "Content-Type": "application/json",
-    "Authorization": generateOAuthHeader(method, url)
+    "Authorization": generateOAuthHeader(method, url, userAccessToken, userAccessTokenSecret)
   };
 
   const response = await fetch(url, {
@@ -380,17 +336,15 @@ Deno.serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     
-    // Check if this is a service role call (from auto-publish-books cron job)
+    // Check if this is a service role call
     const isServiceRole = authHeader.includes(supabaseServiceKey);
     let userId: string;
     
     if (isServiceRole) {
       console.log('🔧 Service role call detected (from auto-publish-books cron)');
-      // For service role calls, get userId from the first available OAuth token
-      // The cron job runs without user context, so we use any connected account
       const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
       const { data: tokenData, error: tokenError } = await serviceSupabase
-        .from('twitter_oauth_tokens')
+        .from('twitter_oauth1_tokens')
         .select('user_id')
         .limit(1)
         .single();
@@ -403,7 +357,6 @@ Deno.serve(async (req) => {
       console.log('Using user_id from OAuth tokens:', userId);
     } else {
       console.log('👤 User call detected');
-      // Regular user call - get userId from JWT
       const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey, {
         global: { headers: { Authorization: authHeader } }
       });
@@ -425,16 +378,15 @@ Deno.serve(async (req) => {
     const { bookId, bookIds, campaignPostId, testConnection: shouldTestConnection, storageBucket, storagePath, customText } = await req.json();
     console.log('Request body:', { bookId, bookIds: bookIds ? `${bookIds.length} items` : undefined, campaignPostId, testConnection: shouldTestConnection, storageBucket, storagePath });
     
-    // Fetch latest OAuth2 token for this user
-    const oauth2Token = await getLatestOAuth2AccessToken(supabaseClient, userId);
-    console.log('OAuth2 token for user:', oauth2Token ? 'found' : 'not found');
+    // Fetch user's OAuth 1.0a tokens
+    const oauth1Token = await getLatestOAuth1Token(supabaseClient, userId);
+    console.log('OAuth1 token for user:', oauth1Token ? `found (@${oauth1Token.screen_name})` : 'not found');
     
-    // Require OAuth2 token - user must connect their X account
-    if (!oauth2Token) {
+    if (!oauth1Token) {
       return new Response(
         JSON.stringify({ 
           success: false,
-          error: 'No X account connected. Please connect your X account first in Social Accounts settings.',
+          error: 'No X account connected. Please connect your X account first.',
           requiresConnection: true
         }),
         { 
@@ -446,37 +398,57 @@ Deno.serve(async (req) => {
     
     // Test connection endpoint
     if (shouldTestConnection) {
-      console.log("Testing Twitter API connection (OAuth1 and OAuth2)...");
-
-      // OAuth1 test (does not require OAuth2 token)
-      const oauth1 = await verifyOAuth1();
-
-      // OAuth2 test (optional)
-      let oauth2: any = { ok: false, error: 'Brak ważnego tokenu OAuth2' };
-      if (oauth2Token) {
-        try {
-          const result = await testConnectionWithOAuth2(oauth2Token);
-          oauth2 = { ok: true, user: result.data ?? result };
-        } catch (e: any) {
-          oauth2 = { ok: false, error: e.message };
+      console.log("Testing Twitter API connection with OAuth 1.0a...");
+      
+      try {
+        const testUrl = "https://api.twitter.com/1.1/account/verify_credentials.json";
+        const testMethod = "GET";
+        const testHeader = generateOAuthHeader(testUrl, testMethod, oauth1Token.oauth_token, oauth1Token.oauth_token_secret);
+        
+        const testResponse = await fetch(testUrl, {
+          method: testMethod,
+          headers: { Authorization: testHeader }
+        });
+        
+        const testText = await testResponse.text();
+        console.log("Test response:", testResponse.status, testText);
+        
+        if (testResponse.ok) {
+          const userData = JSON.parse(testText);
+          return new Response(
+            JSON.stringify({
+              success: true,
+              connected: true,
+              username: userData.screen_name,
+              name: userData.name
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } else {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: `Connection test failed: ${testResponse.status}`
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
         }
+      } catch (error: any) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: error.message
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
-
-      return new Response(
-        JSON.stringify({
-          success: oauth1.ok || oauth2.ok,
-          oauth1,
-          oauth2,
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
+
     console.log("Received request:", { bookId, bookIds, campaignPostId });
 
     // Handle campaign post
     if (campaignPostId) {
       try {
-        // Get campaign post details
         const { data: campaignPost, error: postError } = await supabaseClient
           .from('campaign_posts')
           .select(`
@@ -489,7 +461,6 @@ Deno.serve(async (req) => {
         if (postError) throw postError;
         if (!campaignPost) throw new Error(`Campaign post not found: ${campaignPostId}`);
 
-        // Check if already published
         if (campaignPost.status === 'published') {
           console.log(`Campaign post ${campaignPostId} already published, skipping`);
           return new Response(
@@ -498,10 +469,8 @@ Deno.serve(async (req) => {
           );
         }
 
-        // Format tweet text - text already contains URL for sales posts from campaign generation
         let tweetText = campaignPost.text + '\n\n(ai)';
 
-        // Upload media if book has an image (REQUIRED for sales posts)
         let mediaIds: string[] = [];
         if (campaignPost.book?.image_url || campaignPost.book?.storage_path) {
           try {
@@ -533,13 +502,12 @@ Deno.serve(async (req) => {
               const contentType = storageBlob.type || inferType(campaignPost.book.storage_path);
               console.log(`📸 Uploading to X.com with content type: ${contentType}`);
               
-              // Upload media using OAuth 1.0a
-              const mediaId = await uploadMedia(undefined, { arrayBuffer, contentType });
+              const mediaId = await uploadMedia(undefined, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, { arrayBuffer, contentType });
               mediaIds = [mediaId];
               console.log("✅ Media uploaded successfully from storage_path, media_id:", mediaId);
             } else if (campaignPost.book.image_url) {
               console.log(`📤 Uploading media from image_url: ${campaignPost.book.image_url}`);
-              const mediaId = await uploadMedia(campaignPost.book.image_url);
+              const mediaId = await uploadMedia(campaignPost.book.image_url, oauth1Token.oauth_token, oauth1Token.oauth_token_secret);
               mediaIds = [mediaId];
               console.log("✅ Media uploaded successfully from image_url, media_id:", mediaId);
             }
@@ -552,23 +520,19 @@ Deno.serve(async (req) => {
               image_url: campaignPost.book?.image_url
             });
             
-            // For sales posts, media is REQUIRED - don't publish without it
             if (campaignPost.type === 'sales') {
               throw new Error(`Sales post requires image but upload failed: ${error.message}`);
             }
           }
         } else if (campaignPost.type === 'sales') {
-          // Sales posts MUST have an image
           throw new Error('Sales post missing book image (no storage_path or image_url)');
         }
 
         console.log(`🐦 Sending tweet with ${mediaIds.length} media attachments`);
 
-        // Send tweet using user's OAuth2 token
-        const tweetResponse = await sendTweetWithRetry(tweetText, mediaIds, oauth2Token);
+        const tweetResponse = await sendTweetWithRetry(tweetText, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, mediaIds);
         console.log("Tweet sent successfully:", tweetResponse);
 
-        // Update campaign post as published
         const { error: updateError } = await supabaseClient
           .from('campaign_posts')
           .update({ 
@@ -590,14 +554,12 @@ Deno.serve(async (req) => {
       } catch (error: any) {
         console.error(`Error publishing campaign post ${campaignPostId}:`, error);
         
-        // Check if it's a rate limit error (429)
         const isRateLimitError = error.statusCode === 429 || 
           error.message?.includes('429') || 
           error.message?.includes('Too Many Requests') ||
           error.message?.includes('rate limit');
         
         if (isRateLimitError) {
-          // Get current retry count
           const { data: currentPost } = await supabaseClient
             .from('campaign_posts')
             .select('retry_count')
@@ -606,12 +568,10 @@ Deno.serve(async (req) => {
           
           const retryCount = (currentPost?.retry_count || 0) + 1;
           
-          // Calculate next retry time: 15, 30, 60 minutes
           const retryDelays = [15, 30, 60];
           const delayMinutes = retryDelays[Math.min(retryCount - 1, retryDelays.length - 1)];
           const nextRetryAt = new Date(Date.now() + delayMinutes * 60 * 1000).toISOString();
           
-          // Update with rate limit info
           const { error: rateLimitUpdateError } = await supabaseClient
             .from('campaign_posts')
             .update({ 
@@ -643,7 +603,6 @@ Deno.serve(async (req) => {
             }
           );
         } else {
-          // Mark post as failed for other errors
           await supabaseClient
             .from('campaign_posts')
             .update({ 
@@ -677,7 +636,6 @@ Deno.serve(async (req) => {
     
     for (const id of idsToPublish) {
       try {
-        // Get book details
         const { data: book, error: bookError } = await supabaseClient
           .from('books')
           .select('*')
@@ -687,7 +645,6 @@ Deno.serve(async (req) => {
         if (bookError) throw bookError;
         if (!book) throw new Error(`Book not found: ${id}`);
 
-        // Check if already published on THIS platform (X)
         const { data: platformContent } = await supabaseClient
           .from('book_platform_content')
           .select('*')
@@ -701,25 +658,20 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Format tweet using AI-generated text from database, or fall back to visual template
         let tweetText;
         if (book.ai_generated_text) {
-          // Use AI-generated text from database
           tweetText = `${book.ai_generated_text}\n\n${book.product_url}\n\n(ai)`;
           console.log("Using AI-generated text from database");
         } else if (customText) {
-          // Fallback to custom text parameter (for backwards compatibility)
           tweetText = `${customText}\n\n(ai)`;
           console.log("Using custom text parameter");
         } else {
-          // Use default visual template
           tweetText = `✨ LIMITOWANA OFERTA ✨\n\n📚 ${book.title}\n\n`;
           
           if (book.sale_price) {
             tweetText += `💰 Tylko ${book.sale_price} zł\n\n`;
           }
           
-          // Add truncated description if available
           if (book.description) {
             const maxDescLength = 120;
             const truncatedDesc = book.description.length > maxDescLength 
@@ -733,7 +685,6 @@ Deno.serve(async (req) => {
 
         console.log("Tweet to send:", tweetText);
 
-        // Upload media: prefer storage_path, then Supabase Storage override, then image_url
         let mediaIds: string[] | undefined = undefined;
         try {
           if (book.storage_path) {
@@ -755,7 +706,7 @@ Deno.serve(async (req) => {
               }
             };
             const contentType = storageBlob.type || inferType(book.storage_path);
-            const mediaId = await uploadMedia(undefined, { arrayBuffer, contentType });
+            const mediaId = await uploadMedia(undefined, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, { arrayBuffer, contentType });
             mediaIds = [mediaId];
             console.log("Media uploaded successfully from book.storage_path, media_id:", mediaId);
           } else if (storageBucket && storagePath) {
@@ -777,12 +728,12 @@ Deno.serve(async (req) => {
               }
             };
             const contentType = storageBlob.type || inferType(storagePath);
-            const mediaId = await uploadMedia(undefined, { arrayBuffer, contentType });
+            const mediaId = await uploadMedia(undefined, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, { arrayBuffer, contentType });
             mediaIds = [mediaId];
             console.log("Media uploaded successfully from storage override, media_id:", mediaId);
           } else if (book.image_url) {
             console.log("Uploading media from image_url...");
-            const mediaId = await uploadMedia(book.image_url);
+            const mediaId = await uploadMedia(book.image_url, oauth1Token.oauth_token, oauth1Token.oauth_token_secret);
             mediaIds = [mediaId];
             console.log("Media uploaded successfully, media_id:", mediaId);
           }
@@ -790,11 +741,9 @@ Deno.serve(async (req) => {
           console.error("Failed to upload media, continuing without image:", error);
         }
 
-        // Send tweet with retry logic for rate limiting (using user's OAuth2 token)
-        const tweetResponse = await sendTweetWithRetry(tweetText, mediaIds, oauth2Token);
+        const tweetResponse = await sendTweetWithRetry(tweetText, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, mediaIds);
         console.log("Tweet sent successfully:", tweetResponse);
 
-        // Get or create platform content record
         const { data: existingContent } = await supabaseClient
           .from('book_platform_content')
           .select('*')
@@ -803,7 +752,6 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (existingContent) {
-          // Update existing record
           const { error: updateError } = await supabaseClient
             .from('book_platform_content')
             .update({ 
@@ -815,7 +763,6 @@ Deno.serve(async (req) => {
 
           if (updateError) throw updateError;
         } else {
-          // Create new record
           const { error: insertError } = await supabaseClient
             .from('book_platform_content')
             .insert({
@@ -848,7 +795,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({ 
-        success: results.every(r => r.success), // true only if all succeeded
+        success: results.every(r => r.success),
         results,
         summary: {
           total: results.length,

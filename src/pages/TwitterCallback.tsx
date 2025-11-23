@@ -12,54 +12,58 @@ export default function TwitterCallback() {
 
   useEffect(() => {
     const handleCallback = async () => {
-      const code = searchParams.get("code");
-      const state = searchParams.get("state");
-      const error = searchParams.get("error");
+      const oauthToken = searchParams.get('oauth_token');
+      const oauthVerifier = searchParams.get('oauth_verifier');
+      const denied = searchParams.get('denied');
 
-      if (error) {
-        setStatus("error");
-        setMessage(`Autoryzacja anulowana: ${error}`);
-        setTimeout(() => navigate("/"), 3000);
+      // Get stored state from session storage
+      const storedState = sessionStorage.getItem('twitter_oauth1_state');
+
+      console.log('Twitter OAuth 1.0a callback received:', { oauthToken, oauthVerifier, denied });
+      console.log('Stored state:', storedState);
+
+      if (denied) {
+        setStatus('error');
+        setMessage('Autoryzacja została anulowana');
+        
+        // Clear stored data
+        sessionStorage.removeItem('twitter_oauth1_state');
+        
+        setTimeout(() => navigate('/platforms/x'), 3000);
         return;
       }
 
-      if (!code) {
-        setStatus("error");
-        setMessage("Brak kodu autoryzacyjnego");
-        setTimeout(() => navigate("/"), 3000);
+      if (!oauthToken || !oauthVerifier) {
+        setStatus('error');
+        setMessage('Brak parametrów OAuth');
+        setTimeout(() => navigate('/platforms/x'), 3000);
+        return;
+      }
+
+      if (!storedState) {
+        setStatus('error');
+        setMessage('Brak state - możliwy timeout sesji');
+        setTimeout(() => navigate('/platforms/x'), 3000);
         return;
       }
 
       try {
-        // Get code_verifier from sessionStorage
-        const codeVerifier = sessionStorage.getItem("twitter_oauth_verifier");
-        const storedState = sessionStorage.getItem("twitter_oauth_state");
-
-        if (!codeVerifier) {
-          throw new Error("Brak code_verifier - rozpocznij autoryzację ponownie");
-        }
-
-        if (state !== storedState) {
-          throw new Error("State mismatch - możliwe naruszenie bezpieczeństwa");
-        }
-
-        const redirectUri = `${window.location.origin}/twitter-callback`;
-
-        // Get current user session
+        // Get current session
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
-          throw new Error("Musisz być zalogowany");
+          throw new Error('Musisz być zalogowany');
         }
 
-        // Call callback function
+        console.log('Calling twitter-oauth1-callback edge function...');
+        
+        // Call the OAuth 1.0a callback edge function
         const { data, error: callbackError } = await supabase.functions.invoke(
-          "twitter-oauth-callback",
+          'twitter-oauth1-callback',
           {
             body: { 
-              code, 
-              codeVerifier,
-              state,
-              redirectUri
+              oauthToken,
+              oauthVerifier,
+              state: storedState
             },
             headers: {
               Authorization: `Bearer ${session.access_token}`
@@ -67,21 +71,30 @@ export default function TwitterCallback() {
           }
         );
 
-        if (callbackError) throw callbackError;
+        console.log('Callback response:', data, callbackError);
 
-        // Clear stored OAuth data
-        sessionStorage.removeItem("twitter_oauth_verifier");
-        sessionStorage.removeItem("twitter_oauth_state");
+        if (callbackError) {
+          throw callbackError;
+        }
 
-        setStatus("success");
-        setMessage(data.message || "Autoryzacja zakończona sukcesem!");
+        if (!data?.success) {
+          throw new Error(data?.error || 'Nie udało się zakończyć OAuth flow');
+        }
+
+        // Clear stored data on success
+        sessionStorage.removeItem('twitter_oauth1_state');
+
+        setStatus('success');
+        setMessage(`Konto X (@${data.screen_name}) zostało połączone!`);
         
-        setTimeout(() => navigate("/"), 2000);
+        // Redirect to platform page after 2 seconds
+        setTimeout(() => navigate('/platforms/x'), 2000);
       } catch (err: any) {
-        console.error("Callback error:", err);
-        setStatus("error");
-        setMessage(err.message || "Wystąpił błąd podczas autoryzacji");
-        setTimeout(() => navigate("/"), 3000);
+        console.error('Error in Twitter OAuth 1.0a callback:', err);
+        setStatus('error');
+        setMessage(err.message || 'Wystąpił błąd podczas autoryzacji');
+        
+        setTimeout(() => navigate('/platforms/x'), 3000);
       }
     };
 
