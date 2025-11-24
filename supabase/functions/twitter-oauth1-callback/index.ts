@@ -84,13 +84,19 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  console.log("=== twitter-oauth1-callback called ===");
+
   try {
+    console.log("Checking environment variables...");
     if (!CONSUMER_KEY || !CONSUMER_SECRET) {
+      console.error("Missing Twitter OAuth credentials");
       throw new Error('Missing Twitter OAuth credentials');
     }
+    console.log("Consumer key exists:", !!CONSUMER_KEY);
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.error("Missing authorization header");
       throw new Error('Missing authorization header');
     }
 
@@ -99,16 +105,26 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const token = authHeader.replace('Bearer ', '');
+    console.log("Authenticating user...");
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
     if (userError || !user) {
+      console.error('User authentication failed:', userError);
       throw new Error('Unauthorized');
     }
+    console.log("User authenticated:", user.id);
 
-    const { oauthToken, oauthVerifier, state } = await req.json();
-    console.log('OAuth callback for user:', user.id, 'token:', oauthToken, 'state:', state);
+    const body = await req.json();
+    const { oauthToken, oauthVerifier, state } = body;
+    console.log('=== OAuth callback parameters ===');
+    console.log('User ID:', user.id);
+    console.log('OAuth Token:', oauthToken);
+    console.log('OAuth Verifier:', oauthVerifier);
+    console.log('State:', state);
+
 
     // Retrieve request token from database
+    console.log("Retrieving request token from database...");
     const { data: requestData, error: requestError } = await supabase
       .from('twitter_oauth1_requests')
       .select('*')
@@ -119,22 +135,33 @@ Deno.serve(async (req) => {
 
     if (requestError || !requestData) {
       console.error('Failed to retrieve request token:', requestError);
-      throw new Error('Invalid OAuth state');
+      console.error('Query parameters: user_id:', user.id, 'state:', state, 'oauth_token:', oauthToken);
+      throw new Error('Invalid OAuth state or token');
     }
+    console.log("Request token retrieved successfully");
 
     // Check if token expired
+    console.log("Checking token expiration...");
+    console.log("Expires at:", requestData.expires_at);
+    console.log("Current time:", new Date().toISOString());
+    
     if (new Date(requestData.expires_at) < new Date()) {
+      console.error("Token expired!");
       throw new Error('OAuth request expired');
     }
+    console.log("Token is still valid");
 
     // Exchange for access token
+    console.log("Exchanging for access token...");
     const { oauth_token, oauth_token_secret, screen_name, user_id } = await getAccessToken(
       oauthToken,
       requestData.oauth_token_secret,
       oauthVerifier
     );
+    console.log("Access token received for @" + screen_name);
 
     // Store access token in database (upsert)
+    console.log("Storing access token in database...");
     const { error: upsertError } = await supabase
       .from('twitter_oauth1_tokens')
       .upsert({
@@ -150,25 +177,35 @@ Deno.serve(async (req) => {
 
     if (upsertError) {
       console.error('Failed to store access token:', upsertError);
-      throw new Error('Failed to save OAuth credentials');
+      throw new Error('Failed to save OAuth credentials: ' + upsertError.message);
     }
+    console.log("Access token stored successfully");
 
     // Delete request token
+    console.log("Deleting request token...");
     await supabase
       .from('twitter_oauth1_requests')
       .delete()
       .eq('id', requestData.id);
+    console.log("Request token deleted");
 
-    console.log('OAuth 1.0a flow completed successfully for @' + screen_name);
+    console.log('=== OAuth 1.0a flow completed successfully for @' + screen_name + ' ===');
 
     return new Response(
       JSON.stringify({ success: true, screen_name }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: any) {
-    console.error('Error in twitter-oauth1-callback:', error);
+    console.error('=== Error in twitter-oauth1-callback ===');
+    console.error('Error type:', error.constructor.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: "Check edge function logs for more information"
+      }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

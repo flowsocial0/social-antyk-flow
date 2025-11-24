@@ -77,37 +77,72 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  console.log("=== twitter-oauth1-start called ===");
+  console.log("Method:", req.method);
+  console.log("Headers:", Object.fromEntries(req.headers.entries()));
+
   try {
+    // Validate environment variables
+    console.log("Checking environment variables...");
+    console.log("CONSUMER_KEY exists:", !!CONSUMER_KEY);
+    console.log("CONSUMER_SECRET exists:", !!CONSUMER_SECRET);
+    
     if (!CONSUMER_KEY || !CONSUMER_SECRET) {
-      throw new Error('Missing Twitter OAuth credentials');
+      console.error("Missing Twitter OAuth credentials!");
+      throw new Error('Missing Twitter OAuth credentials. Please configure TWITTER_CONSUMER_KEY and TWITTER_CONSUMER_SECRET in Supabase Secrets.');
     }
 
+    // Validate authorization
     const authHeader = req.headers.get('Authorization');
+    console.log("Authorization header exists:", !!authHeader);
+    
     if (!authHeader) {
+      console.error("Missing authorization header");
       throw new Error('Missing authorization header');
     }
 
+    // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Get user from token
     const token = authHeader.replace('Bearer ', '');
+    console.log("Getting user from token...");
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
     if (userError || !user) {
+      console.error('User authentication failed:', userError);
       throw new Error('Unauthorized');
     }
+    console.log("User authenticated successfully:", user.id);
 
-    const { redirectUri } = await req.json();
-    console.log('Starting OAuth 1.0a flow for user:', user.id, 'redirect:', redirectUri);
+    // Parse request body
+    const body = await req.json();
+    const { redirectUri } = body;
+    console.log('Redirect URI from request:', redirectUri);
+    
+    if (!redirectUri) {
+      console.error("Missing redirectUri in request body");
+      throw new Error('Missing redirectUri parameter');
+    }
+
+    console.log('=== Starting OAuth 1.0a flow ===');
+    console.log('User ID:', user.id);
+    console.log('Redirect URI:', redirectUri);
 
     // Get request token from Twitter
+    console.log("Calling getRequestToken...");
     const { oauth_token, oauth_token_secret } = await getRequestToken(redirectUri);
+    console.log("Request token received successfully");
+    console.log("OAuth token (first 10 chars):", oauth_token.substring(0, 10) + "...");
 
     // Generate state for CSRF protection
     const state = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+    console.log("Generated state:", state);
 
     // Store request token in database
+    console.log("Storing request token in database...");
     const { error: insertError } = await supabase
       .from('twitter_oauth1_requests')
       .insert({
@@ -119,20 +154,30 @@ Deno.serve(async (req) => {
 
     if (insertError) {
       console.error('Failed to store request token:', insertError);
-      throw new Error('Failed to store OAuth state');
+      throw new Error('Failed to store OAuth state: ' + insertError.message);
     }
+    console.log("Request token stored successfully");
 
     // Build authorization URL
     const authUrl = `https://api.twitter.com/oauth/authenticate?oauth_token=${oauth_token}`;
+    console.log("Authorization URL:", authUrl);
 
+    console.log("=== OAuth 1.0a start completed successfully ===");
     return new Response(
       JSON.stringify({ authUrl, state }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: any) {
-    console.error('Error in twitter-oauth1-start:', error);
+    console.error('=== Error in twitter-oauth1-start ===');
+    console.error('Error type:', error.constructor.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: "Check edge function logs for more information"
+      }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
