@@ -19,7 +19,7 @@ function generateOAuthSignature(
   const signatureBaseString = `${method}&${encodeURIComponent(url)}&${encodeURIComponent(
     Object.entries(params)
       .sort()
-      .map(([k, v]) => `${k}=${v}`)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&')
   )}`;
   const signingKey = `${encodeURIComponent(consumerSecret)}&${encodeURIComponent(tokenSecret)}`;
