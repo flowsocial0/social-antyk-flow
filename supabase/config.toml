@@ -36,5 +36,8 @@ verify_jwt = false
 [functions.facebook-oauth-callback]
 verify_jwt = false
 
+[functions.facebook-data-deletion]
+verify_jwt = false
+
 [functions.sync-books-from-xml]
 verify_jwt = false

@@ -38,6 +38,7 @@ import Platforms from "./pages/Platforms";
 import ExpressCampaignLaunch from "./pages/ExpressCampaignLaunch";
 import NotFound from "./pages/NotFound";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import DataDeletion from "./pages/DataDeletion";
 
 const queryClient = new QueryClient();
 
@@ -82,6 +83,7 @@ const App = () => (
           <Route path="/schedule-overview" element={<ScheduleOverview />} />
           <Route path="/platforms" element={<Platforms />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/data-deletion" element={<DataDeletion />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
