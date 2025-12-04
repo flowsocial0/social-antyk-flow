@@ -457,15 +457,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
               >
                 Tytuł <SortIcon column="title" />
               </TableHead>
-              <TableHead>Tekst AI</TableHead>
-              <TableHead 
-                className="cursor-pointer"
-                onClick={() => handleSort("published")}
-              >
-                Status <SortIcon column="published" />
-              </TableHead>
               <TableHead>Data publikacji</TableHead>
-              <TableHead>Harmonogram</TableHead>
               <TableHead className="text-right">Akcje</TableHead>
             </TableRow>
           </TableHeader>
@@ -492,28 +484,6 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                   <TableCell className="font-medium">{book.code}</TableCell>
                   <TableCell className="max-w-xs truncate">{book.title}</TableCell>
                   <TableCell>
-                    {content.ai_generated_text ? (
-                      <span title="Tekst AI wygenerowany">
-                        <Sparkles className="h-5 w-5 text-green-500" />
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground" title="Brak tekstu AI">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {content.published ? (
-                      <span title="Opublikowano">
-                        <Send className="h-5 w-5 text-green-500" />
-                      </span>
-                    ) : content.auto_publish_enabled ? (
-                      <span title="Zaplanowano">
-                        <Calendar className="h-5 w-5 text-blue-500" />
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground" title="Oczekuje">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
                     {content.published_at ? (
                       <div className="flex flex-col gap-1">
                         <span className="text-sm font-medium">
@@ -523,15 +493,6 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                           {new Date(content.published_at).toLocaleTimeString("pl-PL")}
                         </span>
                       </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {content.scheduled_publish_at ? (
-                      <span className="text-sm text-muted-foreground">
-                        {new Date(content.scheduled_publish_at).toLocaleString("pl-PL")}
-                      </span>
                     ) : (
                       <span className="text-sm text-muted-foreground">-</span>
                     )}
@@ -575,7 +536,6 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                           ) : (
                             <>
                               <Undo2 className="h-4 w-4 mr-1" />
-                              Ponownie
                             </>
                           )}
                         </Button>
