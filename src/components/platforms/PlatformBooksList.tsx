@@ -562,7 +562,6 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                         onClick={() => handleGenerateAI(book.id)}
                       >
                         <Sparkles className="h-4 w-4 mr-1" />
-                        AI
                       </Button>
                       <Button
                         size="sm"
