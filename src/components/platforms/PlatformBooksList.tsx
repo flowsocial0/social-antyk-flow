@@ -481,8 +481,8 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                       </div>
                     )}
                   </TableCell>
-                  <TableCell className="font-medium">
-                    <span className="inline-block max-w-15 truncate" title={book.code}>
+                  <TableCell className="font-medium w-[4.5rem]">
+                    <span className="inline-block truncate" title={book.code}>
                       {book.code}
                     </span>
                   </TableCell>
