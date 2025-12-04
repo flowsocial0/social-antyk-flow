@@ -499,30 +499,6 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleEdit(book.id)}
-                        title="Edytuj książkę"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleGenerateAI(book.id)}
-                      >
-                        <Sparkles className="h-4 w-4 mr-1" />
-                        AI
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handlePreview(book.id)}
-                        disabled={!content.ai_generated_text}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
                       {content.published ? (
                         <Button
                           size="sm"
@@ -572,6 +548,31 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                           )}
                         </>
                       )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEdit(book.id)}
+                        title="Edytuj książkę"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleGenerateAI(book.id)}
+                      >
+                        <Sparkles className="h-4 w-4 mr-1" />
+                        AI
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handlePreview(book.id)}
+                        disabled={!content.ai_generated_text}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      
                       {book.product_url && (
                         <Button
                           size="sm"
