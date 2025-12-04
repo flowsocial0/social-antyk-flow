@@ -572,16 +572,6 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      
-                      {book.product_url && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => window.open(book.product_url, "_blank")}
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      )}
                     </div>
                   </TableCell>
                 </TableRow>
