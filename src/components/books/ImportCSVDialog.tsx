@@ -15,6 +15,7 @@ interface ImportCSVDialogProps {
 interface CSVRow {
   Kod: string;
   Nazwa: string;
+  Autor?: string;
   Obrazek: string;
   "Cena sprzedaży": string;
   "Cena promocyjna": string;
@@ -25,7 +26,12 @@ interface CSVRow {
 export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
-  const [progress, setProgress] = useState<{ success: number; failed: number; total: number } | null>(null);
+  const [progress, setProgress] = useState<{ 
+    success: number; 
+    failed: number; 
+    total: number;
+    phase: string;
+  } | null>(null);
 
   const parsePrice = (priceStr: string): number | null => {
     if (!priceStr || priceStr.trim() === "") return null;
@@ -70,6 +76,20 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
     }
   };
 
+  const migrateImagesToStorage = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('migrate-images-to-storage');
+      if (error) {
+        console.error('Error migrating images:', error);
+        return { success: false, error };
+      }
+      return data;
+    } catch (err) {
+      console.error('Error calling migrate-images-to-storage:', err);
+      return { success: false, error: err };
+    }
+  };
+
   const handleImport = async () => {
     if (!file) {
       toast.error("Wybierz plik CSV");
@@ -77,7 +97,7 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
     }
 
     setImporting(true);
-    setProgress({ success: 0, failed: 0, total: 0 });
+    setProgress({ success: 0, failed: 0, total: 0, phase: "Parsowanie pliku..." });
 
     const arrayBuffer = await file.arrayBuffer();
     const { text: csvText } = decodeWithFallback(arrayBuffer);
@@ -86,33 +106,41 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
       header: true,
       skipEmptyLines: true,
       complete: async (results) => {
-        // Filter out items marked as "niewidoczny" and empty statuses
-        const visibleItems = results.data.filter((row) => {
-          const status = row["Stan towaru"]?.trim().toLowerCase();
-          return !!status && status !== "niewidoczny";
+        // Filter out empty rows (no code)
+        const validItems = results.data.filter((row) => {
+          const code = row.Kod?.trim();
+          return !!code;
         });
-        const total = visibleItems.length;
+        const total = validItems.length;
         let success = 0;
         let failed = 0;
 
-        setProgress({ success, failed, total });
+        setProgress({ success, failed, total, phase: "Importowanie książek..." });
 
         // Process in batches of 10
         const batchSize = 10;
-        for (let i = 0; i < visibleItems.length; i += batchSize) {
-          const batch = visibleItems.slice(i, i + batchSize);
+        for (let i = 0; i < validItems.length; i += batchSize) {
+          const batch = validItems.slice(i, i + batchSize);
           
-          const bookData = batch.map((row) => ({
-            code: row.Kod?.trim() || "",
-            title: row.Nazwa?.trim() || "",
-            image_url: row.Obrazek?.trim() || null,
-            sale_price: parsePrice(row["Cena sprzedaży"]),
-            promotional_price: parsePrice(row["Cena promocyjna"]),
-            stock_status: row["Stan towaru"]?.trim() || null,
-            warehouse_quantity: parseQuantity(row["Ilość w magazynach"]),
-          }));
+          const bookData = batch.map((row) => {
+            const stockStatus = row["Stan towaru"]?.trim() || null;
+            const isHidden = stockStatus?.toLowerCase() === "niewidoczny";
+            
+            return {
+              code: row.Kod?.trim() || "",
+              title: row.Nazwa?.trim() || "",
+              author: row.Autor?.trim() || null,
+              image_url: row.Obrazek?.trim() || null,
+              sale_price: parsePrice(row["Cena sprzedaży"]),
+              promotional_price: parsePrice(row["Cena promocyjna"]),
+              stock_status: stockStatus,
+              warehouse_quantity: parseQuantity(row["Ilość w magazynach"]),
+              // Freeze items with "niewidoczny" status
+              exclude_from_campaigns: isHidden,
+            };
+          });
 
-          const { data, error } = await supabase
+          const { error } = await supabase
             .from("books")
             .upsert(bookData, { 
               onConflict: "code",
@@ -126,13 +154,22 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
             success += batch.length;
           }
 
-          setProgress({ success, failed, total });
+          setProgress({ success, failed, total, phase: "Importowanie książek..." });
         }
 
+        // Phase 2: Migrate images to storage
+        setProgress({ success, failed, total, phase: "Migrowanie okładek do storage..." });
+        
+        const migrationResult = await migrateImagesToStorage();
+        
         setImporting(false);
         
         if (failed === 0) {
-          toast.success(`Pomyślnie zaimportowano ${success} książek!`);
+          const imageStats = migrationResult?.stats;
+          const imageMsg = imageStats 
+            ? ` Okładki: ${imageStats.succeeded} dodanych, ${imageStats.failed} błędów.`
+            : '';
+          toast.success(`Pomyślnie zaimportowano ${success} książek!${imageMsg}`);
         } else {
           toast.warning(`Zaimportowano ${success} książek. Błędów: ${failed}`);
         }
@@ -157,7 +194,11 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
         <DialogHeader>
           <DialogTitle>Importuj książki z CSV</DialogTitle>
           <DialogDescription>
-            Wybierz plik CSV z danymi książek. Plik powinien zawierać kolumny: Kod, Nazwa, Obrazek, Cena sprzedaży, Cena promocyjna, Stan towaru, Ilość w magazynach.
+            Wybierz plik CSV z danymi książek. Plik powinien zawierać kolumny: Kod, Nazwa, Autor, Obrazek, Cena sprzedaży, Cena promocyjna, Stan towaru, Ilość w magazynach.
+            <br /><br />
+            <span className="text-muted-foreground text-xs">
+              Produkty ze stanem "niewidoczny" zostaną automatycznie zamrożone. Po imporcie okładki zostaną przesłane do storage.
+            </span>
           </DialogDescription>
         </DialogHeader>
 
@@ -181,7 +222,7 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
             {progress && (
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Postęp importu:</span>
+                  <span className="text-muted-foreground">{progress.phase}</span>
                   <span className="font-medium">
                     {progress.success + progress.failed} / {progress.total}
                   </span>
@@ -190,7 +231,9 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
                   <div
                     className="bg-primary h-2 rounded-full transition-all duration-300"
                     style={{
-                      width: `${((progress.success + progress.failed) / progress.total) * 100}%`,
+                      width: progress.total > 0 
+                        ? `${((progress.success + progress.failed) / progress.total) * 100}%`
+                        : '0%',
                     }}
                   />
                 </div>

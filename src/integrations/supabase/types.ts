@@ -79,6 +79,7 @@ export type Database = {
       books: {
         Row: {
           ai_generated_text: string | null
+          author: string | null
           auto_publish_enabled: boolean | null
           campaign_post_count: number | null
           code: string
@@ -103,6 +104,7 @@ export type Database = {
         }
         Insert: {
           ai_generated_text?: string | null
+          author?: string | null
           auto_publish_enabled?: boolean | null
           campaign_post_count?: number | null
           code: string
@@ -127,6 +129,7 @@ export type Database = {
         }
         Update: {
           ai_generated_text?: string | null
+          author?: string | null
           auto_publish_enabled?: boolean | null
           campaign_post_count?: number | null
           code?: string
