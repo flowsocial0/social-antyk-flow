@@ -158,31 +158,70 @@ async function generatePostsContent(body: any, apiKey: string) {
 
   // Get available books for sales posts - filter by selectedBooks if provided
   const salesPostsCount = structure.filter((item: any) => item.type === "sales").length;
-  let booksQuery = supabase
-    .from("books")
-    .select("id, title, description, sale_price, product_url, campaign_post_count")
-    .eq("exclude_from_campaigns", false);
-
-  // If selectedBooks is provided and not empty, filter by those IDs
+  
+  let availableBooks: any[] = [];
+  
+  // If selectedBooks is provided and not empty, fetch in batches to avoid query size limits
   if (selectedBooks && selectedBooks.length > 0) {
-    booksQuery = booksQuery.in("id", selectedBooks);
+    console.log(`Fetching ${selectedBooks.length} selected books in batches...`);
+    
+    // Supabase has a limit on IN query size, so we fetch in batches of 100
+    const batchSize = 100;
+    const allFetchedBooks: any[] = [];
+    
+    for (let i = 0; i < selectedBooks.length; i += batchSize) {
+      const batch = selectedBooks.slice(i, i + batchSize);
+      const { data: batchBooks, error: batchError } = await supabase
+        .from("books")
+        .select("id, title, description, sale_price, product_url, campaign_post_count")
+        .eq("exclude_from_campaigns", false)
+        .in("id", batch);
+      
+      if (batchError) {
+        console.error(`Error fetching books batch ${i / batchSize}:`, batchError);
+        continue;
+      }
+      
+      if (batchBooks) {
+        allFetchedBooks.push(...batchBooks);
+      }
+    }
+    
+    // Sort and limit after fetching all batches
+    availableBooks = allFetchedBooks
+      .sort((a, b) => {
+        // Sort by sale_price DESC (nulls last)
+        if (a.sale_price !== b.sale_price) {
+          if (a.sale_price === null) return 1;
+          if (b.sale_price === null) return -1;
+          return b.sale_price - a.sale_price;
+        }
+        // Then by campaign_post_count ASC
+        return (a.campaign_post_count || 0) - (b.campaign_post_count || 0);
+      })
+      .slice(0, salesPostsCount);
+      
   } else {
     // Fallback: only products if no selection
-    booksQuery = booksQuery.eq("is_product", true);
+    const { data: fallbackBooks, error: fallbackError } = await supabase
+      .from("books")
+      .select("id, title, description, sale_price, product_url, campaign_post_count")
+      .eq("exclude_from_campaigns", false)
+      .eq("is_product", true)
+      .order("sale_price", { ascending: false, nullsFirst: false })
+      .order("campaign_post_count", { ascending: true })
+      .order("last_campaign_date", { ascending: true, nullsFirst: true })
+      .limit(salesPostsCount);
+    
+    if (fallbackError) {
+      console.error("Error fetching fallback books:", fallbackError);
+      throw new Error("Failed to fetch books for campaign");
+    }
+    
+    availableBooks = fallbackBooks || [];
   }
 
-  const { data: availableBooks, error: booksError } = await booksQuery
-    .order("sale_price", { ascending: false, nullsFirst: false })
-    .order("campaign_post_count", { ascending: true })
-    .order("last_campaign_date", { ascending: true, nullsFirst: true })
-    .limit(salesPostsCount);
-
-  if (booksError) {
-    console.error("Error fetching books:", booksError);
-    throw new Error("Failed to fetch books for campaign");
-  }
-
-  console.log(`Found ${availableBooks?.length || 0} available books for ${salesPostsCount} sales posts`);
+  console.log(`Found ${availableBooks.length} available books for ${salesPostsCount} sales posts`);
 
   // Fetch all books with descriptions for content context
   const { data: allBooksWithDescriptions, error: allBooksError } = await supabase
