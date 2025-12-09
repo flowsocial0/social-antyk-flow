@@ -194,6 +194,7 @@ export const GeneralBooksList = () => {
                     <SortIcon column="title" />
                   </Button>
                 </TableHead>
+                <TableHead>Autor</TableHead>
                 <TableHead>
                   <Button
                     variant="ghost"
@@ -222,8 +223,13 @@ export const GeneralBooksList = () => {
                       )}
                     </TableCell>
                     <TableCell className="font-medium">{book.code}</TableCell>
-                    <TableCell className="max-w-md">
+                    <TableCell className="max-w-xs">
                       <div className="line-clamp-2">{book.title}</div>
+                    </TableCell>
+                    <TableCell className="max-w-[150px]">
+                      <div className="line-clamp-2 text-sm text-muted-foreground">
+                        {book.author || "-"}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {book.sale_price ? (
@@ -269,7 +275,7 @@ export const GeneralBooksList = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     {searchQuery ? "Nie znaleziono książek pasujących do wyszukiwania" : "Brak książek w bazie"}
                   </TableCell>
                 </TableRow>
