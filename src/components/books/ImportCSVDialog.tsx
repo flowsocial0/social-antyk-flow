@@ -166,9 +166,57 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
         const total = validItems.length;
         let success = 0;
         let failed = 0;
+        let deleted = 0;
         const errors: string[] = [];
 
-        setProgress({ success, failed, total, phase: "Importowanie książek...", errors });
+        // Get all codes from CSV
+        const csvCodes = new Set(validItems.map(row => row.Kod?.trim()).filter(Boolean));
+
+        // Phase 1: Delete books not in CSV
+        setProgress({ success: 0, failed: 0, total, phase: "Usuwanie nieaktualnych książek...", errors });
+        
+        // Fetch all existing book codes from database
+        const { data: existingBooks, error: fetchError } = await supabase
+          .from("books")
+          .select("id, code");
+        
+        if (fetchError) {
+          console.error("Błąd pobierania książek:", fetchError);
+          errors.push(`Błąd pobierania istniejących książek: ${fetchError.message}`);
+        } else if (existingBooks) {
+          // Find books to delete (in DB but not in CSV)
+          const booksToDelete = existingBooks.filter(book => !csvCodes.has(book.code));
+          
+          if (booksToDelete.length > 0) {
+            setProgress({ 
+              success: 0, 
+              failed: 0, 
+              total, 
+              phase: `Usuwanie ${booksToDelete.length} nieaktualnych książek...`, 
+              errors 
+            });
+            
+            // Delete in batches of 50
+            const deleteIds = booksToDelete.map(b => b.id);
+            for (let i = 0; i < deleteIds.length; i += 50) {
+              const batchIds = deleteIds.slice(i, i + 50);
+              const { error: deleteError } = await supabase
+                .from("books")
+                .delete()
+                .in("id", batchIds);
+              
+              if (deleteError) {
+                console.error("Błąd usuwania książek:", deleteError);
+                errors.push(`Błąd usuwania książek: ${deleteError.message}`);
+              } else {
+                deleted += batchIds.length;
+              }
+            }
+          }
+        }
+
+        // Phase 2: Upsert books from CSV (add new / update existing)
+        setProgress({ success, failed, total, phase: "Aktualizowanie danych książek...", errors: [...errors] });
 
         // Process in batches of 10
         const batchSize = 10;
@@ -190,6 +238,8 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
               warehouse_quantity: parseQuantity(row["Ilość w magazynach"]),
               // Freeze items with "niewidoczny" status
               exclude_from_campaigns: isHidden,
+              // Reset storage_path if image_url changed - will be re-migrated
+              storage_path: null,
             };
           });
 
@@ -209,10 +259,16 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
             success += batch.length;
           }
 
-          setProgress({ success, failed, total, phase: "Importowanie książek...", errors: [...errors] });
+          setProgress({ 
+            success, 
+            failed, 
+            total, 
+            phase: `Aktualizowanie danych... (${success}/${total})`, 
+            errors: [...errors] 
+          });
         }
 
-        // Phase 2: Migrate images to storage
+        // Phase 3: Migrate images to storage
         setProgress({ success, failed, total, phase: "Migrowanie okładek do storage...", errors: [...errors] });
         
         const migrationResult = await migrateImagesToStorage((stats) => {
@@ -220,21 +276,23 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
             success, 
             failed, 
             total, 
-            phase: `Migrowanie okładek... (${stats.succeeded} dodanych${stats.remaining > 0 ? `, pozostało: ${stats.remaining}` : ''})`,
+            phase: `Migrowanie okładek... (${stats.succeeded} przesłanych${stats.remaining > 0 ? `, pozostało: ${stats.remaining}` : ''})`,
             errors: [...errors] 
           });
         });
         
         setImporting(false);
         
+        const imageStats = migrationResult?.stats;
+        const deletedMsg = deleted > 0 ? ` Usunięto: ${deleted}.` : '';
+        const imageMsg = imageStats 
+          ? ` Okładki: ${imageStats.succeeded} przesłanych.`
+          : '';
+        
         if (failed === 0) {
-          const imageStats = migrationResult?.stats;
-          const imageMsg = imageStats 
-            ? ` Okładki: ${imageStats.succeeded} dodanych, ${imageStats.failed} błędów.`
-            : '';
-          toast.success(`Pomyślnie zaimportowano ${success} książek!${imageMsg}`);
+          toast.success(`Import zakończony! Zaktualizowano: ${success}.${deletedMsg}${imageMsg}`);
         } else {
-          toast.warning(`Zaimportowano ${success} książek. Błędów: ${failed}`);
+          toast.warning(`Import zakończony. Zaktualizowano: ${success}. Błędów: ${failed}.${deletedMsg}`);
         }
 
         setTimeout(() => {
