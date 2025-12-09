@@ -209,17 +209,43 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
         console.log(`CSV zawiera ${csvCodes.size} unikalnych kodów (${duplicatesCount} duplikatów pominięto)`);
         console.log("Przykładowe kody z CSV:", Array.from(csvCodes).slice(0, 10));
 
-        // Phase 1: Fetch all existing book codes AND image_urls from database
+        // Phase 1: Fetch ALL existing book codes AND image_urls from database using pagination
         setProgress({ success: 0, failed: 0, total, phase: "Sprawdzanie istniejących książek...", errors });
 
-        const { data: existingBooks, error: fetchError } = await supabase
-          .from("books")
-          .select("id, code, title, image_url");
+        // Fetch all books in batches of 1000 (Supabase default limit)
+        const fetchAllBooks = async () => {
+          const allBooks: { id: string; code: string | null; title: string; image_url: string | null }[] = [];
+          let from = 0;
+          const batchSize = 1000;
+          let hasMore = true;
 
-        if (fetchError) {
-          console.error("Błąd pobierania książek:", fetchError);
-          errors.push(`Błąd pobierania istniejących książek: ${fetchError.message}`);
-        }
+          while (hasMore) {
+            const { data, error } = await supabase
+              .from("books")
+              .select("id, code, title, image_url")
+              .range(from, from + batchSize - 1);
+
+            if (error) {
+              console.error("Błąd pobierania książek:", error);
+              errors.push(`Błąd pobierania istniejących książek: ${error.message}`);
+              break;
+            }
+
+            if (data && data.length > 0) {
+              allBooks.push(...data);
+              console.log(`Pobrano partię ${from + 1}-${from + data.length}, razem: ${allBooks.length}`);
+              from += batchSize;
+              hasMore = data.length === batchSize;
+            } else {
+              hasMore = false;
+            }
+          }
+
+          return allBooks;
+        };
+
+        const existingBooks = await fetchAllBooks();
+        console.log(`ŁĄCZNIE pobrano ${existingBooks.length} książek z bazy danych`);
 
         // Create a map of existing books by code for quick lookup
         const existingBooksMap = new Map<string, { id: string; image_url: string | null }>();
@@ -294,7 +320,7 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
 
         // Phase 3: Delete books that are in DB but NOT in CSV
         // Only proceed if we successfully imported at least some books
-        if (success > 0 && existingBooks) {
+        if (success > 0 && existingBooks.length > 0) {
           setProgress({ success, failed, total, phase: "Usuwanie nieaktualnych książek...", errors: [...errors] });
 
           // Find books to delete (in DB but not in CSV) - exact code match
