@@ -12,6 +12,9 @@ interface Book {
   storage_path: string | null;
 }
 
+// Process only 20 books per invocation to avoid compute limits
+const BATCH_SIZE = 20;
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -20,31 +23,32 @@ Deno.serve(async (req) => {
   try {
     console.log('Starting migration of book images to storage...');
     
-    // Initialize Supabase client with service role key for admin access
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Fetch all books that have image_url but no storage_path
-    const { data: books, error: fetchError } = await supabase
+    // Fetch only a batch of books that need migration
+    const { data: books, error: fetchError, count } = await supabase
       .from('books')
-      .select('id, title, image_url, storage_path')
+      .select('id, title, image_url, storage_path', { count: 'exact' })
       .not('image_url', 'is', null)
-      .is('storage_path', null);
+      .is('storage_path', null)
+      .limit(BATCH_SIZE);
 
     if (fetchError) {
       console.error('Error fetching books:', fetchError);
       throw fetchError;
     }
 
-    console.log(`Found ${books?.length || 0} books to migrate`);
+    const totalRemaining = count || 0;
+    console.log(`Found ${totalRemaining} books total to migrate, processing ${books?.length || 0} in this batch`);
 
     if (!books || books.length === 0) {
       return new Response(
         JSON.stringify({
           success: true,
-          message: 'No books to migrate',
-          stats: { total: 0, succeeded: 0, failed: 0 }
+          message: 'Brak książek do migracji',
+          stats: { total: 0, succeeded: 0, failed: 0, remaining: 0 }
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -57,10 +61,11 @@ Deno.serve(async (req) => {
       total: books.length,
       succeeded: 0,
       failed: 0,
+      remaining: totalRemaining - books.length,
       errors: [] as string[],
     };
 
-    // Process each book
+    // Process each book in this batch
     for (const book of books as Book[]) {
       try {
         console.log(`Processing book: ${book.title} (${book.id})`);
@@ -70,9 +75,19 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Download the image
+        // Download the image with timeout
         console.log(`Downloading image from: ${book.image_url}`);
-        const imageResponse = await fetch(book.image_url);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        
+        let imageResponse;
+        try {
+          imageResponse = await fetch(book.image_url, { signal: controller.signal });
+          clearTimeout(timeoutId);
+        } catch (fetchErr) {
+          clearTimeout(timeoutId);
+          throw new Error(`Download timeout or error: ${fetchErr}`);
+        }
         
         if (!imageResponse.ok) {
           throw new Error(`Failed to download image: ${imageResponse.statusText}`);
@@ -84,7 +99,7 @@ Deno.serve(async (req) => {
         
         console.log(`Downloaded image: ${imageBuffer.byteLength} bytes, type: ${contentType}`);
 
-        // Generate filename from book ID and original URL
+        // Generate filename from book ID
         const urlParts = book.image_url.split('/');
         const originalFilename = urlParts[urlParts.length - 1];
         const extension = originalFilename.split('.').pop() || 'jpg';
@@ -130,13 +145,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log('Migration completed:', results);
+    console.log('Batch migration completed:', results);
 
+    const hasMore = results.remaining > 0;
+    
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Migracja zakończona: ${results.succeeded} sukces, ${results.failed} błędów`,
+        message: `Przetworzono ${results.succeeded} z ${results.total} książek${hasMore ? `. Pozostało: ${results.remaining}` : ''}`,
         stats: results,
+        hasMore: hasMore,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

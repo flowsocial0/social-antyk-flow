@@ -77,18 +77,46 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
     }
   };
 
-  const migrateImagesToStorage = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('migrate-images-to-storage');
-      if (error) {
-        console.error('Error migrating images:', error);
-        return { success: false, error };
+  const migrateImagesToStorage = async (
+    onProgress: (stats: { succeeded: number; failed: number; remaining: number }) => void
+  ) => {
+    let totalSucceeded = 0;
+    let totalFailed = 0;
+    let hasMore = true;
+    
+    // Keep calling until all images are migrated
+    while (hasMore) {
+      try {
+        const { data, error } = await supabase.functions.invoke('migrate-images-to-storage');
+        
+        if (error) {
+          console.error('Error migrating images:', error);
+          return { success: false, error, stats: { succeeded: totalSucceeded, failed: totalFailed } };
+        }
+        
+        if (data?.stats) {
+          totalSucceeded += data.stats.succeeded;
+          totalFailed += data.stats.failed;
+          onProgress({ 
+            succeeded: totalSucceeded, 
+            failed: totalFailed, 
+            remaining: data.stats.remaining || 0 
+          });
+        }
+        
+        hasMore = data?.hasMore === true;
+        
+        // Small delay between batches to avoid rate limiting
+        if (hasMore) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (err) {
+        console.error('Error calling migrate-images-to-storage:', err);
+        return { success: false, error: err, stats: { succeeded: totalSucceeded, failed: totalFailed } };
       }
-      return data;
-    } catch (err) {
-      console.error('Error calling migrate-images-to-storage:', err);
-      return { success: false, error: err };
     }
+    
+    return { success: true, stats: { succeeded: totalSucceeded, failed: totalFailed } };
   };
 
   const handleImport = async () => {
@@ -164,7 +192,15 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
         // Phase 2: Migrate images to storage
         setProgress({ success, failed, total, phase: "Migrowanie okładek do storage...", errors: [...errors] });
         
-        const migrationResult = await migrateImagesToStorage();
+        const migrationResult = await migrateImagesToStorage((stats) => {
+          setProgress({ 
+            success, 
+            failed, 
+            total, 
+            phase: `Migrowanie okładek... (${stats.succeeded} dodanych${stats.remaining > 0 ? `, pozostało: ${stats.remaining}` : ''})`,
+            errors: [...errors] 
+          });
+        });
         
         setImporting(false);
         
