@@ -83,6 +83,8 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
     let totalSucceeded = 0;
     let totalFailed = 0;
     let hasMore = true;
+    let consecutiveErrors = 0;
+    const maxRetries = 3;
     
     // Keep calling until all images are migrated
     while (hasMore) {
@@ -91,8 +93,20 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
         
         if (error) {
           console.error('Error migrating images:', error);
+          consecutiveErrors++;
+          
+          // If network error, retry up to maxRetries times
+          if (consecutiveErrors < maxRetries) {
+            console.log(`Retrying... attempt ${consecutiveErrors + 1}/${maxRetries}`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            continue;
+          }
+          
           return { success: false, error, stats: { succeeded: totalSucceeded, failed: totalFailed } };
         }
+        
+        // Reset error counter on success
+        consecutiveErrors = 0;
         
         if (data?.stats) {
           totalSucceeded += data.stats.succeeded;
@@ -108,10 +122,19 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
         
         // Small delay between batches to avoid rate limiting
         if (hasMore) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       } catch (err) {
         console.error('Error calling migrate-images-to-storage:', err);
+        consecutiveErrors++;
+        
+        // Retry on network errors
+        if (consecutiveErrors < maxRetries) {
+          console.log(`Network error, retrying... attempt ${consecutiveErrors + 1}/${maxRetries}`);
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          continue;
+        }
+        
         return { success: false, error: err, stats: { succeeded: totalSucceeded, failed: totalFailed } };
       }
     }
