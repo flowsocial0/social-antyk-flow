@@ -54,6 +54,32 @@ export const GeneralBooksList = () => {
         );
       }
 
+      // For code column, we need to sort numerically (code is text but contains numbers)
+      // Supabase doesn't support numeric cast in order, so we fetch more and sort client-side for code
+      if (sortColumn === "code") {
+        // Fetch all matching records for client-side numeric sorting
+        const { data: allData, error: allError, count } = await query;
+        
+        if (allError) throw allError;
+        
+        // Sort numerically by code
+        const sortedData = [...(allData || [])].sort((a, b) => {
+          const numA = parseInt(a.code || "0", 10);
+          const numB = parseInt(b.code || "0", 10);
+          // Handle non-numeric codes by falling back to string comparison
+          if (isNaN(numA) && isNaN(numB)) return (a.code || "").localeCompare(b.code || "");
+          if (isNaN(numA)) return 1;
+          if (isNaN(numB)) return -1;
+          return sortDirection === "asc" ? numA - numB : numB - numA;
+        });
+        
+        // Apply pagination after sorting
+        const paginatedData = sortedData.slice(from, to + 1);
+        
+        return { books: paginatedData, totalCount: count || 0 };
+      }
+
+      // For other columns, use database sorting
       const { data, error, count } = await query
         .order(sortColumn, { ascending: sortDirection === "asc" })
         .range(from, to);
