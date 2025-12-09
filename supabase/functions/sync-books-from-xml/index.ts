@@ -12,6 +12,7 @@ interface BookData {
   stock_status: string;
   sale_price: number;
   product_url: string;
+  author: string;
 }
 
 Deno.serve(async (req) => {
@@ -33,152 +34,196 @@ Deno.serve(async (req) => {
     
     // Parse XML to extract book data
     const books: BookData[] = [];
+    const seenCodes = new Set<string>();
     const itemRegex = /<item>([\s\S]*?)<\/item>/g;
     let match;
     
     while ((match = itemRegex.exec(xmlText)) !== null) {
       const itemXml = match[1];
       
-      const codeMatch = itemXml.match(/<g:id>(.*?)<\/g:id>/);
-      const titleMatch = itemXml.match(/<g:title>(?:<!--\[CDATA\[)?(.*?)(?:\]\]-->)?<\/g:title>/);
-      const imageMatch = itemXml.match(/<g:image_link>(?:<!--\[CDATA\[)?(.*?)(?:\]\]-->)?<\/g:image_link>/);
-      const linkMatch = itemXml.match(/<g:link>(?:<!--\[CDATA\[)?(.*?)(?:\]\]-->)?<\/g:link>/);
-      const availabilityMatch = itemXml.match(/<g:availability>(.*?)<\/g:availability>/);
-      const priceMatch = itemXml.match(/<g:price>(.*?) PLN<\/g:price>/);
+      // Extract fields using regex - handle both CDATA and plain text
+      const codeMatch = itemXml.match(/<g:id>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/g:id>/s);
+      const titleMatch = itemXml.match(/<g:title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/g:title>/s);
+      const imageMatch = itemXml.match(/<g:image_link>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/g:image_link>/s);
+      const linkMatch = itemXml.match(/<g:link>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/g:link>/s);
+      const availabilityMatch = itemXml.match(/<g:availability>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/g:availability>/s);
+      const priceMatch = itemXml.match(/<g:price>(?:<!\[CDATA\[)?([\d.,]+)\s*PLN(?:\]\]>)?<\/g:price>/s);
+      const brandMatch = itemXml.match(/<g:brand>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/g:brand>/s);
       
       if (codeMatch && titleMatch) {
+        const code = codeMatch[1].trim();
+        
+        // Skip duplicates (keep last occurrence like CSV import)
+        if (seenCodes.has(code)) {
+          continue;
+        }
+        seenCodes.add(code);
+        
         const title = titleMatch[1].trim();
-        console.log(`Parsed XML title: "${title}"`);
+        const priceStr = priceMatch ? priceMatch[1].replace(',', '.') : '0';
+        const price = parseFloat(priceStr) || 0;
+        
+        // Map availability to stock_status
+        let stockStatus = 'dostępny';
+        if (availabilityMatch) {
+          const availability = availabilityMatch[1].trim().toLowerCase();
+          if (availability === 'out of stock' || availability === 'out_of_stock') {
+            stockStatus = 'niewidoczny';
+          } else if (availability === 'in stock' || availability === 'in_stock') {
+            stockStatus = 'dostępny';
+          }
+        }
         
         books.push({
-          code: codeMatch[1],
+          code: code,
           title: title,
-          image_url: imageMatch ? imageMatch[1] : '',
-          product_url: linkMatch ? linkMatch[1] : '',
-          stock_status: availabilityMatch ? availabilityMatch[1] : 'unknown',
-          sale_price: priceMatch ? parseFloat(priceMatch[1]) : 0,
+          image_url: imageMatch ? imageMatch[1].trim() : '',
+          product_url: linkMatch ? linkMatch[1].trim() : '',
+          stock_status: stockStatus,
+          sale_price: price,
+          author: brandMatch ? brandMatch[1].trim() : '',
         });
       }
     }
     
-    console.log(`Parsed ${books.length} books from XML`);
+    console.log(`Parsed ${books.length} unique books from XML`);
+    
+    if (books.length === 0) {
+      throw new Error('No books parsed from XML - file may be empty or format changed');
+    }
     
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Get all books from database
-    const { data: dbBooks, error: fetchError } = await supabase
-      .from('books')
-      .select('id, code, title');
+    // Get all existing books from database (paginated fetch)
+    const allDbBooks: { id: string; code: string }[] = [];
+    const batchSize = 1000;
+    let offset = 0;
+    let hasMore = true;
     
-    if (fetchError) {
-      console.error('Error fetching books:', fetchError);
-      throw fetchError;
-    }
-    
-    console.log(`Found ${dbBooks?.length || 0} books in database`);
-    
-    // Helper functions to normalize and shorten titles
-    const normalizeTitle = (title: string) => {
-      return title
-        .toLowerCase()
-        .normalize('NFD') // split accents
-        .replace(/[\u0300-\u036f]/g, '') // remove accents
-        .replace(/[-–—]/g, ' ') // unify dashes to space
-        .replace(/[^\p{L}\p{N}\s]/gu, '') // remove punctuation, keep letters/digits
-        .replace(/\s+/g, ' ') // normalize spaces
-        .trim();
-    };
-
-    const shortTitle = (title: string) => {
-      const t = title.split(/[:\-–—\(\[]/)[0]; // take part before colon/dash/paren/bracket
-      return normalizeTitle(t);
-    };
-    
-    console.log('Sample XML titles:', books.slice(0, 3).map(b => `"${b.title}"`));
-    console.log('Sample DB titles:', dbBooks?.slice(0, 3).map(b => `"${b.title}"`));
-    
-    // Update each book by matching titles
-    let updatedCount = 0;
-    let notFoundCount = 0;
-    let matchedPairs: string[] = [];
-    
-    for (const dbBook of dbBooks || []) {
-      const normalizedDbTitle = normalizeTitle(dbBook.title);
-      const normalizedDbShort = shortTitle(dbBook.title);
-      console.log(`Looking for DB title: "${dbBook.title}" -> normalized: "${normalizedDbTitle}" | short: "${normalizedDbShort}"`);
+    while (hasMore) {
+      const { data: batch, error: fetchError } = await supabase
+        .from('books')
+        .select('id, code')
+        .range(offset, offset + batchSize - 1);
       
-      // 1) Exact match on full normalized title
-      let xmlBook = books.find(b => normalizeTitle(b.title) === normalizedDbTitle);
-
-      // 2) Exact match on short normalized title (before dash/colon)
-      if (!xmlBook) {
-        xmlBook = books.find(b => shortTitle(b.title) === normalizedDbShort);
-      }
-
-      // 3) Includes match (one contains the other)
-      if (!xmlBook) {
-        xmlBook = books.find(b => {
-          const x = normalizeTitle(b.title);
-          const xs = shortTitle(b.title);
-          return x.includes(normalizedDbShort) || normalizedDbShort.includes(x) ||
-                 xs.includes(normalizedDbShort) || normalizedDbShort.includes(xs) ||
-                 x.includes(normalizedDbTitle) || normalizedDbTitle.includes(x);
-        });
-      }
-
-      // 4) Fuzzy match by overlapping words (>= 50%, at least 2)
-      if (!xmlBook) {
-        const dbWords = normalizedDbShort.split(' ').filter(w => w.length > 2);
-        xmlBook = books.find(b => {
-          const xmlWords = shortTitle(b.title).split(' ').filter(w => w.length > 2);
-          const matchingWords = dbWords.filter(word => xmlWords.some(xmlWord => xmlWord.includes(word) || word.includes(xmlWord)));
-          const threshold = Math.max(2, Math.ceil(dbWords.length * 0.5));
-          return matchingWords.length >= threshold;
-        });
+      if (fetchError) {
+        console.error('Error fetching books:', fetchError);
+        throw fetchError;
       }
       
-      if (xmlBook) {
-        const { error: updateError } = await supabase
-          .from('books')
-          .update({
-            code: xmlBook.code,
-            title: xmlBook.title,
-            image_url: xmlBook.image_url,
-            product_url: xmlBook.product_url,
-            stock_status: xmlBook.stock_status,
-            sale_price: xmlBook.sale_price,
-          })
-          .eq('id', dbBook.id);
-        
-        if (updateError) {
-          console.error(`Error updating book "${dbBook.title}":`, updateError);
-        } else {
-          updatedCount++;
-          matchedPairs.push(`"${dbBook.title}" -> "${xmlBook.title}"`);
-          console.log(`✅ Matched: "${dbBook.title}" -> "${xmlBook.title}"`);
-        }
+      if (batch && batch.length > 0) {
+        allDbBooks.push(...batch);
+        offset += batchSize;
+        hasMore = batch.length === batchSize;
       } else {
-        notFoundCount++;
-        console.log(`❌ No match for: "${dbBook.title}"`);
+        hasMore = false;
       }
     }
     
-    console.log('=== SYNC SUMMARY ===');
-    console.log(`Updated: ${updatedCount}`);
-    console.log(`Not found: ${notFoundCount}`);
-    console.log('Sample matches:', matchedPairs.slice(0, 5));
+    console.log(`Found ${allDbBooks.length} existing books in database`);
+    
+    // Create a map of existing books by code
+    const existingByCode = new Map<string, string>();
+    for (const book of allDbBooks) {
+      existingByCode.set(book.code, book.id);
+    }
+    
+    // Create a set of XML codes for deletion check
+    const xmlCodes = new Set(books.map(b => b.code));
+    
+    // Upsert books in batches
+    let insertedCount = 0;
+    let updatedCount = 0;
+    let errorCount = 0;
+    const upsertBatchSize = 100;
+    
+    for (let i = 0; i < books.length; i += upsertBatchSize) {
+      const batch = books.slice(i, i + upsertBatchSize);
+      
+      const upsertData = batch.map(book => ({
+        code: book.code,
+        title: book.title,
+        image_url: book.image_url,
+        product_url: book.product_url,
+        stock_status: book.stock_status,
+        sale_price: book.sale_price,
+        author: book.author || null,
+        // Mark as frozen if stock_status is 'niewidoczny'
+        exclude_from_campaigns: book.stock_status === 'niewidoczny',
+      }));
+      
+      const { error: upsertError, data: upsertResult } = await supabase
+        .from('books')
+        .upsert(upsertData, { 
+          onConflict: 'code',
+          ignoreDuplicates: false 
+        })
+        .select('id');
+      
+      if (upsertError) {
+        console.error(`Error upserting batch ${i}:`, upsertError);
+        errorCount += batch.length;
+      } else {
+        // Count inserts vs updates
+        for (const book of batch) {
+          if (existingByCode.has(book.code)) {
+            updatedCount++;
+          } else {
+            insertedCount++;
+          }
+        }
+      }
+      
+      // Log progress every 500 books
+      if ((i + upsertBatchSize) % 500 === 0 || i + upsertBatchSize >= books.length) {
+        console.log(`Upserted ${Math.min(i + upsertBatchSize, books.length)}/${books.length} books`);
+      }
+    }
+    
+    // Delete books that are in database but not in XML
+    const codesToDelete: string[] = [];
+    for (const [code, id] of existingByCode) {
+      if (!xmlCodes.has(code)) {
+        codesToDelete.push(code);
+      }
+    }
+    
+    let deletedCount = 0;
+    if (codesToDelete.length > 0) {
+      console.log(`Deleting ${codesToDelete.length} books not in XML...`);
+      
+      // Delete in batches
+      const deleteBatchSize = 100;
+      for (let i = 0; i < codesToDelete.length; i += deleteBatchSize) {
+        const batch = codesToDelete.slice(i, i + deleteBatchSize);
+        
+        const { error: deleteError, count } = await supabase
+          .from('books')
+          .delete()
+          .in('code', batch);
+        
+        if (deleteError) {
+          console.error(`Error deleting batch:`, deleteError);
+        } else {
+          deletedCount += batch.length;
+        }
+      }
+      
+      console.log(`Deleted ${deletedCount} books`);
+    }
     
     const result = {
       success: true,
       message: `Synchronizacja zakończona`,
       stats: {
         xmlBooksFound: books.length,
-        dbBooksTotal: dbBooks?.length || 0,
+        inserted: insertedCount,
         updated: updatedCount,
-        notFoundInXml: notFoundCount,
+        deleted: deletedCount,
+        errors: errorCount,
       }
     };
     

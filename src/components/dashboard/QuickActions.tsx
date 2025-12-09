@@ -24,8 +24,11 @@ export const QuickActions = () => {
       return data;
     },
     onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["general-books"] });
+      queryClient.invalidateQueries({ queryKey: ["books"] });
+      const stats = data.stats;
       toast.success(`Synchronizacja zakończona`, {
-        description: `Zaktualizowano ${data.stats.updated} książek z ${data.stats.xmlBooksFound} dostępnych`,
+        description: `Dodano: ${stats.inserted}, Zaktualizowano: ${stats.updated}, Usunięto: ${stats.deleted} (z ${stats.xmlBooksFound} w XML)`,
       });
     },
     onError: (error: any) => {
