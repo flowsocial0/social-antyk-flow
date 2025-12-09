@@ -31,6 +31,7 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
     failed: number; 
     total: number;
     phase: string;
+    errors: string[];
   } | null>(null);
 
   const parsePrice = (priceStr: string): number | null => {
@@ -97,7 +98,7 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
     }
 
     setImporting(true);
-    setProgress({ success: 0, failed: 0, total: 0, phase: "Parsowanie pliku..." });
+    setProgress({ success: 0, failed: 0, total: 0, phase: "Parsowanie pliku...", errors: [] });
 
     const arrayBuffer = await file.arrayBuffer();
     const { text: csvText } = decodeWithFallback(arrayBuffer);
@@ -114,8 +115,9 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
         const total = validItems.length;
         let success = 0;
         let failed = 0;
+        const errors: string[] = [];
 
-        setProgress({ success, failed, total, phase: "Importowanie książek..." });
+        setProgress({ success, failed, total, phase: "Importowanie książek...", errors });
 
         // Process in batches of 10
         const batchSize = 10;
@@ -150,15 +152,17 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
           if (error) {
             console.error("Błąd importu partii:", error);
             failed += batch.length;
+            const errorMsg = `Pozycje ${i + 1}-${i + batch.length}: ${error.message || 'Nieznany błąd'}`;
+            errors.push(errorMsg);
           } else {
             success += batch.length;
           }
 
-          setProgress({ success, failed, total, phase: "Importowanie książek..." });
+          setProgress({ success, failed, total, phase: "Importowanie książek...", errors: [...errors] });
         }
 
         // Phase 2: Migrate images to storage
-        setProgress({ success, failed, total, phase: "Migrowanie okładek do storage..." });
+        setProgress({ success, failed, total, phase: "Migrowanie okładek do storage...", errors: [...errors] });
         
         const migrationResult = await migrateImagesToStorage();
         
@@ -238,9 +242,18 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
                   />
                 </div>
                 {progress.failed > 0 && (
-                  <div className="flex items-center gap-2 text-sm text-destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <span>Błędy: {progress.failed}</span>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>Błędy: {progress.failed}</span>
+                    </div>
+                    {progress.errors.length > 0 && (
+                      <div className="max-h-32 overflow-y-auto text-xs bg-destructive/10 rounded p-2 space-y-1">
+                        {progress.errors.map((err, i) => (
+                          <div key={i} className="text-destructive">{err}</div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

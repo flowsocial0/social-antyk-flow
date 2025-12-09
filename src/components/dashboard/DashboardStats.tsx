@@ -5,13 +5,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 
 export const DashboardStats = () => {
-  // Fetch all books
-  const { data: books } = useQuery({
-    queryKey: ["books"],
+  // Fetch books count (without 1000 limit)
+  const { data: booksCount } = useQuery({
+    queryKey: ["books-count"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("books").select("*");
+      const { count, error } = await supabase
+        .from("books")
+        .select("*", { count: "exact", head: true });
       if (error) throw error;
-      return data;
+      return count || 0;
     },
     staleTime: 300000, // 5 minutes
     refetchInterval: 300000, // Refetch every 5 minutes
@@ -73,7 +75,7 @@ export const DashboardStats = () => {
     refetchInterval: false, // Don't auto-refetch, only on mount/focus
   });
 
-  const totalBooks = books?.length || 0;
+  const totalBooks = booksCount || 0;
   const scheduledCount = scheduledBooks?.length || 0;
   const publishedCount = publishedThisMonth?.length || 0;
   const connectedPlatforms = twitterTokens ? 1 : 0;
