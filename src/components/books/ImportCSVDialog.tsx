@@ -26,9 +26,9 @@ interface CSVRow {
 export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
-  const [progress, setProgress] = useState<{ 
-    success: number; 
-    failed: number; 
+  const [progress, setProgress] = useState<{
+    success: number;
+    failed: number;
     total: number;
     phase: string;
     errors: string[];
@@ -78,67 +78,67 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
   };
 
   const migrateImagesToStorage = async (
-    onProgress: (stats: { succeeded: number; failed: number; remaining: number }) => void
+    onProgress: (stats: { succeeded: number; failed: number; remaining: number }) => void,
   ) => {
     let totalSucceeded = 0;
     let totalFailed = 0;
     let hasMore = true;
     let consecutiveErrors = 0;
     const maxRetries = 3;
-    
+
     // Keep calling until all images are migrated
     while (hasMore) {
       try {
-        const { data, error } = await supabase.functions.invoke('migrate-images-to-storage');
-        
+        const { data, error } = await supabase.functions.invoke("migrate-images-to-storage");
+
         if (error) {
-          console.error('Error migrating images:', error);
+          console.error("Error migrating images:", error);
           consecutiveErrors++;
-          
+
           // If network error, retry up to maxRetries times
           if (consecutiveErrors < maxRetries) {
             console.log(`Retrying... attempt ${consecutiveErrors + 1}/${maxRetries}`);
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise((resolve) => setTimeout(resolve, 2000));
             continue;
           }
-          
+
           return { success: false, error, stats: { succeeded: totalSucceeded, failed: totalFailed } };
         }
-        
+
         // Reset error counter on success
         consecutiveErrors = 0;
-        
+
         if (data?.stats) {
           totalSucceeded += data.stats.succeeded;
           totalFailed += data.stats.failed;
-          onProgress({ 
-            succeeded: totalSucceeded, 
-            failed: totalFailed, 
-            remaining: data.stats.remaining || 0 
+          onProgress({
+            succeeded: totalSucceeded,
+            failed: totalFailed,
+            remaining: data.stats.remaining || 0,
           });
         }
-        
+
         hasMore = data?.hasMore === true;
-        
+
         // Small delay between batches to avoid rate limiting
         if (hasMore) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       } catch (err) {
-        console.error('Error calling migrate-images-to-storage:', err);
+        console.error("Error calling migrate-images-to-storage:", err);
         consecutiveErrors++;
-        
+
         // Retry on network errors
         if (consecutiveErrors < maxRetries) {
           console.log(`Network error, retrying... attempt ${consecutiveErrors + 1}/${maxRetries}`);
-          await new Promise(resolve => setTimeout(resolve, 3000));
+          await new Promise((resolve) => setTimeout(resolve, 3000));
           continue;
         }
-        
+
         return { success: false, error: err, stats: { succeeded: totalSucceeded, failed: totalFailed } };
       }
     }
-    
+
     return { success: true, stats: { succeeded: totalSucceeded, failed: totalFailed } };
   };
 
@@ -153,17 +153,17 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
 
     const arrayBuffer = await file.arrayBuffer();
     const { text: rawCsvText } = decodeWithFallback(arrayBuffer);
-    
+
     // Clean CSV - find the header row (first row containing "Kod")
-    const lines = rawCsvText.split('\n');
+    const lines = rawCsvText.split("\n");
     let headerIndex = 0;
     for (let i = 0; i < Math.min(lines.length, 10); i++) {
-      if (lines[i].includes('Kod') && lines[i].includes('Nazwa')) {
+      if (lines[i].includes("Kod") && lines[i].includes("Nazwa")) {
         headerIndex = i;
         break;
       }
     }
-    const csvText = lines.slice(headerIndex).join('\n');
+    const csvText = lines.slice(headerIndex).join("\n");
     console.log(`Pomijam ${headerIndex} wierszy przed nagłówkami`);
 
     Papa.parse<CSVRow>(csvText, {
@@ -174,29 +174,29 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
       complete: async (results) => {
         console.log("CSV headers:", results.meta.fields);
         console.log("First row sample:", results.data[0]);
-        
+
         // Filter out empty rows (no code)
         const validItems = results.data.filter((row) => {
           const code = row.Kod?.trim();
           return !!code;
         });
-        
+
         // Deduplicate by code - keep last occurrence (most recent in CSV)
         const uniqueBooksMap = new Map<string, CSVRow>();
-        validItems.forEach(row => {
+        validItems.forEach((row) => {
           const code = row.Kod?.trim();
           if (code) {
             uniqueBooksMap.set(code, row);
           }
         });
-        
+
         const uniqueItems = Array.from(uniqueBooksMap.values());
         const duplicatesCount = validItems.length - uniqueItems.length;
-        
+
         if (duplicatesCount > 0) {
           console.log(`Znaleziono ${duplicatesCount} duplikatów kodów w CSV - zostaną pominięte`);
         }
-        
+
         const total = uniqueItems.length;
         let success = 0;
         let failed = 0;
@@ -205,30 +205,30 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
 
         // Get all codes from CSV - already unique from map
         const csvCodes = new Set(uniqueBooksMap.keys());
-        
+
         console.log(`CSV zawiera ${csvCodes.size} unikalnych kodów (${duplicatesCount} duplikatów pominięto)`);
         console.log("Przykładowe kody z CSV:", Array.from(csvCodes).slice(0, 10));
 
         // Phase 1: Fetch all existing book codes AND image_urls from database
         setProgress({ success: 0, failed: 0, total, phase: "Sprawdzanie istniejących książek...", errors });
-        
+
         const { data: existingBooks, error: fetchError } = await supabase
           .from("books")
           .select("id, code, title, image_url");
-        
+
         if (fetchError) {
           console.error("Błąd pobierania książek:", fetchError);
           errors.push(`Błąd pobierania istniejących książek: ${fetchError.message}`);
         }
-        
+
         // Create a map of existing books by code for quick lookup
         const existingBooksMap = new Map<string, { id: string; image_url: string | null }>();
-        existingBooks?.forEach(b => {
+        existingBooks?.forEach((b) => {
           if (b.code) {
             existingBooksMap.set(b.code.trim(), { id: b.id, image_url: b.image_url });
           }
         });
-        
+
         console.log(`Baza danych zawiera ${existingBooksMap.size} książek`);
 
         // Phase 2: Upsert ALL books from CSV FIRST (add new / update existing)
@@ -238,23 +238,21 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
         const batchSize = 10;
         for (let i = 0; i < uniqueItems.length; i += batchSize) {
           const batch = uniqueItems.slice(i, i + batchSize);
-          
+
           const bookData = batch.map((row) => {
             const stockStatus = row["Stan towaru"]?.trim() || null;
             const isHidden = stockStatus?.toLowerCase() === "niewidoczny";
             const code = row.Kod?.trim() || "";
             const newImageUrl = row.Obrazek?.trim() || null;
-            
+
             // Check if image URL changed - only then reset storage_path
             const existingBook = existingBooksMap.get(code);
-            const imageUrlChanged = existingBook 
-              ? existingBook.image_url !== newImageUrl 
-              : false;
-            
+            const imageUrlChanged = existingBook ? existingBook.image_url !== newImageUrl : false;
+
             if (imageUrlChanged) {
               console.log(`Image URL changed for ${code}: "${existingBook?.image_url}" -> "${newImageUrl}"`);
             }
-            
+
             return {
               code,
               title: row.Nazwa?.trim() || "",
@@ -271,38 +269,36 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
             };
           });
 
-          const { error } = await supabase
-            .from("books")
-            .upsert(bookData, { 
-              onConflict: "code",
-              ignoreDuplicates: false 
-            });
+          const { error } = await supabase.from("books").upsert(bookData, {
+            onConflict: "code",
+            ignoreDuplicates: false,
+          });
 
           if (error) {
             console.error("Błąd importu partii:", error, bookData);
             failed += batch.length;
-            const errorMsg = `Pozycje ${i + 1}-${i + batch.length}: ${error.message || 'Nieznany błąd'}`;
+            const errorMsg = `Pozycje ${i + 1}-${i + batch.length}: ${error.message || "Nieznany błąd"}`;
             errors.push(errorMsg);
           } else {
             success += batch.length;
           }
 
-          setProgress({ 
-            success, 
-            failed, 
-            total, 
-            phase: `Importowanie... (${success}/${total})`, 
-            errors: [...errors] 
+          setProgress({
+            success,
+            failed,
+            total,
+            phase: `Importowanie... (${success}/${total})`,
+            errors: [...errors],
           });
         }
-        
+
         // Phase 3: Delete books that are in DB but NOT in CSV
         // Only proceed if we successfully imported at least some books
         if (success > 0 && existingBooks) {
           setProgress({ success, failed, total, phase: "Usuwanie nieaktualnych książek...", errors: [...errors] });
-          
+
           // Find books to delete (in DB but not in CSV)
-          const booksToDelete = existingBooks.filter(book => {
+          const booksToDelete = existingBooks.filter((book) => {
             const bookCode = book.code?.trim();
             const shouldDelete = bookCode ? !csvCodes.has(bookCode) : false;
             if (shouldDelete) {
@@ -310,19 +306,16 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
             }
             return shouldDelete;
           });
-          
+
           console.log(`Książki do usunięcia: ${booksToDelete.length}`);
-          
+
           if (booksToDelete.length > 0) {
             // Delete in batches of 50
-            const deleteIds = booksToDelete.map(b => b.id);
+            const deleteIds = booksToDelete.map((b) => b.id);
             for (let i = 0; i < deleteIds.length; i += 50) {
               const batchIds = deleteIds.slice(i, i + 50);
-              const { error: deleteError } = await supabase
-                .from("books")
-                .delete()
-                .in("id", batchIds);
-              
+              const { error: deleteError } = await supabase.from("books").delete().in("id", batchIds);
+
               if (deleteError) {
                 console.error("Błąd usuwania książek:", deleteError);
                 errors.push(`Błąd usuwania książek: ${deleteError.message}`);
@@ -335,25 +328,23 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
 
         // Phase 3: Migrate images to storage
         setProgress({ success, failed, total, phase: "Migrowanie okładek do storage...", errors: [...errors] });
-        
+
         const migrationResult = await migrateImagesToStorage((stats) => {
-          setProgress({ 
-            success, 
-            failed, 
-            total, 
-            phase: `Migrowanie okładek... (${stats.succeeded} przesłanych${stats.remaining > 0 ? `, pozostało: ${stats.remaining}` : ''})`,
-            errors: [...errors] 
+          setProgress({
+            success,
+            failed,
+            total,
+            phase: `Migrowanie okładek... (${stats.succeeded} przesłanych${stats.remaining > 0 ? `, pozostało: ${stats.remaining}` : ""})`,
+            errors: [...errors],
           });
         });
-        
+
         setImporting(false);
-        
+
         const imageStats = migrationResult?.stats;
-        const deletedMsg = deleted > 0 ? ` Usunięto: ${deleted}.` : '';
-        const imageMsg = imageStats 
-          ? ` Okładki: ${imageStats.succeeded} przesłanych.`
-          : '';
-        
+        const deletedMsg = deleted > 0 ? ` Usunięto: ${deleted}.` : "";
+        const imageMsg = imageStats ? ` Okładki: ${imageStats.succeeded} przesłanych.` : "";
+
         if (failed === 0) {
           toast.success(`Import zakończony! Zaktualizowano: ${success}.${deletedMsg}${imageMsg}`);
         } else {
@@ -380,10 +371,12 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
         <DialogHeader>
           <DialogTitle>Importuj książki z CSV</DialogTitle>
           <DialogDescription>
-            Wybierz plik CSV z danymi książek. Plik powinien zawierać kolumny: Kod, Nazwa, Autor, Obrazek, Cena sprzedaży, Cena promocyjna, Stan towaru, Ilość w magazynach.
-            <br /><br />
+            Wybierz plik CSV z danymi książek. Plik powinien zawierać kolumny: Kod, Nazwa, Autor, Obrazek, Cena
+            sprzedaży, Cena promocyjna, Stan towaru, Ilość w magazynach.
+            <br />
+            <br />
             <span className="text-muted-foreground text-xs">
-              Produkty ze stanem "niewidoczny" zostaną automatycznie zamrożone. Po imporcie okładki zostaną przesłane do storage.
+              Produkty ze stanem "niewidoczny" zostaną automatycznie zamrożone.
             </span>
           </DialogDescription>
         </DialogHeader>
@@ -434,7 +427,9 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
                     {progress.errors.length > 0 && (
                       <div className="max-h-32 overflow-y-auto text-xs bg-destructive/10 rounded p-2 space-y-1">
                         {progress.errors.map((err, i) => (
-                          <div key={i} className="text-destructive">{err}</div>
+                          <div key={i} className="text-destructive">
+                            {err}
+                          </div>
                         ))}
                       </div>
                     )}
@@ -445,18 +440,10 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
           </div>
 
           <div className="flex gap-2 justify-end">
-            <Button
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={importing}
-            >
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={importing}>
               Anuluj
             </Button>
-            <Button
-              onClick={handleImport}
-              disabled={!file || importing}
-              className="gap-2"
-            >
+            <Button onClick={handleImport} disabled={!file || importing} className="gap-2">
               <Upload className="h-4 w-4" />
               {importing ? "Importuję..." : "Importuj"}
             </Button>
