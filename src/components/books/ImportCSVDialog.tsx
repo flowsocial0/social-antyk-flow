@@ -152,7 +152,19 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
     setProgress({ success: 0, failed: 0, total: 0, phase: "Parsowanie pliku...", errors: [] });
 
     const arrayBuffer = await file.arrayBuffer();
-    const { text: csvText } = decodeWithFallback(arrayBuffer);
+    const { text: rawCsvText } = decodeWithFallback(arrayBuffer);
+    
+    // Clean CSV - find the header row (first row containing "Kod")
+    const lines = rawCsvText.split('\n');
+    let headerIndex = 0;
+    for (let i = 0; i < Math.min(lines.length, 10); i++) {
+      if (lines[i].includes('Kod') && lines[i].includes('Nazwa')) {
+        headerIndex = i;
+        break;
+      }
+    }
+    const csvText = lines.slice(headerIndex).join('\n');
+    console.log(`Pomijam ${headerIndex} wierszy przed nagłówkami`);
 
     Papa.parse<CSVRow>(csvText, {
       header: true,
