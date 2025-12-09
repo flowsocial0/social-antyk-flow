@@ -180,18 +180,33 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
           const code = row.Kod?.trim();
           return !!code;
         });
-        const total = validItems.length;
+        
+        // Deduplicate by code - keep last occurrence (most recent in CSV)
+        const uniqueBooksMap = new Map<string, CSVRow>();
+        validItems.forEach(row => {
+          const code = row.Kod?.trim();
+          if (code) {
+            uniqueBooksMap.set(code, row);
+          }
+        });
+        
+        const uniqueItems = Array.from(uniqueBooksMap.values());
+        const duplicatesCount = validItems.length - uniqueItems.length;
+        
+        if (duplicatesCount > 0) {
+          console.log(`Znaleziono ${duplicatesCount} duplikatów kodów w CSV - zostaną pominięte`);
+        }
+        
+        const total = uniqueItems.length;
         let success = 0;
         let failed = 0;
         let deleted = 0;
         const errors: string[] = [];
 
-        // Get all codes from CSV - normalize by trimming
-        const csvCodes = new Set(
-          validItems.map(row => row.Kod?.trim()).filter(Boolean)
-        );
+        // Get all codes from CSV - already unique from map
+        const csvCodes = new Set(uniqueBooksMap.keys());
         
-        console.log(`CSV zawiera ${csvCodes.size} unikalnych kodów`);
+        console.log(`CSV zawiera ${csvCodes.size} unikalnych kodów (${duplicatesCount} duplikatów pominięto)`);
         console.log("Przykładowe kody z CSV:", Array.from(csvCodes).slice(0, 10));
 
         // Phase 1: Fetch all existing book codes from database
@@ -213,10 +228,10 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
         // Phase 2: Upsert ALL books from CSV FIRST (add new / update existing)
         setProgress({ success, failed, total, phase: "Importowanie książek z CSV...", errors: [...errors] });
 
-        // Process in batches of 10
+        // Process in batches of 10 - use uniqueItems (deduplicated)
         const batchSize = 10;
-        for (let i = 0; i < validItems.length; i += batchSize) {
-          const batch = validItems.slice(i, i + batchSize);
+        for (let i = 0; i < uniqueItems.length; i += batchSize) {
+          const batch = uniqueItems.slice(i, i + batchSize);
           
           const bookData = batch.map((row) => {
             const stockStatus = row["Stan towaru"]?.trim() || null;
