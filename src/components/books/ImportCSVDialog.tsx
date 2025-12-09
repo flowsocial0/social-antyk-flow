@@ -209,21 +209,27 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
         console.log(`CSV zawiera ${csvCodes.size} unikalnych kodów (${duplicatesCount} duplikatów pominięto)`);
         console.log("Przykładowe kody z CSV:", Array.from(csvCodes).slice(0, 10));
 
-        // Phase 1: Fetch all existing book codes from database
+        // Phase 1: Fetch all existing book codes AND image_urls from database
         setProgress({ success: 0, failed: 0, total, phase: "Sprawdzanie istniejących książek...", errors });
         
         const { data: existingBooks, error: fetchError } = await supabase
           .from("books")
-          .select("id, code, title");
+          .select("id, code, title, image_url");
         
         if (fetchError) {
           console.error("Błąd pobierania książek:", fetchError);
           errors.push(`Błąd pobierania istniejących książek: ${fetchError.message}`);
         }
         
-        const existingCodes = new Set(existingBooks?.map(b => b.code?.trim()) || []);
-        console.log(`Baza danych zawiera ${existingCodes.size} książek`);
-        console.log("Przykładowe kody z bazy:", Array.from(existingCodes).slice(0, 10));
+        // Create a map of existing books by code for quick lookup
+        const existingBooksMap = new Map<string, { id: string; image_url: string | null }>();
+        existingBooks?.forEach(b => {
+          if (b.code) {
+            existingBooksMap.set(b.code.trim(), { id: b.id, image_url: b.image_url });
+          }
+        });
+        
+        console.log(`Baza danych zawiera ${existingBooksMap.size} książek`);
 
         // Phase 2: Upsert ALL books from CSV FIRST (add new / update existing)
         setProgress({ success, failed, total, phase: "Importowanie książek z CSV...", errors: [...errors] });
@@ -237,20 +243,31 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
             const stockStatus = row["Stan towaru"]?.trim() || null;
             const isHidden = stockStatus?.toLowerCase() === "niewidoczny";
             const code = row.Kod?.trim() || "";
+            const newImageUrl = row.Obrazek?.trim() || null;
+            
+            // Check if image URL changed - only then reset storage_path
+            const existingBook = existingBooksMap.get(code);
+            const imageUrlChanged = existingBook 
+              ? existingBook.image_url !== newImageUrl 
+              : false;
+            
+            if (imageUrlChanged) {
+              console.log(`Image URL changed for ${code}: "${existingBook?.image_url}" -> "${newImageUrl}"`);
+            }
             
             return {
               code,
               title: row.Nazwa?.trim() || "",
               author: row.Autor?.trim() || null,
-              image_url: row.Obrazek?.trim() || null,
+              image_url: newImageUrl,
               sale_price: parsePrice(row["Cena sprzedaży"]),
               promotional_price: parsePrice(row["Cena promocyjna"]),
               stock_status: stockStatus,
               warehouse_quantity: parseQuantity(row["Ilość w magazynach"]),
-              // Freeze items with "niewidoczny" status
               exclude_from_campaigns: isHidden,
-              // Reset storage_path - will be re-migrated
-              storage_path: null,
+              // Only reset storage_path if image URL changed (to trigger re-migration)
+              // If not changed, don't include storage_path at all so it keeps its value
+              ...(imageUrlChanged ? { storage_path: null } : {}),
             };
           });
 
@@ -287,7 +304,7 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
           // Find books to delete (in DB but not in CSV)
           const booksToDelete = existingBooks.filter(book => {
             const bookCode = book.code?.trim();
-            const shouldDelete = !csvCodes.has(bookCode);
+            const shouldDelete = bookCode ? !csvCodes.has(bookCode) : false;
             if (shouldDelete) {
               console.log(`Książka do usunięcia: "${book.title}" (kod: "${bookCode}")`);
             }
