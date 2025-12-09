@@ -72,6 +72,10 @@ Deno.serve(async (req) => {
         
         if (!book.image_url) {
           console.log('No image_url, skipping...');
+          // Mark as processed (set storage_path to empty string to skip next time)
+          await supabase.from('books').update({ storage_path: '' }).eq('id', book.id);
+          results.failed++;
+          results.errors.push(`${book.title}: Brak URL obrazka`);
           continue;
         }
 
@@ -86,11 +90,19 @@ Deno.serve(async (req) => {
           clearTimeout(timeoutId);
         } catch (fetchErr) {
           clearTimeout(timeoutId);
-          throw new Error(`Download timeout or error: ${fetchErr}`);
+          // Mark as processed to skip next time
+          await supabase.from('books').update({ storage_path: '' }).eq('id', book.id);
+          results.failed++;
+          results.errors.push(`${book.title}: Błąd pobierania obrazka`);
+          continue;
         }
         
         if (!imageResponse.ok) {
-          throw new Error(`Failed to download image: ${imageResponse.statusText}`);
+          // Mark as processed to skip next time (404 or other error)
+          await supabase.from('books').update({ storage_path: '' }).eq('id', book.id);
+          results.failed++;
+          results.errors.push(`${book.title}: Obrazek niedostępny (${imageResponse.status})`);
+          continue;
         }
 
         const imageBlob = await imageResponse.blob();
@@ -117,7 +129,11 @@ Deno.serve(async (req) => {
 
         if (uploadError) {
           console.error(`Upload error for ${book.title}:`, uploadError);
-          throw uploadError;
+          // Mark as processed to skip next time
+          await supabase.from('books').update({ storage_path: '' }).eq('id', book.id);
+          results.failed++;
+          results.errors.push(`${book.title}: Błąd uploadu`);
+          continue;
         }
 
         console.log(`Successfully uploaded to storage: ${storagePath}`);
@@ -130,7 +146,9 @@ Deno.serve(async (req) => {
 
         if (updateError) {
           console.error(`Update error for ${book.title}:`, updateError);
-          throw updateError;
+          results.failed++;
+          results.errors.push(`${book.title}: Błąd aktualizacji bazy`);
+          continue;
         }
 
         console.log(`Successfully updated book record with storage_path`);
@@ -138,6 +156,8 @@ Deno.serve(async (req) => {
 
       } catch (error) {
         console.error(`Error processing book ${book.title}:`, error);
+        // Mark as processed to skip next time
+        await supabase.from('books').update({ storage_path: '' }).eq('id', book.id);
         results.failed++;
         results.errors.push(
           `${book.title}: ${error instanceof Error ? error.message : 'Unknown error'}`

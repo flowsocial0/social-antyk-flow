@@ -263,20 +263,22 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">{progress.phase}</span>
-                  <span className="font-medium">
-                    {progress.success + progress.failed} / {progress.total}
-                  </span>
+                  {progress.total > 0 && (
+                    <span className="font-medium">
+                      {progress.success + progress.failed} / {progress.total}
+                    </span>
+                  )}
                 </div>
-                <div className="w-full bg-secondary rounded-full h-2">
-                  <div
-                    className="bg-primary h-2 rounded-full transition-all duration-300"
-                    style={{
-                      width: progress.total > 0 
-                        ? `${((progress.success + progress.failed) / progress.total) * 100}%`
-                        : '0%',
-                    }}
-                  />
-                </div>
+                {progress.total > 0 && (
+                  <div className="w-full bg-secondary rounded-full h-2">
+                    <div
+                      className="bg-primary h-2 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${((progress.success + progress.failed) / progress.total) * 100}%`,
+                      }}
+                    />
+                  </div>
+                )}
                 {progress.failed > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm text-destructive">

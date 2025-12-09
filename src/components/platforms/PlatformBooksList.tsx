@@ -457,6 +457,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
               >
                 Tytuł <SortIcon column="title" />
               </TableHead>
+              <TableHead className="w-32">Autor</TableHead>
               <TableHead className="w-28">Data publikacji</TableHead>
               <TableHead className="text-right w-45">Akcje</TableHead>
             </TableRow>
@@ -485,6 +486,9 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                     {book.code}
                   </TableCell>
                   <TableCell className="truncate" title={book.title}>{book.title}</TableCell>
+                  <TableCell className="truncate text-sm text-muted-foreground" title={book.author || ''}>
+                    {book.author || '-'}
+                  </TableCell>
                   <TableCell>
                     {content.published_at ? (
                       <div className="flex flex-col gap-1">
