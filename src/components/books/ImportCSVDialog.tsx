@@ -203,10 +203,8 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
         let deleted = 0;
         const errors: string[] = [];
 
-        // Get all codes from CSV - already unique from map
-        // Normalize codes: remove leading zeros for consistent comparison
-        const normalizeCode = (code: string) => code.replace(/^0+/, '') || '0';
-        const csvCodes = new Set(Array.from(uniqueBooksMap.keys()).map(normalizeCode));
+        // Get all codes from CSV - exact match, no normalization
+        const csvCodes = new Set(uniqueBooksMap.keys());
 
         console.log(`CSV zawiera ${csvCodes.size} unikalnych kodów (${duplicatesCount} duplikatów pominięto)`);
         console.log("Przykładowe kody z CSV:", Array.from(csvCodes).slice(0, 10));
@@ -299,14 +297,12 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
         if (success > 0 && existingBooks) {
           setProgress({ success, failed, total, phase: "Usuwanie nieaktualnych książek...", errors: [...errors] });
 
-          // Find books to delete (in DB but not in CSV)
-          // Normalize DB codes the same way as CSV codes (remove leading zeros)
+          // Find books to delete (in DB but not in CSV) - exact code match
           const booksToDelete = existingBooks.filter((book) => {
             const bookCode = book.code?.trim();
-            const normalizedDbCode = bookCode ? normalizeCode(bookCode) : '';
-            const shouldDelete = normalizedDbCode ? !csvCodes.has(normalizedDbCode) : false;
+            const shouldDelete = bookCode ? !csvCodes.has(bookCode) : false;
             if (shouldDelete) {
-              console.log(`Książka do usunięcia: "${book.title}" (kod: "${bookCode}" -> "${normalizedDbCode}")`);
+              console.log(`Książka do usunięcia: "${book.title}" (kod: "${bookCode}")`);
             }
             return shouldDelete;
           });
