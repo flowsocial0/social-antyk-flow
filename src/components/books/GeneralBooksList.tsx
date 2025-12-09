@@ -55,15 +55,42 @@ export const GeneralBooksList = () => {
       }
 
       // For code column, we need to sort numerically (code is text but contains numbers)
-      // Supabase doesn't support numeric cast in order, so we fetch more and sort client-side for code
+      // Supabase doesn't support numeric cast in order, so we fetch ALL and sort client-side
       if (sortColumn === "code") {
-        // Fetch all matching records for client-side numeric sorting
-        const { data: allData, error: allError, count } = await query;
+        // First get total count
+        const { count } = await query;
         
-        if (allError) throw allError;
+        // Fetch ALL records using pagination (Supabase has 1000 row limit)
+        const allBooks: Tables<"books">[] = [];
+        const batchSize = 1000;
+        let offset = 0;
+        let hasMore = true;
+        
+        while (hasMore) {
+          // Build fresh query for each batch
+          let batchQuery = supabase.from("books").select("*");
+          
+          if (debouncedSearchQuery.trim()) {
+            batchQuery = batchQuery.or(
+              `code.ilike.%${debouncedSearchQuery}%,title.ilike.%${debouncedSearchQuery}%,sale_price.eq.${parseFloat(debouncedSearchQuery) || 0}`,
+            );
+          }
+          
+          const { data: batchData, error: batchError } = await batchQuery.range(offset, offset + batchSize - 1);
+          
+          if (batchError) throw batchError;
+          
+          if (batchData && batchData.length > 0) {
+            allBooks.push(...batchData);
+            offset += batchSize;
+            hasMore = batchData.length === batchSize;
+          } else {
+            hasMore = false;
+          }
+        }
         
         // Sort numerically by code
-        const sortedData = [...(allData || [])].sort((a, b) => {
+        const sortedData = allBooks.sort((a, b) => {
           const numA = parseInt(a.code || "0", 10);
           const numB = parseInt(b.code || "0", 10);
           // Handle non-numeric codes by falling back to string comparison
