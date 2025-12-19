@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Helmet } from "react-helmet";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { ExternalLink, Loader2, ArrowLeft } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 export default function BookPreview() {
@@ -87,6 +87,14 @@ export default function BookPreview() {
 
       <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-primary/5 py-12 px-4">
         <div className="container max-w-4xl mx-auto">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/")}
+            className="mb-6 gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Powrót
+          </Button>
           <Card className="overflow-hidden shadow-elegant">
             <CardContent className="p-8">
               <div className="grid md:grid-cols-2 gap-8">
