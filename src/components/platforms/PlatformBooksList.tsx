@@ -159,6 +159,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
       // Select the correct function based on platform
       const functionName = platform === 'x' ? 'publish-to-x' : 
                           platform === 'facebook' ? 'publish-to-facebook' : 
+                          platform === 'tiktok' ? 'publish-to-tiktok' :
                           'publish-to-x'; // fallback to X for other platforms
 
       const { data, error } = await supabase.functions.invoke(functionName, {

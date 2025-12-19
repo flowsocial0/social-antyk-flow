@@ -55,12 +55,21 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
       .limit(1)
       .maybeSingle();
 
+    // Check TikTok connection
+    const { data: tiktokData } = await (supabase as any)
+      .from('tiktok_oauth_tokens')
+      .select('id')
+      .limit(1)
+      .maybeSingle();
+
     // Set connection status for all platforms
     platforms.forEach(platform => {
       if (platform.id === 'x') {
         connectionStatus[platform.id] = !!xData;
       } else if (platform.id === 'facebook') {
         connectionStatus[platform.id] = !!fbData;
+      } else if (platform.id === 'tiktok') {
+        connectionStatus[platform.id] = !!tiktokData;
       } else {
         // For other platforms, mark as not connected
         connectionStatus[platform.id] = false;
