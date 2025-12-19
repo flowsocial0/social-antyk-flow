@@ -10,6 +10,8 @@ async function refreshAccessToken(supabase: any, userId: string, refreshToken: s
   const clientKey = Deno.env.get('TIKTOK_CLIENT_KEY')!;
   const clientSecret = Deno.env.get('TIKTOK_CLIENT_SECRET')!;
 
+  console.log('Refreshing TikTok access token...');
+
   const response = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
     method: 'POST',
     headers: {
@@ -40,6 +42,7 @@ async function refreshAccessToken(supabase: any, userId: string, refreshToken: s
     })
     .eq('user_id', userId);
 
+  console.log('Token refreshed successfully');
   return data.access_token;
 }
 
@@ -50,26 +53,51 @@ serve(async (req) => {
   }
 
   try {
-    const { text, imageUrl, videoUrl, userId } = await req.json();
+    console.log('=== Publish to TikTok Request ===');
     
-    console.log('Publish to TikTok request received');
-    console.log('User ID:', userId);
-    console.log('Has image:', !!imageUrl);
-    console.log('Has video:', !!videoUrl);
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    let userId: string | null = null;
+
+    // Parse request body
+    const body = await req.json();
+    const { 
+      contentId, 
+      bookId, 
+      platform, 
+      testConnection,
+      userId: userIdFromBody 
+    } = body;
+
+    console.log('Request body:', { contentId, bookId, platform, testConnection });
+
+    // Get user from Authorization header or from body (for auto-publish)
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader) {
+      const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } }
+      });
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      userId = user?.id ?? null;
+    }
+
+    // Allow userId from body for server-to-server calls (auto-publish)
+    if (!userId && userIdFromBody) {
+      userId = userIdFromBody;
+    }
 
     if (!userId) {
-      throw new Error('User ID is required');
+      throw new Error('User authentication required');
     }
 
-    if (!imageUrl && !videoUrl) {
-      throw new Error('TikTok requires either an image or video');
-    }
+    console.log('User ID:', userId);
 
-    // Get TikTok token from database
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    // Create service client for database operations
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+    // Get TikTok token
     const { data: tokenData, error: tokenError } = await supabase
       .from('tiktok_oauth_tokens')
       .select('*')
@@ -78,57 +106,119 @@ serve(async (req) => {
 
     if (tokenError || !tokenData) {
       console.error('Token fetch error:', tokenError);
-      throw new Error('TikTok not connected for this user');
+      throw new Error('TikTok nie jest połączony. Przejdź do ustawień kont społecznościowych.');
+    }
+
+    // Handle test connection request
+    if (testConnection) {
+      console.log('Testing TikTok connection...');
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'TikTok połączony pomyślnie',
+          openId: tokenData.open_id
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     let accessToken = tokenData.access_token;
-    const openId = tokenData.open_id;
 
     // Check if token is expired and refresh if needed
     if (tokenData.expires_at && new Date(tokenData.expires_at) < new Date()) {
       console.log('Token expired, refreshing...');
       if (!tokenData.refresh_token) {
-        throw new Error('Token expired and no refresh token available');
+        throw new Error('Token wygasł i brak refresh tokena. Połącz konto ponownie.');
       }
       accessToken = await refreshAccessToken(supabase, userId, tokenData.refresh_token);
     }
 
-    // Determine if we're posting a video or photo
-    const isVideo = !!videoUrl;
-    const mediaUrl = videoUrl || imageUrl;
+    // Get book data if bookId provided
+    let bookData: any = null;
+    let contentData: any = null;
+    let textToPost: string = '';
+    let imageUrl: string | null = null;
 
-    console.log('Publishing', isVideo ? 'video' : 'photo', 'to TikTok');
+    if (bookId) {
+      const { data: book, error: bookError } = await supabase
+        .from('books')
+        .select('*')
+        .eq('id', bookId)
+        .single();
 
-    // Step 1: Initialize upload
-    const initEndpoint = isVideo 
-      ? 'https://open.tiktokapis.com/v2/post/publish/video/init/'
-      : 'https://open.tiktokapis.com/v2/post/publish/content/init/';
-
-    const initBody = isVideo ? {
-      post_info: {
-        title: text?.substring(0, 150) || 'New post',
-        privacy_level: 'SELF_ONLY', // Start with private until app approval
-        disable_duet: false,
-        disable_comment: false,
-        disable_stitch: false,
-      },
-      source_info: {
-        source: 'PULL_FROM_URL',
-        video_url: mediaUrl,
+      if (bookError) {
+        console.error('Book fetch error:', bookError);
+        throw new Error('Nie znaleziono książki');
       }
-    } : {
+      bookData = book;
+      console.log('Book data:', { title: bookData.title, hasImage: !!bookData.image_url });
+    }
+
+    if (contentId) {
+      const { data: content, error: contentError } = await supabase
+        .from('book_platform_content')
+        .select('*')
+        .eq('id', contentId)
+        .single();
+
+      if (contentError) {
+        console.error('Content fetch error:', contentError);
+        throw new Error('Nie znaleziono treści do publikacji');
+      }
+      contentData = content;
+      console.log('Content data:', { hasCustomText: !!contentData.custom_text, hasAiText: !!contentData.ai_generated_text });
+    }
+
+    // Determine text and image
+    textToPost = contentData?.custom_text || contentData?.ai_generated_text || bookData?.ai_generated_text || bookData?.title || 'Nowy post';
+    imageUrl = bookData?.image_url || null;
+
+    // If we have storage_path, construct the full URL
+    if (bookData?.storage_path) {
+      const { data: urlData } = supabase.storage
+        .from('ObrazkiKsiazek')
+        .getPublicUrl(bookData.storage_path);
+      if (urlData?.publicUrl) {
+        imageUrl = urlData.publicUrl;
+      }
+    }
+
+    console.log('Publishing to TikTok:', { 
+      textLength: textToPost.length, 
+      hasImage: !!imageUrl 
+    });
+
+    if (!imageUrl) {
+      throw new Error('TikTok wymaga obrazu lub wideo do publikacji. Dodaj obraz do książki.');
+    }
+
+    // TikTok Photo Post via Content Posting API
+    // NOTE: privacy_level options depend on app approval:
+    // - SELF_ONLY: Only visible to creator (always available)
+    // - MUTUAL_FOLLOW_FRIENDS: Visible to mutual followers
+    // - FOLLOWER_OF_CREATOR: Visible to followers
+    // - PUBLIC_TO_EVERYONE: Public (requires app approval)
+    
+    const initEndpoint = 'https://open.tiktokapis.com/v2/post/publish/content/init/';
+    
+    const initBody = {
       post_info: {
-        title: text?.substring(0, 150) || 'New post',
-        privacy_level: 'SELF_ONLY',
+        title: textToPost.substring(0, 150),
+        description: textToPost.substring(0, 2200),
+        privacy_level: 'PUBLIC_TO_EVERYONE', // Will fallback if not approved
+        disable_comment: false,
+        auto_add_music: true,
       },
       source_info: {
         source: 'PULL_FROM_URL',
         photo_cover_index: 0,
-        photo_images: [mediaUrl],
+        photo_images: [imageUrl],
       },
       post_mode: 'DIRECT_POST',
       media_type: 'PHOTO',
     };
+
+    console.log('TikTok init request:', JSON.stringify(initBody, null, 2));
 
     const initResponse = await fetch(initEndpoint, {
       method: 'POST',
@@ -140,35 +230,102 @@ serve(async (req) => {
     });
 
     const initData = await initResponse.json();
-    console.log('TikTok init response:', initData);
+    console.log('TikTok init response:', JSON.stringify(initData, null, 2));
 
+    // Handle TikTok API errors
     if (initData.error?.code) {
-      throw new Error(`TikTok error: ${initData.error.message || initData.error.code}`);
+      const errorCode = initData.error.code;
+      const errorMsg = initData.error.message || errorCode;
+      
+      // Common error handling
+      if (errorCode === 'spam_risk_too_many_pending_share') {
+        throw new Error('Za dużo oczekujących postów. Poczekaj chwilę i spróbuj ponownie.');
+      }
+      if (errorCode === 'invalid_param' && errorMsg.includes('privacy_level')) {
+        // Try with SELF_ONLY if PUBLIC not approved
+        console.log('Retrying with SELF_ONLY privacy...');
+        initBody.post_info.privacy_level = 'SELF_ONLY';
+        
+        const retryResponse = await fetch(initEndpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json; charset=UTF-8',
+          },
+          body: JSON.stringify(initBody),
+        });
+        
+        const retryData = await retryResponse.json();
+        console.log('TikTok retry response:', JSON.stringify(retryData, null, 2));
+        
+        if (retryData.error?.code) {
+          throw new Error(`TikTok error: ${retryData.error.message || retryData.error.code}`);
+        }
+        
+        if (retryData.data?.publish_id) {
+          // Update content as published
+          if (contentId) {
+            await supabase
+              .from('book_platform_content')
+              .update({
+                published: true,
+                published_at: new Date().toISOString(),
+                post_id: retryData.data.publish_id,
+              })
+              .eq('id', contentId);
+          }
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              publishId: retryData.data.publish_id,
+              message: 'Post wysłany jako prywatny (wymaga zatwierdzenia aplikacji dla publicznych postów)',
+              warning: 'Post jest widoczny tylko dla Ciebie. Aplikacja wymaga zatwierdzenia TikTok dla publicznych postów.'
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+      
+      throw new Error(`TikTok error: ${errorMsg}`);
     }
 
     const publishId = initData.data?.publish_id;
     
     if (!publishId) {
-      console.log('Full init response:', JSON.stringify(initData, null, 2));
-      throw new Error('Failed to get publish ID from TikTok');
+      console.error('No publish_id in response:', initData);
+      throw new Error('Nie udało się uzyskać ID publikacji z TikTok');
     }
 
     console.log('TikTok publish initiated, publish_id:', publishId);
+
+    // Update content as published
+    if (contentId) {
+      await supabase
+        .from('book_platform_content')
+        .update({
+          published: true,
+          published_at: new Date().toISOString(),
+          post_id: publishId,
+        })
+        .eq('id', contentId);
+    }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         publishId,
-        message: 'Content submitted to TikTok for processing'
+        message: 'Post opublikowany na TikTok'
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: any) {
     console.error('Publish to TikTok error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        success: false,
+        error: error.message 
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
