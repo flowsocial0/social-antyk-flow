@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -9,14 +9,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Upload, Video } from "lucide-react";
+import { Loader2, Upload, Video, X, FileVideo } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 const bookSchema = z.object({
   code: z.string().min(1, "Kod jest wymagany").max(50, "Kod może mieć maksymalnie 50 znaków"),
   title: z.string().min(1, "Tytuł jest wymagany").max(500, "Tytuł może mieć maksymalnie 500 znaków"),
   image_url: z.string().url("Nieprawidłowy URL").optional().or(z.literal("")),
-  video_url: z.string().url("Nieprawidłowy URL").optional().or(z.literal("")),
   sale_price: z.string().optional(),
   promotional_price: z.string().optional(),
   description: z.string().optional(),
@@ -37,6 +36,10 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoStoragePath, setVideoStoragePath] = useState<string | null>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<BookFormData>({
     resolver: zodResolver(bookSchema),
@@ -44,7 +47,6 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
       code: "",
       title: "",
       image_url: "",
-      video_url: "",
       sale_price: "",
       promotional_price: "",
       description: "",
@@ -60,13 +62,14 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
         code: book.code || "",
         title: book.title || "",
         image_url: book.image_url || "",
-        video_url: (book as any).video_url || "",
         sale_price: book.sale_price?.toString() || "",
         promotional_price: book.promotional_price?.toString() || "",
         description: book.description || "",
         product_url: book.product_url || "",
         stock_status: book.stock_status || "",
       });
+      setVideoUrl((book as any).video_url || null);
+      setVideoStoragePath((book as any).video_storage_path || null);
     }
   }, [book, form]);
 
@@ -74,18 +77,15 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
     try {
       setIsUploadingImage(true);
       
-      // Fetch image through a proxy to avoid CORS
       const response = await fetch(imageUrl);
       if (!response.ok) throw new Error("Nie udało się pobrać obrazu");
       
       const blob = await response.blob();
       
-      // Get file extension from URL or content type
       const contentType = response.headers.get("content-type") || "image/jpeg";
       const extension = contentType.split("/")[1]?.split(";")[0] || "jpg";
       const storagePath = `books/${bookId}.${extension}`;
       
-      // Upload to Storage
       const { error: uploadError } = await supabase.storage
         .from("ObrazkiKsiazek")
         .upload(storagePath, blob, { 
@@ -104,6 +104,88 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
     }
   };
 
+  const handleVideoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !book) return;
+
+    // Validate file type
+    if (!file.type.startsWith('video/')) {
+      toast({
+        title: "Błąd",
+        description: "Wybierz plik wideo (mp4, mov, webm)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (max 128MB for TikTok)
+    const maxSize = 128 * 1024 * 1024; // 128MB
+    if (file.size > maxSize) {
+      toast({
+        title: "Błąd",
+        description: "Plik wideo jest za duży. Maksymalny rozmiar to 128MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploadingVideo(true);
+    try {
+      const extension = file.name.split('.').pop() || 'mp4';
+      const storagePath = `videos/${book.id}.${extension}`;
+
+      // Upload to Storage
+      const { error: uploadError } = await supabase.storage
+        .from("ObrazkiKsiazek")
+        .upload(storagePath, file, { 
+          upsert: true,
+          contentType: file.type
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from("ObrazkiKsiazek")
+        .getPublicUrl(storagePath);
+
+      setVideoUrl(publicUrl);
+      setVideoStoragePath(storagePath);
+
+      toast({
+        title: "Sukces",
+        description: "Wideo zostało przesłane",
+      });
+    } catch (error) {
+      console.error("Error uploading video:", error);
+      toast({
+        title: "Błąd",
+        description: "Nie udało się przesłać wideo",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploadingVideo(false);
+      // Reset input
+      if (videoInputRef.current) {
+        videoInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveVideo = async () => {
+    if (videoStoragePath) {
+      try {
+        await supabase.storage
+          .from("ObrazkiKsiazek")
+          .remove([videoStoragePath]);
+      } catch (error) {
+        console.error("Error removing video from storage:", error);
+      }
+    }
+    setVideoUrl(null);
+    setVideoStoragePath(null);
+  };
+
   const onSubmit = async (data: BookFormData) => {
     if (!book) return;
     
@@ -117,14 +199,14 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
         promotional_price: data.promotional_price ? parseFloat(data.promotional_price) : null,
         product_url: data.product_url || null,
         stock_status: data.stock_status || null,
-        video_url: data.video_url || null,
+        video_url: videoUrl,
+        video_storage_path: videoStoragePath,
       };
 
       // Handle image URL - upload to storage if it's a new URL
       if (data.image_url && data.image_url !== book.image_url) {
         bookData.image_url = data.image_url;
         
-        // Try to upload to storage
         const storagePath = await uploadImageFromUrl(data.image_url, book.id);
         if (storagePath) {
           bookData.storage_path = storagePath;
@@ -300,25 +382,77 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="video_url"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center gap-2">
-                    <Video className="h-4 w-4" />
-                    URL wideo (dla TikTok, Instagram Reels, YouTube Shorts)
-                  </FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://example.com/video.mp4" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                  <p className="text-xs text-muted-foreground">
-                    Wideo będzie używane dla platform obsługujących tylko wideo (TikTok, YouTube)
-                  </p>
-                </FormItem>
+            {/* Video Upload Section */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Video className="h-4 w-4" />
+                Wideo (dla TikTok, Instagram Reels, YouTube Shorts)
+              </label>
+              
+              {videoUrl ? (
+                <div className="border rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <FileVideo className="h-4 w-4" />
+                      <span className="truncate max-w-[300px]">
+                        {videoStoragePath || 'Wideo przypisane'}
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoveVideo}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Usuń
+                    </Button>
+                  </div>
+                  <video 
+                    src={videoUrl} 
+                    controls 
+                    className="w-full max-h-[200px] rounded-md bg-muted"
+                  />
+                </div>
+              ) : (
+                <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
+                  <input
+                    ref={videoInputRef}
+                    type="file"
+                    accept="video/*"
+                    onChange={handleVideoUpload}
+                    className="hidden"
+                    id="video-upload"
+                    disabled={isUploadingVideo}
+                  />
+                  <label 
+                    htmlFor="video-upload" 
+                    className="cursor-pointer flex flex-col items-center gap-2"
+                  >
+                    {isUploadingVideo ? (
+                      <>
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Przesyłanie wideo...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Video className="h-8 w-8 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">
+                          Kliknij aby wybrać wideo z dysku
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          MP4, MOV, WebM • Maks. 128MB
+                        </span>
+                      </>
+                    )}
+                  </label>
+                </div>
               )}
-            />
+              <p className="text-xs text-muted-foreground">
+                Wideo będzie używane dla platform obsługujących tylko wideo (TikTok, YouTube)
+              </p>
+            </div>
 
             <FormField
               control={form.control}
@@ -343,7 +477,7 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
               >
                 Anuluj
               </Button>
-              <Button type="submit" disabled={isSubmitting || isUploadingImage}>
+              <Button type="submit" disabled={isSubmitting || isUploadingImage || isUploadingVideo}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Zapisz zmiany
               </Button>
