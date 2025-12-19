@@ -193,21 +193,21 @@ serve(async (req) => {
     }
 
     // TikTok Photo Post via Content Posting API
-    // NOTE: privacy_level options depend on app approval:
+    // NOTE: Domain must be verified in TikTok Developer Console for PULL_FROM_URL
+    // privacy_level options depend on app approval:
     // - SELF_ONLY: Only visible to creator (always available)
-    // - MUTUAL_FOLLOW_FRIENDS: Visible to mutual followers
-    // - FOLLOWER_OF_CREATOR: Visible to followers
     // - PUBLIC_TO_EVERYONE: Public (requires app approval)
     
     const initEndpoint = 'https://open.tiktokapis.com/v2/post/publish/content/init/';
     
+    // Simplified post_info for photo posts - only essential fields
     const initBody = {
       post_info: {
         title: textToPost.substring(0, 150),
-        description: textToPost.substring(0, 2200),
-        privacy_level: 'PUBLIC_TO_EVERYONE', // Will fallback if not approved
+        privacy_level: 'PUBLIC_TO_EVERYONE',
         disable_comment: false,
-        auto_add_music: true,
+        disable_duet: false,
+        disable_stitch: false,
       },
       source_info: {
         source: 'PULL_FROM_URL',
