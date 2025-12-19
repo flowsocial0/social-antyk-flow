@@ -31,7 +31,6 @@ async function refreshAccessToken(supabase: any, userId: string, refreshToken: s
     throw new Error(`Token refresh failed: ${data.error_description || data.error}`);
   }
 
-  // Update token in database
   await supabase
     .from('tiktok_oauth_tokens')
     .update({
@@ -46,8 +45,23 @@ async function refreshAccessToken(supabase: any, userId: string, refreshToken: s
   return data.access_token;
 }
 
+// Download image and return as ArrayBuffer with content type
+async function downloadImage(imageUrl: string): Promise<{ data: ArrayBuffer; contentType: string; size: number }> {
+  console.log('Downloading image from:', imageUrl);
+  
+  const response = await fetch(imageUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+  }
+  
+  const contentType = response.headers.get('content-type') || 'image/jpeg';
+  const data = await response.arrayBuffer();
+  
+  console.log('Image downloaded:', { size: data.byteLength, contentType });
+  return { data, contentType, size: data.byteLength };
+}
+
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -61,7 +75,6 @@ serve(async (req) => {
 
     let userId: string | null = null;
 
-    // Parse request body
     const body = await req.json();
     const { 
       contentId, 
@@ -73,7 +86,6 @@ serve(async (req) => {
 
     console.log('Request body:', { contentId, bookId, platform, testConnection });
 
-    // Get user from Authorization header or from body (for auto-publish)
     const authHeader = req.headers.get('Authorization');
     if (authHeader) {
       const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
@@ -83,7 +95,6 @@ serve(async (req) => {
       userId = user?.id ?? null;
     }
 
-    // Allow userId from body for server-to-server calls (auto-publish)
     if (!userId && userIdFromBody) {
       userId = userIdFromBody;
     }
@@ -94,10 +105,8 @@ serve(async (req) => {
 
     console.log('User ID:', userId);
 
-    // Create service client for database operations
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Get TikTok token
     const { data: tokenData, error: tokenError } = await supabase
       .from('tiktok_oauth_tokens')
       .select('*')
@@ -109,7 +118,6 @@ serve(async (req) => {
       throw new Error('TikTok nie jest połączony. Przejdź do ustawień kont społecznościowych.');
     }
 
-    // Handle test connection request
     if (testConnection) {
       console.log('Testing TikTok connection...');
       return new Response(
@@ -124,7 +132,6 @@ serve(async (req) => {
 
     let accessToken = tokenData.access_token;
 
-    // Check if token is expired and refresh if needed
     if (tokenData.expires_at && new Date(tokenData.expires_at) < new Date()) {
       console.log('Token expired, refreshing...');
       if (!tokenData.refresh_token) {
@@ -133,7 +140,6 @@ serve(async (req) => {
       accessToken = await refreshAccessToken(supabase, userId, tokenData.refresh_token);
     }
 
-    // Get book data if bookId provided
     let bookData: any = null;
     let contentData: any = null;
     let textToPost: string = '';
@@ -169,11 +175,9 @@ serve(async (req) => {
       console.log('Content data:', { hasCustomText: !!contentData.custom_text, hasAiText: !!contentData.ai_generated_text });
     }
 
-    // Determine text and image
     textToPost = contentData?.custom_text || contentData?.ai_generated_text || bookData?.ai_generated_text || bookData?.title || 'Nowy post';
     imageUrl = bookData?.image_url || null;
 
-    // If we have storage_path, construct the full URL
     if (bookData?.storage_path) {
       const { data: urlData } = supabase.storage
         .from('ObrazkiKsiazek')
@@ -192,33 +196,31 @@ serve(async (req) => {
       throw new Error('TikTok wymaga obrazu lub wideo do publikacji. Dodaj obraz do książki.');
     }
 
-    // TikTok Photo Post via Content Posting API
-    // NOTE: Domain must be verified in TikTok Developer Console for PULL_FROM_URL
-    // privacy_level options depend on app approval:
-    // - SELF_ONLY: Only visible to creator (always available)
-    // - PUBLIC_TO_EVERYONE: Public (requires app approval)
+    // Download the image first
+    const imageData = await downloadImage(imageUrl);
     
+    // TikTok Photo Post - try MEDIA_UPLOAD mode (creates draft for user to post)
+    // DIRECT_POST for photos has limited API support
     const initEndpoint = 'https://open.tiktokapis.com/v2/post/publish/content/init/';
     
-    // Simplified post_info for photo posts - only essential fields
     const initBody = {
       post_info: {
         title: textToPost.substring(0, 150),
-        privacy_level: 'PUBLIC_TO_EVERYONE',
+        privacy_level: 'SELF_ONLY', // Start with SELF_ONLY which is always available
         disable_comment: false,
         disable_duet: false,
         disable_stitch: false,
       },
       source_info: {
-        source: 'PULL_FROM_URL',
+        source: 'FILE_UPLOAD',
         photo_cover_index: 0,
-        photo_images: [imageUrl],
+        photo_images: ['image1.jpg'],
       },
-      post_mode: 'DIRECT_POST',
+      post_mode: 'MEDIA_UPLOAD', // Creates draft instead of direct post
       media_type: 'PHOTO',
     };
 
-    console.log('TikTok init request:', JSON.stringify(initBody, null, 2));
+    console.log('TikTok init request (MEDIA_UPLOAD):', JSON.stringify(initBody, null, 2));
 
     const initResponse = await fetch(initEndpoint, {
       method: 'POST',
@@ -232,17 +234,16 @@ serve(async (req) => {
     const initData = await initResponse.json();
     console.log('TikTok init response:', JSON.stringify(initData, null, 2));
 
-    // Handle TikTok API errors
     if (initData.error?.code) {
       const errorCode = initData.error.code;
       const errorMsg = initData.error.message || errorCode;
       
-      // Common error handling
       if (errorCode === 'spam_risk_too_many_pending_share') {
         throw new Error('Za dużo oczekujących postów. Poczekaj chwilę i spróbuj ponownie.');
       }
+      
+      // If PUBLIC not allowed, retry with SELF_ONLY
       if (errorCode === 'invalid_param' && errorMsg.includes('privacy_level')) {
-        // Try with SELF_ONLY if PUBLIC not approved
         console.log('Retrying with SELF_ONLY privacy...');
         initBody.post_info.privacy_level = 'SELF_ONLY';
         
@@ -262,8 +263,10 @@ serve(async (req) => {
           throw new Error(`TikTok error: ${retryData.error.message || retryData.error.code}`);
         }
         
-        if (retryData.data?.publish_id) {
-          // Update content as published
+        // Continue with upload using retry data
+        if (retryData.data?.publish_id && retryData.data?.upload_url) {
+          await uploadImageToTikTok(retryData.data.upload_url, imageData.data, imageData.contentType);
+          
           if (contentId) {
             await supabase
               .from('book_platform_content')
@@ -291,15 +294,22 @@ serve(async (req) => {
     }
 
     const publishId = initData.data?.publish_id;
+    const uploadUrl = initData.data?.upload_url;
     
     if (!publishId) {
       console.error('No publish_id in response:', initData);
       throw new Error('Nie udało się uzyskać ID publikacji z TikTok');
     }
 
+    // Step 2: Upload the image if we got an upload URL
+    if (uploadUrl) {
+      console.log('Uploading image to TikTok...');
+      await uploadImageToTikTok(uploadUrl, imageData.data, imageData.contentType);
+      console.log('Image uploaded successfully');
+    }
+
     console.log('TikTok publish initiated, publish_id:', publishId);
 
-    // Update content as published
     if (contentId) {
       await supabase
         .from('book_platform_content')
@@ -333,3 +343,22 @@ serve(async (req) => {
     );
   }
 });
+
+async function uploadImageToTikTok(uploadUrl: string, imageData: ArrayBuffer, contentType: string): Promise<void> {
+  const response = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': contentType,
+      'Content-Length': imageData.byteLength.toString(),
+    },
+    body: imageData,
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Upload failed:', response.status, errorText);
+    throw new Error(`Failed to upload image to TikTok: ${response.status}`);
+  }
+  
+  console.log('Image upload response:', response.status);
+}
