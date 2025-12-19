@@ -11,6 +11,7 @@ import { PlatformAITextDialog } from "./PlatformAITextDialog";
 import { PlatformScheduleDialog } from "./PlatformScheduleDialog";
 import { XPostPreviewDialog } from "@/components/books/XPostPreviewDialog";
 import { EditBookDialog } from "@/components/books/EditBookDialog";
+import { platformRequiresVideo, PlatformId } from "@/config/platforms";
 
 type SortColumn = "code" | "title" | "published";
 type SortDirection = "asc" | "desc";
@@ -559,6 +560,12 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
             {items.map((content: any) => {
               const book = content.book;
               const isPublishing = publishingIds.has(content.id);
+              
+              // For video-only platforms, only require video; for others require AI text
+              const isVideoOnlyPlatform = platformRequiresVideo(platform as PlatformId);
+              const hasVideo = !!(book.video_url || book.video_storage_path);
+              const hasAiText = !!content.ai_generated_text;
+              const canPublish = isVideoOnlyPlatform ? hasVideo : hasAiText;
 
               return (
                 <TableRow key={content.id}>
@@ -603,7 +610,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                           size="sm"
                           variant="outline"
                           onClick={() => handleRepublish(content.id, book.id)}
-                          disabled={!content.ai_generated_text || isPublishing}
+                          disabled={!canPublish || isPublishing}
                           title="Opublikuj ponownie"
                         >
                           {isPublishing ? (
@@ -620,7 +627,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                             size="sm"
                             variant="outline"
                             onClick={() => handleSchedule(book.id, content.id)}
-                            disabled={!content.ai_generated_text}
+                            disabled={!canPublish}
                           >
                             <Calendar className="h-4 w-4" />
                           </Button>
@@ -636,7 +643,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                             <Button
                               size="sm"
                               onClick={() => handlePublish(content.id, book.id)}
-                              disabled={!content.ai_generated_text || isPublishing}
+                              disabled={!canPublish || isPublishing}
                             >
                               {isPublishing ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -666,7 +673,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                         size="sm"
                         variant="outline"
                         onClick={() => handlePreview(book.id)}
-                        disabled={!content.ai_generated_text}
+                        disabled={!hasAiText && !isVideoOnlyPlatform}
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
