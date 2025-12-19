@@ -5,10 +5,10 @@ const PrivacyPolicy = () => {
   return (
     <div className="min-h-screen bg-background py-12 px-4">
       <Helmet>
-        <title>Polityka Prywatności - SocialFlow</title>
+        <title>Polityka Prywatności - Social Auto Flow</title>
         <meta
           name="description"
-          content="Polityka prywatności SocialFlow - dowiedz się jak chronimy Twoje dane osobowe"
+          content="Polityka prywatności Social Auto Flow - dowiedz się jak chronimy Twoje dane osobowe"
         />
       </Helmet>
 
@@ -26,14 +26,14 @@ const PrivacyPolicy = () => {
               <h2 className="text-2xl font-semibold text-foreground">1. Informacje ogólne</h2>
               <p className="text-muted-foreground">
                 Niniejsza Polityka Prywatności określa zasady przetwarzania i ochrony danych osobowych przekazanych
-                przez Użytkowników w związku z korzystaniem z usług aplikacji SocialFlow.
+                przez Użytkowników w związku z korzystaniem z usług serwisu Social Auto Flow, dostępnego pod adresem socialautoflow.pl.
               </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-semibold text-foreground">2. Administrator danych osobowych</h2>
               <p className="text-muted-foreground">
-                Administratorem danych osobowych zbieranych za pośrednictwem aplikacji SocialFlow jest Księgarnia Antyk.
+                Administratorem danych osobowych zbieranych za pośrednictwem serwisu Social Auto Flow jest Księgarnia Antyk.
               </p>
               <p className="text-muted-foreground">
                 Kontakt z Administratorem możliwy jest poprzez adres e-mail: flowsocial0@gmail.com
@@ -42,11 +42,11 @@ const PrivacyPolicy = () => {
 
             <section>
               <h2 className="text-2xl font-semibold text-foreground">3. Zakres zbieranych danych</h2>
-              <p className="text-muted-foreground">Aplikacja SocialFlow zbiera następujące dane:</p>
+              <p className="text-muted-foreground">Serwis Social Auto Flow zbiera następujące dane:</p>
               <ul className="list-disc list-inside text-muted-foreground space-y-2">
                 <li>Dane autoryzacyjne (adres e-mail, hasło w formie zaszyfrowanej)</li>
-                <li>Tokeny dostępu do połączonych platform społecznościowych (Facebook, X/Twitter, Instagram)</li>
-                <li>Dane dotyczące publikowanych treści (teksty postów, obrazy)</li>
+                <li>Tokeny dostępu do połączonych platform społecznościowych (Facebook, X/Twitter, TikTok, Instagram, LinkedIn)</li>
+                <li>Dane dotyczące publikowanych treści (teksty postów, obrazy, wideo)</li>
                 <li>Dane techniczne (adresy IP, informacje o przeglądarce, logi systemowe)</li>
                 <li>Dane księgarni (informacje o książkach, cenach, linkach do produktów)</li>
               </ul>
@@ -84,7 +84,7 @@ const PrivacyPolicy = () => {
               <p className="text-muted-foreground">Dane osobowe mogą być udostępniane:</p>
               <ul className="list-disc list-inside text-muted-foreground space-y-2">
                 <li>
-                  <strong>Platformom społecznościowym</strong> - Facebook, X/Twitter, Instagram - w zakresie niezbędnym
+                  <strong>Platformom społecznościowym</strong> - Facebook, X/Twitter, TikTok, Instagram, LinkedIn - w zakresie niezbędnym
                   do publikacji treści
                 </li>
                 <li>
