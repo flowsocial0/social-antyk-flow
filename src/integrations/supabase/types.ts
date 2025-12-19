@@ -100,6 +100,8 @@ export type Database = {
           template_type: string | null
           title: string
           updated_at: string
+          video_storage_path: string | null
+          video_url: string | null
           warehouse_quantity: number | null
         }
         Insert: {
@@ -125,6 +127,8 @@ export type Database = {
           template_type?: string | null
           title: string
           updated_at?: string
+          video_storage_path?: string | null
+          video_url?: string | null
           warehouse_quantity?: number | null
         }
         Update: {
@@ -150,6 +154,8 @@ export type Database = {
           template_type?: string | null
           title?: string
           updated_at?: string
+          video_storage_path?: string | null
+          video_url?: string | null
           warehouse_quantity?: number | null
         }
         Relationships: []

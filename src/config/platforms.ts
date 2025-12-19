@@ -20,6 +20,8 @@ export type PlatformId =
   | 'mastodon' 
   | 'gab';
 
+export type MediaType = 'video-only' | 'image-only' | 'both';
+
 export interface PlatformConfig {
   id: PlatformId;
   name: string;
@@ -30,6 +32,7 @@ export interface PlatformConfig {
   path: string;
   status: 'active' | 'coming-soon' | 'planned';
   priority: number; // Lower number = higher priority in UI
+  mediaType: MediaType; // What type of media this platform supports
 }
 
 export const platformConfigs: Record<PlatformId, PlatformConfig> = {
@@ -43,6 +46,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     path: '/platforms/x',
     status: 'active',
     priority: 1,
+    mediaType: 'both',
   },
   facebook: {
     id: 'facebook',
@@ -54,6 +58,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     path: '/platforms/facebook',
     status: 'active',
     priority: 2,
+    mediaType: 'both',
   },
   instagram: {
     id: 'instagram',
@@ -65,6 +70,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     path: '/platforms/instagram',
     status: 'coming-soon',
     priority: 3,
+    mediaType: 'both',
   },
   youtube: {
     id: 'youtube',
@@ -76,6 +82,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     path: '/platforms/youtube',
     status: 'coming-soon',
     priority: 4,
+    mediaType: 'video-only',
   },
   linkedin: {
     id: 'linkedin',
@@ -87,6 +94,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     path: '/platforms/linkedin',
     status: 'coming-soon',
     priority: 5,
+    mediaType: 'both',
   },
   tiktok: {
     id: 'tiktok',
@@ -98,6 +106,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     path: '/platforms/tiktok',
     status: 'active',
     priority: 3,
+    mediaType: 'video-only',
   },
   pinterest: {
     id: 'pinterest',
@@ -109,6 +118,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     path: '/platforms/pinterest',
     status: 'planned',
     priority: 7,
+    mediaType: 'image-only',
   },
   reddit: {
     id: 'reddit',
@@ -120,6 +130,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     path: '/platforms/reddit',
     status: 'planned',
     priority: 8,
+    mediaType: 'both',
   },
   telegram: {
     id: 'telegram',
@@ -131,6 +142,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     path: '/platforms/telegram',
     status: 'planned',
     priority: 9,
+    mediaType: 'both',
   },
   threads: {
     id: 'threads',
@@ -142,6 +154,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     path: '/platforms/threads',
     status: 'planned',
     priority: 10,
+    mediaType: 'both',
   },
   bluesky: {
     id: 'bluesky',
@@ -153,6 +166,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     path: '/platforms/bluesky',
     status: 'planned',
     priority: 11,
+    mediaType: 'both',
   },
   mastodon: {
     id: 'mastodon',
@@ -164,6 +178,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     path: '/platforms/mastodon',
     status: 'planned',
     priority: 12,
+    mediaType: 'both',
   },
   gab: {
     id: 'gab',
@@ -175,6 +190,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     path: '/platforms/gab',
     status: 'planned',
     priority: 13,
+    mediaType: 'both',
   },
 };
 
@@ -196,4 +212,21 @@ export const getComingSoonPlatforms = (): PlatformConfig[] => {
 
 export const getPlannedPlatforms = (): PlatformConfig[] => {
   return getAllPlatforms().filter(p => p.status === 'planned');
+};
+
+export const getVideoOnlyPlatforms = (): PlatformConfig[] => {
+  return getAllPlatforms().filter(p => p.mediaType === 'video-only');
+};
+
+export const getImageOnlyPlatforms = (): PlatformConfig[] => {
+  return getAllPlatforms().filter(p => p.mediaType === 'image-only');
+};
+
+export const platformRequiresVideo = (platformId: PlatformId): boolean => {
+  return platformConfigs[platformId]?.mediaType === 'video-only';
+};
+
+export const platformSupportsVideo = (platformId: PlatformId): boolean => {
+  const mediaType = platformConfigs[platformId]?.mediaType;
+  return mediaType === 'video-only' || mediaType === 'both';
 };
