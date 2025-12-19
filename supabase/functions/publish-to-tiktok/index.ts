@@ -158,7 +158,13 @@ serve(async (req) => {
         throw new Error('Nie znaleziono książki');
       }
       bookData = book;
-      console.log('Book data:', { title: bookData.title, hasImage: !!bookData.image_url });
+      console.log('Book data:', { title: bookData.title, hasImage: !!bookData.image_url, hasVideo: !!(bookData as any).video_url });
+      
+      // Check book's video_url first
+      if ((bookData as any).video_url) {
+        videoUrl = (bookData as any).video_url;
+        console.log('Using video from book.video_url:', videoUrl);
+      }
     }
 
     if (contentId) {
@@ -175,11 +181,12 @@ serve(async (req) => {
       contentData = content;
       console.log('Content data:', { hasCustomText: !!contentData.custom_text, hasAiText: !!contentData.ai_generated_text });
       
-      // Check if there's a video URL in media_urls
+      // Check if there's a video URL in media_urls (overrides book's video_url if present)
       if (contentData.media_urls && contentData.media_urls.length > 0) {
         const mediaUrl = contentData.media_urls[0];
         if (mediaUrl.includes('.mp4') || mediaUrl.includes('video')) {
           videoUrl = mediaUrl;
+          console.log('Using video from content.media_urls:', videoUrl);
         }
       }
     }
@@ -192,7 +199,7 @@ serve(async (req) => {
     });
 
     if (!videoUrl) {
-      throw new Error('TikTok wymaga wideo do publikacji. Dodaj wideo do treści (media_urls) lub przekaż videoUrl.');
+      throw new Error('TikTok wymaga wideo do publikacji. Dodaj URL wideo do książki lub przekaż videoUrl w żądaniu.');
     }
 
     // Download the video first

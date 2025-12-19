@@ -9,13 +9,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Upload } from "lucide-react";
+import { Loader2, Upload, Video } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 const bookSchema = z.object({
   code: z.string().min(1, "Kod jest wymagany").max(50, "Kod może mieć maksymalnie 50 znaków"),
   title: z.string().min(1, "Tytuł jest wymagany").max(500, "Tytuł może mieć maksymalnie 500 znaków"),
   image_url: z.string().url("Nieprawidłowy URL").optional().or(z.literal("")),
+  video_url: z.string().url("Nieprawidłowy URL").optional().or(z.literal("")),
   sale_price: z.string().optional(),
   promotional_price: z.string().optional(),
   description: z.string().optional(),
@@ -43,6 +44,7 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
       code: "",
       title: "",
       image_url: "",
+      video_url: "",
       sale_price: "",
       promotional_price: "",
       description: "",
@@ -58,6 +60,7 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
         code: book.code || "",
         title: book.title || "",
         image_url: book.image_url || "",
+        video_url: (book as any).video_url || "",
         sale_price: book.sale_price?.toString() || "",
         promotional_price: book.promotional_price?.toString() || "",
         description: book.description || "",
@@ -114,6 +117,7 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
         promotional_price: data.promotional_price ? parseFloat(data.promotional_price) : null,
         product_url: data.product_url || null,
         stock_status: data.stock_status || null,
+        video_url: data.video_url || null,
       };
 
       // Handle image URL - upload to storage if it's a new URL
@@ -292,6 +296,26 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
                       Zapisano w storage: {book.storage_path}
                     </p>
                   )}
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="video_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <Video className="h-4 w-4" />
+                    URL wideo (dla TikTok, Instagram Reels, YouTube Shorts)
+                  </FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://example.com/video.mp4" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                  <p className="text-xs text-muted-foreground">
+                    Wideo będzie używane dla platform obsługujących tylko wideo (TikTok, YouTube)
+                  </p>
                 </FormItem>
               )}
             />
