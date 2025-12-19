@@ -45,19 +45,19 @@ async function refreshAccessToken(supabase: any, userId: string, refreshToken: s
   return data.access_token;
 }
 
-// Download image and return as ArrayBuffer with content type
-async function downloadImage(imageUrl: string): Promise<{ data: ArrayBuffer; contentType: string; size: number }> {
-  console.log('Downloading image from:', imageUrl);
+// Download video and return as ArrayBuffer with content type
+async function downloadVideo(videoUrl: string): Promise<{ data: ArrayBuffer; contentType: string; size: number }> {
+  console.log('Downloading video from:', videoUrl);
   
-  const response = await fetch(imageUrl);
+  const response = await fetch(videoUrl);
   if (!response.ok) {
-    throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+    throw new Error(`Failed to download video: ${response.status} ${response.statusText}`);
   }
   
-  const contentType = response.headers.get('content-type') || 'image/jpeg';
+  const contentType = response.headers.get('content-type') || 'video/mp4';
   const data = await response.arrayBuffer();
   
-  console.log('Image downloaded:', { size: data.byteLength, contentType });
+  console.log('Video downloaded:', { size: data.byteLength, contentType });
   return { data, contentType, size: data.byteLength };
 }
 
@@ -67,7 +67,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('=== Publish to TikTok Request ===');
+    console.log('=== Publish to TikTok (VIDEO) Request ===');
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -81,10 +81,11 @@ serve(async (req) => {
       bookId, 
       platform, 
       testConnection,
-      userId: userIdFromBody 
+      userId: userIdFromBody,
+      videoUrl: videoUrlFromBody
     } = body;
 
-    console.log('Request body:', { contentId, bookId, platform, testConnection });
+    console.log('Request body:', { contentId, bookId, platform, testConnection, hasVideoUrl: !!videoUrlFromBody });
 
     const authHeader = req.headers.get('Authorization');
     if (authHeader) {
@@ -143,7 +144,7 @@ serve(async (req) => {
     let bookData: any = null;
     let contentData: any = null;
     let textToPost: string = '';
-    let imageUrl: string | null = null;
+    let videoUrl: string | null = videoUrlFromBody || null;
 
     if (bookId) {
       const { data: book, error: bookError } = await supabase
@@ -173,54 +174,59 @@ serve(async (req) => {
       }
       contentData = content;
       console.log('Content data:', { hasCustomText: !!contentData.custom_text, hasAiText: !!contentData.ai_generated_text });
-    }
-
-    textToPost = contentData?.custom_text || contentData?.ai_generated_text || bookData?.ai_generated_text || bookData?.title || 'Nowy post';
-    imageUrl = bookData?.image_url || null;
-
-    if (bookData?.storage_path) {
-      const { data: urlData } = supabase.storage
-        .from('ObrazkiKsiazek')
-        .getPublicUrl(bookData.storage_path);
-      if (urlData?.publicUrl) {
-        imageUrl = urlData.publicUrl;
+      
+      // Check if there's a video URL in media_urls
+      if (contentData.media_urls && contentData.media_urls.length > 0) {
+        const mediaUrl = contentData.media_urls[0];
+        if (mediaUrl.includes('.mp4') || mediaUrl.includes('video')) {
+          videoUrl = mediaUrl;
+        }
       }
     }
 
-    console.log('Publishing to TikTok:', { 
+    textToPost = contentData?.custom_text || contentData?.ai_generated_text || bookData?.ai_generated_text || bookData?.title || 'Nowy post';
+
+    console.log('Publishing VIDEO to TikTok:', { 
       textLength: textToPost.length, 
-      hasImage: !!imageUrl 
+      hasVideo: !!videoUrl 
     });
 
-    if (!imageUrl) {
-      throw new Error('TikTok wymaga obrazu lub wideo do publikacji. Dodaj obraz do książki.');
+    if (!videoUrl) {
+      throw new Error('TikTok wymaga wideo do publikacji. Dodaj wideo do treści (media_urls) lub przekaż videoUrl.');
     }
 
-    // Download the image first
-    const imageData = await downloadImage(imageUrl);
+    // Download the video first
+    const videoData = await downloadVideo(videoUrl);
     
-    // TikTok Photo Post - try MEDIA_UPLOAD mode (creates draft for user to post)
-    // DIRECT_POST for photos has limited API support
-    const initEndpoint = 'https://open.tiktokapis.com/v2/post/publish/content/init/';
+    // Check video size - TikTok has limits
+    const videoSizeMB = videoData.size / (1024 * 1024);
+    console.log('Video size:', videoSizeMB.toFixed(2), 'MB');
+    
+    if (videoSizeMB > 128) {
+      throw new Error('Wideo jest za duże. Maksymalny rozmiar to 128MB.');
+    }
+
+    // TikTok Video Upload - FILE_UPLOAD method
+    // Step 1: Initialize video upload
+    const initEndpoint = 'https://open.tiktokapis.com/v2/post/publish/video/init/';
     
     const initBody = {
       post_info: {
         title: textToPost.substring(0, 150),
-        privacy_level: 'SELF_ONLY', // Start with SELF_ONLY which is always available
+        privacy_level: 'SELF_ONLY', // Start with SELF_ONLY (always available)
         disable_comment: false,
         disable_duet: false,
         disable_stitch: false,
       },
       source_info: {
         source: 'FILE_UPLOAD',
-        photo_cover_index: 0,
-        photo_images: ['image1.jpg'],
+        video_size: videoData.size,
+        chunk_size: videoData.size, // Single chunk for smaller videos
+        total_chunk_count: 1,
       },
-      post_mode: 'MEDIA_UPLOAD', // Creates draft instead of direct post
-      media_type: 'PHOTO',
     };
 
-    console.log('TikTok init request (MEDIA_UPLOAD):', JSON.stringify(initBody, null, 2));
+    console.log('TikTok video init request:', JSON.stringify(initBody, null, 2));
 
     const initResponse = await fetch(initEndpoint, {
       method: 'POST',
@@ -232,7 +238,7 @@ serve(async (req) => {
     });
 
     const initData = await initResponse.json();
-    console.log('TikTok init response:', JSON.stringify(initData, null, 2));
+    console.log('TikTok video init response:', JSON.stringify(initData, null, 2));
 
     if (initData.error?.code) {
       const errorCode = initData.error.code;
@@ -242,74 +248,44 @@ serve(async (req) => {
         throw new Error('Za dużo oczekujących postów. Poczekaj chwilę i spróbuj ponownie.');
       }
       
-      // If PUBLIC not allowed, retry with SELF_ONLY
-      if (errorCode === 'invalid_param' && errorMsg.includes('privacy_level')) {
-        console.log('Retrying with SELF_ONLY privacy...');
-        initBody.post_info.privacy_level = 'SELF_ONLY';
-        
-        const retryResponse = await fetch(initEndpoint, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json; charset=UTF-8',
-          },
-          body: JSON.stringify(initBody),
-        });
-        
-        const retryData = await retryResponse.json();
-        console.log('TikTok retry response:', JSON.stringify(retryData, null, 2));
-        
-        if (retryData.error?.code) {
-          throw new Error(`TikTok error: ${retryData.error.message || retryData.error.code}`);
-        }
-        
-        // Continue with upload using retry data
-        if (retryData.data?.publish_id && retryData.data?.upload_url) {
-          await uploadImageToTikTok(retryData.data.upload_url, imageData.data, imageData.contentType);
-          
-          if (contentId) {
-            await supabase
-              .from('book_platform_content')
-              .update({
-                published: true,
-                published_at: new Date().toISOString(),
-                post_id: retryData.data.publish_id,
-              })
-              .eq('id', contentId);
-          }
-          
-          return new Response(
-            JSON.stringify({ 
-              success: true, 
-              publishId: retryData.data.publish_id,
-              message: 'Post wysłany jako prywatny (wymaga zatwierdzenia aplikacji dla publicznych postów)',
-              warning: 'Post jest widoczny tylko dla Ciebie. Aplikacja wymaga zatwierdzenia TikTok dla publicznych postów.'
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-      }
-      
       throw new Error(`TikTok error: ${errorMsg}`);
     }
 
     const publishId = initData.data?.publish_id;
     const uploadUrl = initData.data?.upload_url;
     
-    if (!publishId) {
-      console.error('No publish_id in response:', initData);
-      throw new Error('Nie udało się uzyskać ID publikacji z TikTok');
+    if (!publishId || !uploadUrl) {
+      console.error('Missing publish_id or upload_url in response:', initData);
+      throw new Error('Nie udało się uzyskać URL uploadu z TikTok');
     }
 
-    // Step 2: Upload the image if we got an upload URL
-    if (uploadUrl) {
-      console.log('Uploading image to TikTok...');
-      await uploadImageToTikTok(uploadUrl, imageData.data, imageData.contentType);
-      console.log('Image uploaded successfully');
+    // Step 2: Upload the video
+    console.log('Uploading video to TikTok...');
+    console.log('Upload URL:', uploadUrl);
+    
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'video/mp4',
+        'Content-Length': videoData.size.toString(),
+        'Content-Range': `bytes 0-${videoData.size - 1}/${videoData.size}`,
+      },
+      body: videoData.data,
+    });
+    
+    console.log('Video upload response status:', uploadResponse.status);
+    
+    if (!uploadResponse.ok && uploadResponse.status !== 201) {
+      const errorText = await uploadResponse.text();
+      console.error('Video upload failed:', uploadResponse.status, errorText);
+      throw new Error(`Błąd uploadu wideo: ${uploadResponse.status}`);
     }
 
-    console.log('TikTok publish initiated, publish_id:', publishId);
+    console.log('Video uploaded successfully, publish_id:', publishId);
 
+    // Step 3: Check publish status (optional, but good for debugging)
+    // TikTok processes the video asynchronously
+    
     if (contentId) {
       await supabase
         .from('book_platform_content')
@@ -325,7 +301,8 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         publishId,
-        message: 'Post opublikowany na TikTok'
+        message: 'Wideo wysłane do TikTok! Przetwarzanie może potrwać kilka minut.',
+        note: 'Post jest ustawiony jako prywatny (SELF_ONLY). Możesz zmienić widoczność w aplikacji TikTok.'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -343,22 +320,3 @@ serve(async (req) => {
     );
   }
 });
-
-async function uploadImageToTikTok(uploadUrl: string, imageData: ArrayBuffer, contentType: string): Promise<void> {
-  const response = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': contentType,
-      'Content-Length': imageData.byteLength.toString(),
-    },
-    body: imageData,
-  });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Upload failed:', response.status, errorText);
-    throw new Error(`Failed to upload image to TikTok: ${response.status}`);
-  }
-  
-  console.log('Image upload response:', response.status);
-}
