@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Video } from "lucide-react";
 import { PlatformConnectionStatus } from "@/components/platforms/PlatformConnectionStatus";
@@ -8,6 +9,7 @@ import { PlatformBooksList } from "@/components/platforms/PlatformBooksList";
 
 const PlatformTikTok = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
@@ -27,7 +29,7 @@ const PlatformTikTok = () => {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => window.history.back()}>
+            <Button variant="outline" onClick={() => navigate("/")}>
               Powrót
             </Button>
           </div>
