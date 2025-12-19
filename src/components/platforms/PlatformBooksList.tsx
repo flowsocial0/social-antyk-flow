@@ -110,8 +110,21 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
           aVal = a.published ? 1 : 0;
           bVal = b.published ? 1 : 0;
         } else if (sortColumn === "code") {
-          aVal = a.book.code || "";
-          bVal = b.book.code || "";
+          // Try numeric sort first, fall back to string sort
+          const aCode = a.book.code || "";
+          const bCode = b.book.code || "";
+          const aNum = parseFloat(aCode);
+          const bNum = parseFloat(bCode);
+          
+          // If both are valid numbers, compare numerically
+          if (!isNaN(aNum) && !isNaN(bNum)) {
+            aVal = aNum;
+            bVal = bNum;
+          } else {
+            // Fall back to string comparison
+            aVal = aCode;
+            bVal = bCode;
+          }
         } else { // title
           aVal = a.book.title || "";
           bVal = b.book.title || "";
