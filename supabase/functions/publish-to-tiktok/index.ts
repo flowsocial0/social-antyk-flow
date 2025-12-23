@@ -327,13 +327,16 @@ serve(async (req) => {
     );
   } catch (error: any) {
     console.error('Publish to TikTok error:', error);
+    
+    // Return HTTP 200 with success: false for expected errors
+    // This prevents "edge function non-2xx" errors in the frontend
     return new Response(
       JSON.stringify({ 
         success: false,
         error: error.message 
       }),
       {
-        status: 500,
+        status: 200, // Changed from 500 to 200 for better UX
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );

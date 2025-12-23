@@ -220,20 +220,39 @@ export default function SocialAccounts() {
   };
 
   const disconnectTikTok = async () => {
+    setIsLoadingTikTok(true);
     try {
-      const { error } = await (supabase as any)
-        .from('tiktok_oauth_tokens')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Musisz być zalogowany');
+        return;
+      }
+
+      // Call revoke function to properly disconnect from TikTok
+      const { data, error } = await supabase.functions.invoke('tiktok-oauth-revoke', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      });
       
       if (error) throw error;
       
-      setTiktokConnected(false);
-      setTiktokOpenId(null);
-      toast.success('Odłączono konto TikTok');
+      if (data?.success) {
+        setTiktokConnected(false);
+        setTiktokOpenId(null);
+        toast.success('Odłączono konto TikTok', {
+          description: data.revokeResult
+        });
+      } else {
+        throw new Error(data?.error || 'Nieznany błąd');
+      }
     } catch (error: any) {
       console.error('Error disconnecting TikTok:', error);
-      toast.error('Nie udało się odłączyć konta TikTok');
+      toast.error('Nie udało się odłączyć konta TikTok', {
+        description: error.message
+      });
+    } finally {
+      setIsLoadingTikTok(false);
     }
   };
 
@@ -385,9 +404,14 @@ export default function SocialAccounts() {
                 <Button
                   variant="outline"
                   onClick={disconnectTikTok}
+                  disabled={isLoadingTikTok}
                   className="gap-2"
                 >
-                  <XCircle className="h-4 w-4" />
+                  {isLoadingTikTok ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <XCircle className="h-4 w-4" />
+                  )}
                   Odłącz
                 </Button>
               ) : (

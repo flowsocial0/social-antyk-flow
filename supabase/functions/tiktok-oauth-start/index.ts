@@ -51,6 +51,8 @@ serve(async (req) => {
     authUrl.searchParams.set('state', state);
     authUrl.searchParams.set('code_challenge', codeChallenge);
     authUrl.searchParams.set('code_challenge_method', 'S256');
+    // Force consent screen to always show (required for demo video)
+    authUrl.searchParams.set('prompt', 'consent');
 
     console.log('TikTok OAuth started for user:', userId);
     console.log('Redirect URI:', redirectUri);

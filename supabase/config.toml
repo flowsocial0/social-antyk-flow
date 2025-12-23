@@ -48,5 +48,8 @@ verify_jwt = false
 [functions.tiktok-oauth-callback]
 verify_jwt = false
 
+[functions.tiktok-oauth-revoke]
+verify_jwt = false
+
 [functions.sync-books-from-xml]
 verify_jwt = false
