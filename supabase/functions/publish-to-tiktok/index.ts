@@ -255,7 +255,19 @@ serve(async (req) => {
         throw new Error('Za dużo oczekujących postów. Poczekaj chwilę i spróbuj ponownie.');
       }
       
-      throw new Error(`TikTok error: ${errorMsg}`);
+      if (errorCode === 'unaudited_client_can_only_post_to_private_accounts') {
+        throw new Error('Aplikacja TikTok wymaga zatwierdzenia przez TikTok. Skontaktuj się z administratorem, aby przejść proces weryfikacji aplikacji TikTok Developer.');
+      }
+      
+      if (errorCode === 'access_token_invalid') {
+        throw new Error('Token dostępu wygasł. Połącz konto TikTok ponownie.');
+      }
+      
+      if (errorCode === 'scope_not_authorized') {
+        throw new Error('Brak uprawnień do publikacji. Połącz konto TikTok ponownie z wymaganymi uprawnieniami.');
+      }
+      
+      throw new Error(`Błąd TikTok: ${errorMsg}`);
     }
 
     const publishId = initData.data?.publish_id;
