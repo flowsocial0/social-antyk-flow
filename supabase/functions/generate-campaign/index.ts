@@ -6,6 +6,46 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function safeText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  const s = String(value);
+  if (s.toLowerCase() === "null" || s.toLowerCase() === "undefined") return "";
+  return s;
+}
+
+function sanitizeGeneratedText(text: string, bookData?: any): string {
+  let out = safeText(text);
+
+  // Replace common placeholders with real values (or empty strings)
+  const url = safeText(bookData?.product_url) || "https://sklep.antyk.org.pl";
+  const title = safeText(bookData?.title);
+  const author = safeText(bookData?.author);
+  const priceNumber = bookData?.sale_price ?? bookData?.promotional_price;
+  const price = priceNumber !== null && priceNumber !== undefined && priceNumber !== ""
+    ? `${safeText(priceNumber)} zł`
+    : "";
+
+  out = out
+    .replace(/\[link do księgarni\]/gi, "https://sklep.antyk.org.pl")
+    .replace(/\[link\]/gi, url)
+    .replace(/\[Tytuł książki\]/gi, title)
+    .replace(/\[Autor\]/gi, author)
+    .replace(/\[cena\]/gi, price);
+
+  // Remove literal null/undefined words that often leak from missing fields
+  out = out
+    .replace(/\bnull\b/gi, "")
+    .replace(/\bundefined\b/gi, "");
+
+  // Remove any remaining bracket placeholders
+  out = out.replace(/\[[^\]]+\]/g, "");
+
+  // Final whitespace cleanup
+  out = out.replace(/\s{2,}/g, " ").trim();
+
+  return out;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -528,21 +568,12 @@ BEZWZGLĘDNE ZASADY:
         if (placeholders) {
           console.warn(`WARNING: Post ${item.position} contains placeholders: ${placeholders.join(', ')}`);
           console.warn(`Original text: ${text}`);
-          
-          // Try to clean up common placeholders
-          text = text
-            .replace(/\[link do księgarni\]/gi, 'https://sklep.antyk.org.pl')
-            .replace(/\[link\]/gi, bookData?.product_url || 'https://sklep.antyk.org.pl')
-            .replace(/\[Tytuł książki\]/gi, bookData?.title || '')
-            .replace(/\[Autor\]/gi, bookData?.author || '')
-            .replace(/\[cena\]/gi, bookData?.sale_price ? `${bookData.sale_price} zł` : '')
-            .replace(/\bnull\b/gi, '')  // Remove any literal "null" strings
-            .replace(/\s{2,}/g, ' ')    // Clean up extra spaces
-            .trim();
-          
-          // Remove any remaining placeholders
-          text = text.replace(/\[[^\]]+\]/g, '');
-          
+        }
+
+        // Always sanitize output (even if the model didn't use [placeholders])
+        text = sanitizeGeneratedText(text, bookData);
+
+        if (placeholders) {
           console.log(`Cleaned text: ${text}`);
         }
 
