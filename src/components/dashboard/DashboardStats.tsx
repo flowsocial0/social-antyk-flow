@@ -9,9 +9,7 @@ export const DashboardStats = () => {
   const { data: booksCount } = useQuery({
     queryKey: ["books-count"],
     queryFn: async () => {
-      const { count, error } = await supabase
-        .from("books")
-        .select("*", { count: "exact", head: true });
+      const { count, error } = await supabase.from("books").select("*", { count: "exact", head: true });
       if (error) throw error;
       return count || 0;
     },
@@ -104,10 +102,10 @@ export const DashboardStats = () => {
     },
     {
       title: "Aktywne platformy",
-      value: `2/13`,
+      value: `3/13`,
       icon: Activity,
       description: "Połączone",
-      trend: "X, Facebook",
+      trend: "X, Facebook, TikTok",
     },
   ];
 
