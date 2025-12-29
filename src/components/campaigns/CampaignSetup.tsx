@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Calendar, Clock, ArrowRight, Plus, X, ArrowUpDown, AlertCircle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar, Clock, ArrowRight, Plus, X, ArrowUpDown, AlertCircle, Sparkles } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import type { CampaignConfig } from "./CampaignBuilder";
@@ -29,6 +30,7 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
     preSelectedPlatform ? [preSelectedPlatform] : ['x']
   );
   const [selectedBooks, setSelectedBooks] = useState<string[]>([]);
+  const [useAI, setUseAI] = useState(true);
   const [connectedPlatforms, setConnectedPlatforms] = useState<Record<PlatformId, boolean>>(
     {} as Record<PlatformId, boolean>
   );
@@ -153,7 +155,8 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
       startTime: sortedTimes[0],
       postingTimes: sortedTimes,
       targetPlatforms,
-      selectedBooks
+      selectedBooks,
+      useAI
     });
   };
 
@@ -163,6 +166,26 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
     <div className="space-y-6">
       <Card className="p-6 bg-secondary/30">
         <h3 className="text-lg font-semibold mb-4">Parametry kampanii</h3>
+        
+        {/* Use AI Checkbox */}
+        <div className="flex items-center space-x-3 mb-6 p-4 bg-primary/5 rounded-lg border border-primary/20">
+          <Checkbox
+            id="useAI"
+            checked={useAI}
+            onCheckedChange={(checked) => setUseAI(checked === true)}
+          />
+          <div className="flex-1">
+            <Label htmlFor="useAI" className="flex items-center gap-2 cursor-pointer">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="font-medium">Użyj AI do generowania treści</span>
+            </Label>
+            <p className="text-xs text-muted-foreground mt-1">
+              {useAI 
+                ? "Grok AI wygeneruje unikalne, angażujące treści dla każdego posta" 
+                : "Posty zostaną utworzone z opisów książek z bazy danych"}
+            </p>
+          </div>
+        </div>
         
         <div className="space-y-6">
           {/* Duration */}
@@ -314,7 +337,7 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
           <ul className="text-sm space-y-1 text-muted-foreground">
             <li>• 20% postów to wartościowy content (ciekawostki, zagadki, wydarzenia)</li>
             <li>• 80% postów to bezpośrednia promocja i sprzedaż książek</li>
-            <li>• Grok AI automatycznie dobierze odpowiednie typy postów</li>
+            <li>• {useAI ? "Grok AI automatycznie dobierze odpowiednie typy postów" : "Treści zostaną pobrane z opisów książek w bazie"}</li>
           </ul>
         </div>
       </Card>
