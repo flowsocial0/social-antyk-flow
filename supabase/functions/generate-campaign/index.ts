@@ -535,7 +535,10 @@ BEZWZGLĘDNE ZASADY:
             .replace(/\[link\]/gi, bookData?.product_url || 'https://sklep.antyk.org.pl')
             .replace(/\[Tytuł książki\]/gi, bookData?.title || '')
             .replace(/\[Autor\]/gi, bookData?.author || '')
-            .replace(/\[cena\]/gi, bookData?.sale_price ? `${bookData.sale_price} zł` : '');
+            .replace(/\[cena\]/gi, bookData?.sale_price ? `${bookData.sale_price} zł` : '')
+            .replace(/\bnull\b/gi, '')  // Remove any literal "null" strings
+            .replace(/\s{2,}/g, ' ')    // Clean up extra spaces
+            .trim();
           
           // Remove any remaining placeholders
           text = text.replace(/\[[^\]]+\]/g, '');
