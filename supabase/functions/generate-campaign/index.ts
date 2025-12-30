@@ -88,7 +88,14 @@ serve(async (req) => {
 });
 
 async function generateCampaignStructure(body: any, apiKey: string) {
-  const { totalPosts, contentPosts, salesPosts, durationDays, postsPerDay } = body;
+  let { totalPosts, contentPosts, salesPosts, durationDays, postsPerDay } = body;
+
+  // WAŻNE: Jeśli jest tylko 1 post, musi być sprzedażowy
+  if (totalPosts === 1) {
+    salesPosts = 1;
+    contentPosts = 0;
+    console.log("Single post campaign - forcing sales post");
+  }
 
   console.log("Generating campaign structure:", { totalPosts, contentPosts, salesPosts });
 
@@ -295,21 +302,28 @@ async function generatePostsContent(body: any, apiKey: string) {
     return 0;
   });
 
-  // If more books than sales posts, limit to most expensive ones
-  if (availableBooks.length > salesPostsCount) {
-    console.log(`More books (${availableBooks.length}) than sales posts (${salesPostsCount}), using ${salesPostsCount} most expensive`);
-    availableBooks = availableBooks.slice(0, salesPostsCount);
+  // Keep all books available for content generation
+  const allBooksForContent = [...availableBooks];
+  
+  // For sales posts, limit to most expensive if more books than sales posts
+  let booksForSales = [...availableBooks];
+  if (salesPostsCount > 0 && booksForSales.length > salesPostsCount) {
+    console.log(`More books (${booksForSales.length}) than sales posts (${salesPostsCount}), using ${salesPostsCount} most expensive for sales`);
+    booksForSales = booksForSales.slice(0, salesPostsCount);
+  } else if (salesPostsCount === 0) {
+    console.log(`No sales posts - all ${availableBooks.length} books available for trivia content`);
+    booksForSales = [];
   }
 
-  console.log(`Using ${availableBooks.length} books for ${salesPostsCount} sales posts`);
-  console.log("Selected books:", availableBooks.map(b => b.title).join(", "));
+  console.log(`Using ${booksForSales.length} books for ${salesPostsCount} sales posts`);
+  console.log("Books for sales:", booksForSales.map(b => b.title).join(", ") || "(none)");
 
-  // Build book context ONLY from selected books for trivia posts
-  const booksContext = availableBooks
+  // Build book context from ALL selected books for trivia posts
+  const booksContext = allBooksForContent
     .map((book: any) => `- "${book.title}"${book.author ? ` autorstwa ${book.author}` : ""}: ${book.description || 'Brak opisu'}`)
     .join('\n');
 
-  console.log(`Built context from ${availableBooks.length} selected books for trivia generation`);
+  console.log(`Built context from ${allBooksForContent.length} selected books for trivia generation`);
 
   // Fetch content history for deduplication (last 6 months)
   const sixMonthsAgo = new Date();
@@ -378,14 +392,18 @@ WAŻNE: NIE używaj placeholderów w nawiasach kwadratowych. NIE dodawaj informa
   let tempSalesIndex = 0;
   
   structure.forEach((item: any) => {
-    if (item.type === 'sales') {
+    if (item.type === 'sales' && booksForSales.length > 0) {
       // ROTATION: use modulo to cycle through books when we have fewer books than sales posts
-      positionToBookMap[item.position] = availableBooks[tempSalesIndex % availableBooks.length];
+      positionToBookMap[item.position] = booksForSales[tempSalesIndex % booksForSales.length];
       tempSalesIndex++;
     }
   });
 
-  console.log("Sales post book assignments:", Object.entries(positionToBookMap).map(([pos, book]) => `Position ${pos}: ${book.title}`).join(", "));
+  if (Object.keys(positionToBookMap).length > 0) {
+    console.log("Sales post book assignments:", Object.entries(positionToBookMap).map(([pos, book]) => `Position ${pos}: ${book.title}`).join(", "));
+  } else {
+    console.log("No sales posts - no book assignments for sales");
+  }
 
   // Generate posts in batches of 5 to avoid rate limits
   const batchSize = 5;
@@ -401,8 +419,11 @@ WAŻNE: NIE używaj placeholderów w nawiasach kwadratowych. NIE dodawaj informa
         // For sales posts, use book with rotation
         if (item.category === "sales") {
           // ROTATION: use modulo to cycle through books
-          bookData = availableBooks[salesBookIndex % availableBooks.length];
+          bookData = booksForSales[salesBookIndex % booksForSales.length];
           salesBookIndex++;
+          
+          // Fallback URL in case product_url is null
+          const bookUrl = bookData.product_url || "https://sklep.antyk.org.pl";
 
           if (hasFacebook && !hasX) {
             // Rich Facebook post for sales
@@ -411,13 +432,13 @@ Tytuł: ${bookData.title}
 ${bookData.author ? `Autor: ${bookData.author}` : ""}
 ${bookData.description ? `Opis: ${bookData.description}` : ""}
 ${bookData.sale_price ? `Cena: ${bookData.sale_price} zł` : ""}
-Link do produktu: ${bookData.product_url}
+Link do produktu: ${bookUrl}
 
 Post może mieć do ${maxTextLength} znaków. Powinien:
 - Przedstawić produkt w atrakcyjny sposób
 - Podkreślić wartości patriotyczne (jeśli dotyczy)
 - Zachęcić do zakupu
-- Kończyć się DOKŁADNIE tym linkiem: ${bookData.product_url}
+- Kończyć się DOKŁADNIE tym linkiem: ${bookUrl}
 
 KRYTYCZNE ZASADY:
 - Używaj TYLKO podanych powyżej danych (tytuł, autor, opis, cena, link)
@@ -431,13 +452,13 @@ KRYTYCZNE ZASADY:
 Tytuł: ${bookData.title}
 ${bookData.author ? `Autor: ${bookData.author}` : ""}
 ${bookData.sale_price ? `Cena: ${bookData.sale_price} zł` : ""}
-Link: ${bookData.product_url}
+Link: ${bookUrl}
 
 KRYTYCZNE ZASADY:
 - Używaj TYLKO podanych powyżej danych
 - NIE wymyślaj informacji, których nie podano
 - NIE używaj placeholderów w nawiasach kwadratowych
-- Kończyć się DOKŁADNIE tym linkiem: ${bookData.product_url}
+- Kończyć się DOKŁADNIE tym linkiem: ${bookUrl}
 - NIE dodawaj informacji o liczbie znaków`;
           }
         } else if (item.type === 'content' && item.category === 'trivia') {
@@ -453,7 +474,12 @@ KRYTYCZNE ZASADY:
             }
           }
           
-          // If we found a nearby book, create trivia specifically about its topic
+          // Fallback: if no sales posts, use random book from all selected books
+          if (!nearestBook && allBooksForContent.length > 0) {
+            nearestBook = allBooksForContent[Math.floor(Math.random() * allBooksForContent.length)];
+          }
+          
+          // If we found a book, create trivia specifically about its topic
           if (nearestBook) {
             const bookUrl = nearestBook.product_url || "https://sklep.antyk.org.pl";
             const triviaContext = `Stwórz ciekawostkę BEZPOŚREDNIO związaną z tematyką tego produktu:
@@ -474,23 +500,15 @@ WAŻNE:
               ? `Post może mieć do ${maxTextLength} znaków. NIE dodawaj informacji o liczbie znaków do treści.`
               : `Max 240 znaków ŁĄCZNIE z linkiem. NIE dodawaj informacji o liczbie znaków do treści.`);
           } else {
-            // Fallback: use random book from selected ones
-            const randomBook = availableBooks[Math.floor(Math.random() * availableBooks.length)];
-            const bookUrl = randomBook.product_url || "https://sklep.antyk.org.pl";
-            const triviaContext = `Stwórz ciekawostkę związaną z tematyką tego produktu:
-Tytuł: ${randomBook.title}
-${randomBook.description ? `Opis: ${randomBook.description}` : ""}
-
-WAŻNE:
-- NIE wspominaj bezpośrednio tytułu produktu
-- Stwórz ciekawostkę o temacie, o którym traktuje ten produkt
+            // Ultimate fallback: generic bookstore trivia
+            console.log("No books available for trivia - using generic prompt");
+            prompt = `Stwórz krótką ciekawostkę o książkach, literaturze lub historii Polski.
 - NIE używaj placeholderów w nawiasach kwadratowych
-- Zakończ DOKŁADNIE tym linkiem: ${bookUrl}
+- Zakończ linkiem: https://sklep.antyk.org.pl
 
-`;
-            prompt = triviaContext + (hasFacebook && !hasX 
-              ? `Post może mieć do ${maxTextLength} znaków. NIE dodawaj informacji o liczbie znaków do treści.`
-              : `Max 240 znaków ŁĄCZNIE z linkiem. NIE dodawaj informacji o liczbie znaków do treści.`);
+` + (hasFacebook && !hasX 
+              ? `Post może mieć do ${maxTextLength} znaków.`
+              : `Max 240 znaków ŁĄCZNIE z linkiem.`);
           }
 
           // Add deduplication instruction for content posts
