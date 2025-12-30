@@ -455,6 +455,7 @@ KRYTYCZNE ZASADY:
           
           // If we found a nearby book, create trivia specifically about its topic
           if (nearestBook) {
+            const bookUrl = nearestBook.product_url || "https://sklep.antyk.org.pl";
             const triviaContext = `Stwórz ciekawostkę BEZPOŚREDNIO związaną z tematyką tego produktu:
 Tytuł: ${nearestBook.title}
 ${nearestBook.author ? `Autor: ${nearestBook.author}` : ""}
@@ -466,7 +467,7 @@ WAŻNE:
 - Ciekawostka ma wzbudzić zainteresowanie tematem, żeby czytelnik chciał poznać więcej
 - Musi być samodzielna i wartościowa, nie tylko "wstępem" do sprzedaży
 - NIE używaj placeholderów w nawiasach kwadratowych
-- Zakończ linkiem: https://sklep.antyk.org.pl
+- Zakończ DOKŁADNIE tym linkiem: ${bookUrl}
 
 `;
             prompt = triviaContext + (hasFacebook && !hasX 
@@ -475,6 +476,7 @@ WAŻNE:
           } else {
             // Fallback: use random book from selected ones
             const randomBook = availableBooks[Math.floor(Math.random() * availableBooks.length)];
+            const bookUrl = randomBook.product_url || "https://sklep.antyk.org.pl";
             const triviaContext = `Stwórz ciekawostkę związaną z tematyką tego produktu:
 Tytuł: ${randomBook.title}
 ${randomBook.description ? `Opis: ${randomBook.description}` : ""}
@@ -483,7 +485,7 @@ WAŻNE:
 - NIE wspominaj bezpośrednio tytułu produktu
 - Stwórz ciekawostkę o temacie, o którym traktuje ten produkt
 - NIE używaj placeholderów w nawiasach kwadratowych
-- Zakończ linkiem: https://sklep.antyk.org.pl
+- Zakończ DOKŁADNIE tym linkiem: ${bookUrl}
 
 `;
             prompt = triviaContext + (hasFacebook && !hasX 
