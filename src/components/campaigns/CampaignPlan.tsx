@@ -158,12 +158,13 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
           const title = book.title || '';
           const author = book.author || '';
           const description = book.description || '';
+          const url = book.product_url || 'https://sklep.antyk.org.pl';
           
           if (description && description.length > 30) {
             const shortDesc = description.substring(0, 150).trim();
-            text = `📖 ${title}${author ? ` - ${author}` : ''}\n\n${shortDesc}...`;
+            text = `📖 ${title}${author ? ` - ${author}` : ''}\n\n${shortDesc}...\n\n👉 ${url}`;
           } else {
-            text = `📖 Warto przeczytać: ${title}${author ? ` - ${author}` : ''}`;
+            text = `📖 Warto przeczytać: ${title}${author ? ` - ${author}` : ''}\n\n👉 ${url}`;
           }
         }
         
