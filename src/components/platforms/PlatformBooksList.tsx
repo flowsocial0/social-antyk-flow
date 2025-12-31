@@ -611,55 +611,29 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      {content.published ? (
+                      {!content.published && (
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleRepublish(content.id, book.id)}
-                          disabled={!canPublish || isPublishing}
-                          title="Opublikuj ponownie"
+                          onClick={() => handleSchedule(book.id, content.id)}
+                          disabled={!canPublish}
                         >
-                          {isPublishing ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <>
-                              <Undo2 className="h-4 w-4 mr-1" />
-                            </>
-                          )}
+                          <Calendar className="h-4 w-4" />
                         </Button>
-                      ) : (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleSchedule(book.id, content.id)}
-                            disabled={!canPublish}
-                          >
-                            <Calendar className="h-4 w-4" />
-                          </Button>
-                          {content.auto_publish_enabled ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => cancelScheduleMutation.mutate(content.id)}
-                            >
-                              <Undo2 className="h-4 w-4" />
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              onClick={() => handlePublish(content.id, book.id)}
-                              disabled={!canPublish || isPublishing}
-                            >
-                              {isPublishing ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Send className="h-4 w-4" />
-                              )}
-                            </Button>
-                          )}
-                        </>
                       )}
+                      <Button
+                        size="sm"
+                        variant={canPublish ? "destructive" : "outline"}
+                        onClick={() => handlePublish(content.id, book.id)}
+                        disabled={!canPublish || isPublishing}
+                        title={!canPublish ? "Najpierw wygeneruj tekst AI" : "Opublikuj"}
+                      >
+                        {isPublishing ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"
