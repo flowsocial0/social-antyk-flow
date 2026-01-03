@@ -267,13 +267,20 @@ export const GeneralBooksList = () => {
                 books.map((book: Tables<"books">) => (
                   <TableRow key={book.id}>
                     <TableCell>
-                      {book.image_url ? (
-                        <img src={book.image_url} alt={book.title} className="w-16 h-20 object-cover rounded" />
-                      ) : (
-                        <div className="w-16 h-20 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
-                          Brak
-                        </div>
-                      )}
+                      {(() => {
+                        // Priority: storage_path (for uploaded files), then image_url
+                        const imageUrl = book.storage_path 
+                          ? supabase.storage.from("ObrazkiKsiazek").getPublicUrl(book.storage_path).data.publicUrl
+                          : book.image_url;
+                        
+                        return imageUrl ? (
+                          <img src={imageUrl} alt={book.title} className="w-16 h-20 object-cover rounded" />
+                        ) : (
+                          <div className="w-16 h-20 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
+                            Brak
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="font-medium">{book.code}</TableCell>
                     <TableCell className="max-w-xs">
