@@ -13,6 +13,7 @@ interface Book {
   code: string;
   title: string;
   image_url?: string;
+  storage_path?: string;
   description?: string;
 }
 
@@ -39,7 +40,7 @@ export const BookSelector = ({ selectedBooks, onSelectionChange }: BookSelectorP
     queryFn: async () => {
       let query = supabase
         .from("books")
-        .select("id, code, title, image_url, description")
+        .select("id, code, title, image_url, storage_path, description")
         .eq("exclude_from_campaigns", false)
         .order("code", { ascending: true });
 
@@ -135,17 +136,23 @@ export const BookSelector = ({ selectedBooks, onSelectionChange }: BookSelectorP
                     onCheckedChange={() => handleToggle(book.id)}
                     className="pointer-events-none"
                   />
-                  {book.image_url ? (
-                    <img
-                      src={book.image_url}
-                      alt={book.title}
-                      className="w-10 h-14 object-cover rounded"
-                    />
-                  ) : (
-                    <div className="w-10 h-14 bg-muted rounded flex items-center justify-center text-xs">
-                      Brak
-                    </div>
-                  )}
+                  {(() => {
+                    const imageUrl = book.storage_path 
+                      ? supabase.storage.from("ObrazkiKsiazek").getPublicUrl(book.storage_path).data.publicUrl
+                      : book.image_url;
+                    
+                    return imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt={book.title}
+                        className="w-10 h-14 object-cover rounded"
+                      />
+                    ) : (
+                      <div className="w-10 h-14 bg-muted rounded flex items-center justify-center text-xs">
+                        Brak
+                      </div>
+                    );
+                  })()}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{book.title}</p>
                     <p className="text-xs text-muted-foreground">{book.code}</p>
