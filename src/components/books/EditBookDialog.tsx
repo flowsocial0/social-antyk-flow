@@ -132,7 +132,9 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
       setIsUploadingImage(true);
       
       const extension = file.name.split('.').pop() || 'jpg';
-      const storagePath = `books/${bookId}.${extension}`;
+      // Add timestamp to avoid browser cache issues when replacing images
+      const timestamp = Date.now();
+      const storagePath = `books/${bookId}_${timestamp}.${extension}`;
       
       const { error: uploadError } = await supabase.storage
         .from("ObrazkiKsiazek")

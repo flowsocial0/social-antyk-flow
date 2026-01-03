@@ -88,7 +88,9 @@ export const AddBookDialog = ({ open, onOpenChange, onSuccess }: AddBookDialogPr
       setIsUploadingImage(true);
       
       const extension = file.name.split('.').pop() || 'jpg';
-      const storagePath = `books/${bookId}.${extension}`;
+      // Add timestamp to avoid browser cache issues
+      const timestamp = Date.now();
+      const storagePath = `books/${bookId}_${timestamp}.${extension}`;
       
       const { error: uploadError } = await supabase.storage
         .from("ObrazkiKsiazek")
