@@ -576,17 +576,24 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
               return (
                 <TableRow key={content.id}>
                   <TableCell>
-                    {book.image_url ? (
-                      <img
-                        src={book.image_url}
-                        alt={book.title}
-                        className="w-12 h-16 object-cover rounded"
-                      />
-                    ) : (
-                      <div className="w-12 h-16 bg-muted rounded flex items-center justify-center text-xs">
-                        Brak
-                      </div>
-                    )}
+                    {(() => {
+                      // Priority: storage_path (for uploaded files), then image_url
+                      const imageUrl = book.storage_path 
+                        ? supabase.storage.from("ObrazkiKsiazek").getPublicUrl(book.storage_path).data.publicUrl
+                        : book.image_url;
+                      
+                      return imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={book.title}
+                          className="w-12 h-16 object-cover rounded"
+                        />
+                      ) : (
+                        <div className="w-12 h-16 bg-muted rounded flex items-center justify-center text-xs">
+                          Brak
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="font-medium">
                     {book.code}

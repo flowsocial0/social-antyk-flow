@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Upload, Video, X, FileVideo } from "lucide-react";
+import { Loader2, Upload, Video, X, FileVideo, ImageIcon } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 const bookSchema = z.object({
@@ -41,7 +41,11 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoStoragePath, setVideoStoragePath] = useState<string | null>(null);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [currentStoragePath, setCurrentStoragePath] = useState<string | null>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<BookFormData>({
     resolver: zodResolver(bookSchema),
@@ -76,6 +80,19 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
       });
       setVideoUrl((book as any).video_url || null);
       setVideoStoragePath((book as any).video_storage_path || null);
+      setCurrentStoragePath(book.storage_path || null);
+      setSelectedImageFile(null);
+      // Set image preview from storage if available
+      if (book.storage_path) {
+        const { data: { publicUrl } } = supabase.storage
+          .from("ObrazkiKsiazek")
+          .getPublicUrl(book.storage_path);
+        setImagePreview(publicUrl);
+      } else if (book.image_url) {
+        setImagePreview(book.image_url);
+      } else {
+        setImagePreview(null);
+      }
     }
   }, [book, form]);
 
@@ -107,6 +124,52 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
       return null;
     } finally {
       setIsUploadingImage(false);
+    }
+  };
+
+  const uploadImageFromFile = async (file: File, bookId: string): Promise<string | null> => {
+    try {
+      setIsUploadingImage(true);
+      
+      const extension = file.name.split('.').pop() || 'jpg';
+      const storagePath = `books/${bookId}.${extension}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from("ObrazkiKsiazek")
+        .upload(storagePath, file, { 
+          upsert: true,
+          contentType: file.type
+        });
+        
+      if (uploadError) throw uploadError;
+      
+      return storagePath;
+    } catch (error) {
+      console.error("Error uploading image from file:", error);
+      return null;
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedImageFile(file);
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+      // Clear the URL field when a file is selected
+      form.setValue('image_url', '');
+    }
+  };
+
+  const handleRemoveImageFile = () => {
+    setSelectedImageFile(null);
+    setCurrentStoragePath(null);
+    setImagePreview(null);
+    form.setValue('image_url', '');
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
     }
   };
 
@@ -211,8 +274,18 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
         ai_text_facebook: data.ai_text_facebook || null,
       };
 
-      // Handle image URL - upload to storage if it's a new URL
-      if (data.image_url && data.image_url !== book.image_url) {
+      // Handle image - priority: file upload, then URL, then keep existing
+      if (selectedImageFile) {
+        const storagePath = await uploadImageFromFile(selectedImageFile, book.id);
+        if (storagePath) {
+          bookData.storage_path = storagePath;
+          bookData.image_url = null; // Clear URL when using file upload
+          toast({
+            title: "Obraz zapisany",
+            description: "Okładka została przesłana i zapisana w storage",
+          });
+        }
+      } else if (data.image_url && data.image_url !== book.image_url) {
         bookData.image_url = data.image_url;
         
         const storagePath = await uploadImageFromUrl(data.image_url, book.id);
@@ -225,9 +298,15 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
         }
       } else if (data.image_url) {
         bookData.image_url = data.image_url;
-      } else {
+        bookData.storage_path = currentStoragePath;
+      } else if (!imagePreview) {
+        // Image was removed
         bookData.image_url = null;
         bookData.storage_path = null;
+      } else {
+        // Keep existing
+        bookData.image_url = book.image_url;
+        bookData.storage_path = currentStoragePath;
       }
 
       const { error } = await supabase
@@ -362,33 +441,104 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="image_url"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center gap-2">
-                    URL okładki
-                    {isUploadingImage && (
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Pobieranie...
-                      </span>
+            {/* Image upload section */}
+            <div className="space-y-3">
+              <label className="text-sm font-medium flex items-center gap-2">
+                Okładka książki
+                {isUploadingImage && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Przesyłanie...
+                  </span>
+                )}
+              </label>
+              
+              {/* Current image preview */}
+              {imagePreview && (
+                <div className="flex items-center gap-3 p-3 border rounded-md bg-muted/30">
+                  <img 
+                    src={imagePreview} 
+                    alt="Podgląd okładki" 
+                    className="h-20 w-14 object-cover rounded"
+                  />
+                  <div className="flex-1 min-w-0">
+                    {selectedImageFile ? (
+                      <>
+                        <p className="text-sm font-medium truncate">{selectedImageFile.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(selectedImageFile.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </>
+                    ) : currentStoragePath ? (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Upload className="h-3 w-3" />
+                        Zapisano w storage
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Z URL</p>
                     )}
-                  </FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://example.com/cover.jpg" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                  {book.storage_path && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Upload className="h-3 w-3" />
-                      Zapisano w storage: {book.storage_path}
-                    </p>
-                  )}
-                </FormItem>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRemoveImageFile}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               )}
-            />
+
+              {/* File upload */}
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageFileChange}
+                className="hidden"
+              />
+              
+              {!selectedImageFile && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => imageInputRef.current?.click()}
+                  className="w-full justify-start gap-2"
+                >
+                  <ImageIcon className="h-4 w-4" />
+                  Wybierz plik z dysku
+                </Button>
+              )}
+
+              {/* Divider */}
+              {!selectedImageFile && !imagePreview && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex-1 border-t" />
+                  <span>lub</span>
+                  <div className="flex-1 border-t" />
+                </div>
+              )}
+              
+              {/* URL input (only show when no file selected and no preview) */}
+              {!selectedImageFile && !imagePreview && (
+                <FormField
+                  control={form.control}
+                  name="image_url"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input placeholder="https://example.com/cover.jpg" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Upload className="h-3 w-3" />
+                        Obraz zostanie automatycznie pobrany do storage
+                      </p>
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
 
             {/* Video Upload Section */}
             <div className="space-y-2">
