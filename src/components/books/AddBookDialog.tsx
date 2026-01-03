@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Upload } from "lucide-react";
+import { Loader2, Upload, ImageIcon, X } from "lucide-react";
 
 const bookSchema = z.object({
   code: z.string().min(1, "Kod jest wymagany").max(50, "Kod może mieć maksymalnie 50 znaków"),
@@ -34,6 +34,9 @@ export const AddBookDialog = ({ open, onOpenChange, onSuccess }: AddBookDialogPr
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<BookFormData>({
     resolver: zodResolver(bookSchema),
@@ -80,6 +83,53 @@ export const AddBookDialog = ({ open, onOpenChange, onSuccess }: AddBookDialogPr
     }
   };
 
+  const uploadImageFromFile = async (file: File, bookId: string): Promise<string | null> => {
+    try {
+      setIsUploadingImage(true);
+      
+      const extension = file.name.split('.').pop() || 'jpg';
+      const storagePath = `books/${bookId}.${extension}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from("ObrazkiKsiazek")
+        .upload(storagePath, file, { 
+          upsert: true,
+          contentType: file.type
+        });
+        
+      if (uploadError) throw uploadError;
+      
+      return storagePath;
+    } catch (error) {
+      console.error("Error uploading image from file:", error);
+      return null;
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedImageFile(file);
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+      // Clear the URL field when a file is selected
+      form.setValue('image_url', '');
+    }
+  };
+
+  const handleRemoveImageFile = () => {
+    setSelectedImageFile(null);
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    setImagePreview(null);
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
+  };
+
   const onSubmit = async (data: BookFormData) => {
     setIsSubmitting(true);
     try {
@@ -103,9 +153,16 @@ export const AddBookDialog = ({ open, onOpenChange, onSuccess }: AddBookDialogPr
 
       if (error) throw error;
 
-      // Try to upload image to storage if URL provided
-      if (data.image_url && insertedBook) {
-        const storagePath = await uploadImageFromUrl(data.image_url, insertedBook.id);
+      // Try to upload image to storage if file selected (priority) or URL provided
+      if (insertedBook) {
+        let storagePath: string | null = null;
+        
+        if (selectedImageFile) {
+          storagePath = await uploadImageFromFile(selectedImageFile, insertedBook.id);
+        } else if (data.image_url) {
+          storagePath = await uploadImageFromUrl(data.image_url, insertedBook.id);
+        }
+        
         if (storagePath) {
           await supabase
             .from("books")
@@ -114,7 +171,7 @@ export const AddBookDialog = ({ open, onOpenChange, onSuccess }: AddBookDialogPr
           
           toast({
             title: "Obraz zapisany",
-            description: "Okładka została pobrana i zapisana w storage",
+            description: "Okładka została zapisana w storage",
           });
         }
       }
@@ -125,6 +182,7 @@ export const AddBookDialog = ({ open, onOpenChange, onSuccess }: AddBookDialogPr
       });
 
       form.reset();
+      handleRemoveImageFile();
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -243,31 +301,94 @@ export const AddBookDialog = ({ open, onOpenChange, onSuccess }: AddBookDialogPr
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="image_url"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center gap-2">
-                    URL okładki
-                    {isUploadingImage && (
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Pobieranie do storage...
-                      </span>
+            {/* Image upload section */}
+            <div className="space-y-3">
+              <FormLabel className="flex items-center gap-2">
+                Okładka książki
+                {isUploadingImage && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Przesyłanie...
+                  </span>
+                )}
+              </FormLabel>
+              
+              {/* File upload */}
+              <div className="space-y-2">
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageFileChange}
+                  className="hidden"
+                />
+                
+                {selectedImageFile ? (
+                  <div className="flex items-center gap-3 p-3 border rounded-md bg-muted/30">
+                    {imagePreview && (
+                      <img 
+                        src={imagePreview} 
+                        alt="Podgląd okładki" 
+                        className="h-16 w-12 object-cover rounded"
+                      />
                     )}
-                  </FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://example.com/cover.jpg" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Upload className="h-3 w-3" />
-                    Obraz zostanie automatycznie pobrany do storage
-                  </p>
-                </FormItem>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{selectedImageFile.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(selectedImageFile.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoveImageFile}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => imageInputRef.current?.click()}
+                    className="w-full justify-start gap-2"
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                    Wybierz plik z dysku
+                  </Button>
+                )}
+              </div>
+
+              {/* Divider */}
+              {!selectedImageFile && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex-1 border-t" />
+                  <span>lub</span>
+                  <div className="flex-1 border-t" />
+                </div>
               )}
-            />
+              
+              {/* URL input (only show when no file selected) */}
+              {!selectedImageFile && (
+                <FormField
+                  control={form.control}
+                  name="image_url"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input placeholder="https://example.com/cover.jpg" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Upload className="h-3 w-3" />
+                        Obraz zostanie automatycznie pobrany do storage
+                      </p>
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
 
             <FormField
               control={form.control}
