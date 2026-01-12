@@ -23,7 +23,9 @@ const Login = () => {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
         navigate("/dashboard");
       }
@@ -46,9 +48,7 @@ const Login = () => {
         toast({
           variant: "destructive",
           title: "Błąd logowania",
-          description: error.message === "Invalid login credentials" 
-            ? "Nieprawidłowy email lub hasło" 
-            : error.message,
+          description: error.message === "Invalid login credentials" ? "Nieprawidłowy email lub hasło" : error.message,
         });
       }
     } catch (error) {
@@ -67,9 +67,7 @@ const Login = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">SocialFlow</CardTitle>
-          <CardDescription className="text-center">
-            Zaloguj się do panelu zarządzania
-          </CardDescription>
+          <CardDescription className="text-center">Zaloguj się do panelu zarządzania</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
@@ -108,7 +106,9 @@ const Login = () => {
               )}
             </Button>
           </form>
-          
+
+          <p>LOgin</p>
+
           {/* Footer links */}
           <div className="mt-6 pt-4 border-t border-border text-center text-sm text-muted-foreground">
             <div className="flex items-center justify-center gap-2 flex-wrap">
