@@ -143,7 +143,7 @@ export default function PlatformX() {
 
         {/* Connection Status & Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <PlatformConnectionStatus platform="x" onConnect={handleConnectX} />
+          <PlatformConnectionStatus platform="x" />
           <PlatformStats platform="x" />
         </div>
 
