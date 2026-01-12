@@ -9,11 +9,14 @@ interface Book {
   id: string;
   code: string;
   title: string;
+  author?: string;
   sale_price: number;
   promotional_price?: number;
   product_url?: string;
+  image_url?: string;
   storage_path?: string;
   ai_generated_text?: string;
+  ai_text_facebook?: string;
 }
 
 Deno.serve(async (req) => {
@@ -143,14 +146,20 @@ Deno.serve(async (req) => {
 
     let postText = text;
     let productUrl = '';
+    let finalImageUrl = imageUrl || '';
+    let book: Book | null = null;
 
     // Helper function to validate and fix URL format
     const validateUrl = (url: string): string => {
-      if (!url) return '';
+      if (!url) {
+        console.log('validateUrl: empty URL provided');
+        return '';
+      }
       let fixedUrl = url.trim();
       
       // Fix common URL issues - missing :// after protocol
       if (fixedUrl.match(/^https?:[^/]/)) {
+        console.log('validateUrl: fixing missing :// in URL:', url);
         fixedUrl = fixedUrl.replace(/^(https?):([^/])/, '$1://$2');
       }
       
@@ -162,16 +171,27 @@ Deno.serve(async (req) => {
       // Validate URL format
       try {
         new URL(fixedUrl);
+        console.log('validateUrl: valid URL:', fixedUrl);
         return fixedUrl;
       } catch {
-        console.warn('Invalid URL format, skipping:', url);
+        console.warn('validateUrl: Invalid URL format after fixing, skipping. Original:', url, 'Fixed attempt:', fixedUrl);
         return '';
       }
     };
 
+    // Helper function to get public URL from storage path
+    const getStoragePublicUrl = (storagePath: string): string => {
+      if (!storagePath) return '';
+      const bucketName = 'ObrazkiKsiazek';
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${bucketName}/${storagePath}`;
+      console.log('Generated storage public URL:', publicUrl);
+      return publicUrl;
+    };
+
     // If it's a book post, get book details
     if (bookId) {
-      const { data: book, error: bookError } = await supabase
+      console.log('Fetching book data for bookId:', bookId);
+      const { data: bookData, error: bookError } = await supabase
         .from('books')
         .select('*')
         .eq('id', bookId)
@@ -182,24 +202,48 @@ Deno.serve(async (req) => {
         throw new Error('Book not found');
       }
 
-      productUrl = validateUrl(book.product_url || '');
-      console.log('Validated product URL:', productUrl);
+      book = bookData;
+      console.log('Book data:', { 
+        title: book?.title, 
+        image_url: book?.image_url ? 'present' : 'missing',
+        storage_path: book?.storage_path ? 'present' : 'missing',
+        product_url: book?.product_url,
+        ai_text_facebook: book?.ai_text_facebook ? 'present' : 'missing'
+      });
+
+      productUrl = validateUrl(book?.product_url || '');
 
       // Use platform-specific AI text (ai_text_facebook) first, then fallback to legacy ai_generated_text
-      const aiTextForFacebook = book.ai_text_facebook || book.ai_generated_text;
+      const aiTextForFacebook = book?.ai_text_facebook || book?.ai_generated_text;
       if (aiTextForFacebook) {
         postText = aiTextForFacebook;
+        // Always append product URL if not already in text
+        if (productUrl && postText && !postText.includes(productUrl)) {
+          postText += `\n\n🔗 ${productUrl}`;
+        }
       } else {
-        const price = book.promotional_price || book.sale_price;
-        postText = `📚 ${book.title}\n\n💰 Cena: ${price} zł${productUrl ? `\n\n🔗 Sprawdź szczegóły: ${productUrl}` : ''}`;
+        const price = book?.promotional_price || book?.sale_price;
+        postText = `📚 ${book?.title}\n\n💰 Cena: ${price} zł${productUrl ? `\n\n🔗 Sprawdź szczegóły: ${productUrl}` : ''}`;
+      }
+
+      // Get image URL from book if not provided
+      if (!finalImageUrl) {
+        if (book?.image_url) {
+          finalImageUrl = book.image_url;
+          console.log('Using book.image_url:', finalImageUrl);
+        } else if (book?.storage_path) {
+          finalImageUrl = getStoragePublicUrl(book.storage_path);
+          console.log('Using storage_path URL:', finalImageUrl);
+        }
       }
     }
 
     // If it's a campaign post, get the text from campaign_posts
     if (campaignPostId) {
+      console.log('Fetching campaign post data for campaignPostId:', campaignPostId);
       const { data: campaignPost, error: campaignError } = await supabase
         .from('campaign_posts')
-        .select('*, books(*)')
+        .select('*, book:books(*)')
         .eq('id', campaignPostId)
         .single();
 
@@ -208,13 +252,34 @@ Deno.serve(async (req) => {
         throw new Error('Campaign post not found');
       }
 
-      postText = campaignPost.text;
+      console.log('Campaign post data:', {
+        type: campaignPost.type,
+        text: campaignPost.text ? 'present' : 'missing',
+        book_id: campaignPost.book_id,
+        book: campaignPost.book ? 'present' : 'missing'
+      });
 
-      // For sales posts, append book link
-      if (campaignPost.type === 'sales' && campaignPost.books) {
-        productUrl = validateUrl(campaignPost.books.product_url || '');
-        if (productUrl) {
+      postText = campaignPost.text;
+      book = campaignPost.book;
+
+      // For sales posts, append book link and get image
+      if (campaignPost.type === 'sales' && book) {
+        productUrl = validateUrl(book.product_url || '');
+        
+        // Always append product URL if not already in text
+        if (productUrl && postText && !postText.includes(productUrl)) {
           postText += `\n\n🔗 ${productUrl}`;
+        }
+
+        // Get image URL from book if not provided
+        if (!finalImageUrl) {
+          if (book.image_url) {
+            finalImageUrl = book.image_url;
+            console.log('Using campaign book.image_url:', finalImageUrl);
+          } else if (book.storage_path) {
+            finalImageUrl = getStoragePublicUrl(book.storage_path);
+            console.log('Using campaign book storage_path URL:', finalImageUrl);
+          }
         }
       }
     }
@@ -224,32 +289,27 @@ Deno.serve(async (req) => {
       postText += '\n\nTekst wygenerowany przez sztuczny algorytm';
     }
 
-    console.log('Post text:', postText);
-    console.log('Product URL:', productUrl);
+    console.log('=== Final Publishing Data ===');
+    console.log('Post text length:', postText?.length);
+    console.log('Product URL:', productUrl || 'none');
+    console.log('Image URL:', finalImageUrl || 'none');
 
-    // Prepare Facebook API request
-    const fbApiUrl = `https://graph.facebook.com/v18.0/${page_id}/feed`;
-    const postData: any = {
-      message: postText,
-      access_token: access_token,
-    };
-
-    // Add link only if it's a valid URL
-    if (productUrl) {
-      postData.link = productUrl;
-    }
-
-    // If there's an image, use photos endpoint instead
+    // Publish to Facebook
     let fbPostId = null;
-    if (imageUrl) {
+
+    if (finalImageUrl) {
+      // Two-step process: 1) Upload photo unpublished 2) Create feed post with attached media
+      console.log('=== Publishing with image (two-step process) ===');
+      
+      // Step 1: Upload photo as unpublished
       const photosUrl = `https://graph.facebook.com/v18.0/${page_id}/photos`;
       const photoData = {
-        url: imageUrl,
-        caption: postText,
+        url: finalImageUrl,
+        published: false, // Important: don't publish yet
         access_token: access_token,
       };
 
-      console.log('Publishing photo to Facebook...', { photosUrl, page_id });
+      console.log('Step 1: Uploading unpublished photo...');
       const photoResponse = await fetch(photosUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -257,17 +317,104 @@ Deno.serve(async (req) => {
       });
 
       const photoResult = await photoResponse.json();
-      console.log('Facebook photo API response:', { status: photoResponse.status, result: photoResult });
+      console.log('Photo upload response:', { status: photoResponse.status, result: photoResult });
 
       if (!photoResponse.ok || photoResult.error) {
-        console.error('Facebook photo API error:', photoResult);
-        throw new Error(photoResult.error?.message || 'Failed to publish photo to Facebook');
+        console.error('Facebook photo upload error:', photoResult);
+        // Fallback: try direct photo post with caption
+        console.log('Fallback: trying direct photo post with caption...');
+        const directPhotoData = {
+          url: finalImageUrl,
+          caption: postText,
+          access_token: access_token,
+        };
+        
+        const directPhotoResponse = await fetch(photosUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(directPhotoData),
+        });
+        
+        const directPhotoResult = await directPhotoResponse.json();
+        console.log('Direct photo post response:', { status: directPhotoResponse.status, result: directPhotoResult });
+        
+        if (!directPhotoResponse.ok || directPhotoResult.error) {
+          throw new Error(directPhotoResult.error?.message || 'Failed to publish photo to Facebook');
+        }
+        
+        fbPostId = directPhotoResult.id || directPhotoResult.post_id;
+      } else {
+        // Step 2: Create feed post with attached media
+        const mediaFbId = photoResult.id;
+        console.log('Photo uploaded, media_fbid:', mediaFbId);
+
+        const feedUrl = `https://graph.facebook.com/v18.0/${page_id}/feed`;
+        const feedData: any = {
+          message: postText,
+          attached_media: JSON.stringify([{ media_fbid: mediaFbId }]),
+          access_token: access_token,
+        };
+
+        // Add link for better preview if available
+        if (productUrl) {
+          feedData.link = productUrl;
+        }
+
+        console.log('Step 2: Creating feed post with attached media...');
+        const feedResponse = await fetch(feedUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(feedData),
+        });
+
+        const feedResult = await feedResponse.json();
+        console.log('Feed post response:', { status: feedResponse.status, result: feedResult });
+
+        if (!feedResponse.ok || feedResult.error) {
+          console.error('Facebook feed post error:', feedResult);
+          // If feed post fails, the photo is already uploaded, try simpler approach
+          console.log('Fallback: publishing photo directly with caption...');
+          const fallbackPhotoData = {
+            url: finalImageUrl,
+            caption: postText,
+            access_token: access_token,
+          };
+          
+          const fallbackResponse = await fetch(photosUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(fallbackPhotoData),
+          });
+          
+          const fallbackResult = await fallbackResponse.json();
+          console.log('Fallback photo response:', { status: fallbackResponse.status, result: fallbackResult });
+          
+          if (!fallbackResponse.ok || fallbackResult.error) {
+            throw new Error(fallbackResult.error?.message || feedResult.error?.message || 'Failed to publish to Facebook');
+          }
+          
+          fbPostId = fallbackResult.id || fallbackResult.post_id;
+        } else {
+          fbPostId = feedResult.id;
+        }
       }
 
-      fbPostId = photoResult.id || photoResult.post_id;
-      console.log('Published photo to Facebook, post ID:', fbPostId);
+      console.log('Published to Facebook with image, post ID:', fbPostId);
     } else {
-      console.log('Publishing text post to Facebook...', { fbApiUrl, page_id });
+      // Text-only post
+      console.log('=== Publishing text-only post ===');
+      const fbApiUrl = `https://graph.facebook.com/v18.0/${page_id}/feed`;
+      const postData: any = {
+        message: postText,
+        access_token: access_token,
+      };
+
+      // Add link only if it's a valid URL
+      if (productUrl) {
+        postData.link = productUrl;
+      }
+
+      console.log('Publishing text post to Facebook...');
       const postResponse = await fetch(fbApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -283,7 +430,7 @@ Deno.serve(async (req) => {
       }
 
       fbPostId = postResult.id;
-      console.log('Published to Facebook, post ID:', fbPostId);
+      console.log('Published text post to Facebook, post ID:', fbPostId);
     }
 
     // Update book status if it was a book post
