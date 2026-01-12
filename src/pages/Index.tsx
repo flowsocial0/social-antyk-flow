@@ -23,8 +23,8 @@ const Index = () => {
         navigate("/login");
       } else {
         setUser(session.user);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
