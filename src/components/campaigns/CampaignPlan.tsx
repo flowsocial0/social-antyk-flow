@@ -28,25 +28,40 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
       // Fetch cached texts if not regenerating
       let cachedTexts: Record<string, Record<string, string>> = {};
       
+      console.log("Config regenerateTexts:", config.regenerateTexts);
+      console.log("Config selectedBooks count:", config.selectedBooks?.length);
+      
       if (!config.regenerateTexts && config.selectedBooks && config.selectedBooks.length > 0) {
-        console.log("Fetching cached texts for selected books...");
+        console.log("Fetching ALL cached texts from book_campaign_texts...");
+        
+        // Fetch ALL cached texts (table is small) - avoid .in() with large arrays
         const { data: cached, error: cacheError } = await supabase
           .from('book_campaign_texts')
-          .select('*')
-          .in('book_id', config.selectedBooks);
+          .select('*');
         
         if (cacheError) {
           console.error("Error fetching cached texts:", cacheError);
         } else if (cached && cached.length > 0) {
-          cached.forEach((item: any) => {
-            if (!cachedTexts[item.book_id]) {
-              cachedTexts[item.book_id] = {};
-            }
-            // Key: platform_type (e.g., "x_sales", "facebook_content")
-            cachedTexts[item.book_id][`${item.platform}_${item.post_type}`] = item.text;
-          });
-          console.log(`Found ${cached.length} cached texts for ${Object.keys(cachedTexts).length} books`);
+          console.log(`Total cached texts in database: ${cached.length}`);
+          
+          // Filter to only selected books on client side
+          const selectedBooksSet = new Set(config.selectedBooks);
+          cached
+            .filter((item: any) => selectedBooksSet.has(item.book_id))
+            .forEach((item: any) => {
+              if (!cachedTexts[item.book_id]) {
+                cachedTexts[item.book_id] = {};
+              }
+              // Key: platform_type (e.g., "x_sales", "facebook_content")
+              cachedTexts[item.book_id][`${item.platform}_${item.post_type}`] = item.text;
+            });
+          console.log(`Found cached texts for ${Object.keys(cachedTexts).length} selected books`);
+          console.log("CachedTexts book IDs:", Object.keys(cachedTexts).slice(0, 10).join(", ") + (Object.keys(cachedTexts).length > 10 ? "..." : ""));
+        } else {
+          console.log("No cached texts found in database");
         }
+      } else {
+        console.log("Skipping cache fetch - regenerateTexts:", config.regenerateTexts);
       }
       
       // Step 1: Generate campaign structure
@@ -75,14 +90,16 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
 
       // Step 2: Generate content for each post
       console.log("Generating post content...");
+      console.log("Passing cachedTexts to edge function, keys count:", Object.keys(cachedTexts).length);
+      
       const contentResponse = await supabase.functions.invoke('generate-campaign', {
         body: {
           action: 'generate_posts',
           structure,
           targetPlatforms: config.targetPlatforms,
           selectedBooks: config.selectedBooks,
-          cachedTexts,
-          regenerateTexts: config.regenerateTexts
+          cachedTexts: Object.keys(cachedTexts).length > 0 ? cachedTexts : null,
+          regenerateTexts: config.regenerateTexts || false
         }
       });
 
