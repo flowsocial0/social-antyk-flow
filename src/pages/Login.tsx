@@ -107,7 +107,8 @@ const Login = () => {
             </Button>
           </form>
 
-          <p>LOgin</p>
+          <p>Login: antyk@ksiegarnia.pl</p>
+          <p>password: sukces jest w naszych rekach</p>
 
           {/* Footer links */}
           <div className="mt-6 pt-4 border-t border-border text-center text-sm text-muted-foreground">
