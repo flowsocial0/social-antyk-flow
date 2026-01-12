@@ -20,6 +20,13 @@ export default function SocialAccounts() {
 
   useEffect(() => {
     checkConnections();
+    
+    // Auto-refresh after OAuth callback
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('connected') === 'true' || params.get('success')) {
+      checkConnections();
+      window.history.replaceState({}, '', '/settings/social-accounts');
+    }
   }, []);
 
   const checkConnections = async () => {
@@ -27,16 +34,16 @@ export default function SocialAccounts() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    // Check X connection
+    // Check X connection - use twitter_oauth1_tokens (OAuth 1.0a)
     const { data: xData } = await supabase
-      .from('twitter_oauth_tokens')
+      .from('twitter_oauth1_tokens')
       .select('*')
       .eq('user_id', session.user.id)
       .maybeSingle();
 
     if (xData) {
       setXConnected(true);
-      // You could fetch username from X API here
+      setXUsername((xData as any).screen_name || null);
     }
 
     // Check Facebook connection
@@ -146,10 +153,16 @@ export default function SocialAccounts() {
 
   const disconnectX = async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Musisz być zalogowany');
+        return;
+      }
+      
       const { error } = await supabase
-        .from('twitter_oauth_tokens')
+        .from('twitter_oauth1_tokens')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+        .eq('user_id', session.user.id);
       
       if (error) throw error;
       
