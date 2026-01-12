@@ -153,7 +153,7 @@ Wygeneruj TYLKO tekst posta, bez żadnych dodatkowych komentarzy ani linków.`;
         messages: [
           {
             role: 'system',
-            content: `Jesteś ekspertem od copywritingu i sprzedaży książek na ${platformConfig.name}. Tworzysz przekonujące teksty sprzedażowe które generują wysoką konwersję. Doskonale rozumiesz specyfikę ${platformConfig.name} i potrafisz dostosować styl komunikacji do tej platformy.`
+            content: `Jesteś ekspertem od copywritingu i sprzedaży książek na ${platformConfig.name}. Tworzysz przekonujące teksty sprzedażowe które generują wysoką konwersję. Doskonale rozumiesz specyfikę ${platformConfig.name} i potrafisz dostosować styl komunikacji do tej platformy. ZAWSZE pisz TYLKO po polsku. Nigdy nie używaj angielskiego.`
           },
           {
             role: 'user',
