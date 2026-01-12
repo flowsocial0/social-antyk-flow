@@ -176,10 +176,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Multiple pages found - redirect to selection page
-    console.log('Multiple pages found, redirecting to selection page');
+    // Multiple pages found - save to database and redirect to selection page
+    console.log('Multiple pages found, saving to database and redirecting to selection page');
     
-    // Prepare pages data for URL (only essential info)
+    // Prepare pages data
     const pagesForSelection = pages.map((page: any) => ({
       id: page.id,
       name: page.name,
@@ -187,12 +187,29 @@ Deno.serve(async (req) => {
       access_token: page.access_token
     }));
 
-    // Encode pages data as base64 for URL safety
-    const pagesBase64 = btoa(encodeURIComponent(JSON.stringify(pagesForSelection)));
+    // Generate unique session ID and save pages data to database
+    const sessionId = crypto.randomUUID();
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 15); // 15 minutes expiration
+
+    const { error: insertError } = await supabase
+      .from('facebook_page_selections')
+      .insert({
+        id: sessionId,
+        user_id: userId,
+        pages_data: pagesForSelection,
+        expires_at: expiresAt.toISOString()
+      });
+
+    if (insertError) {
+      console.error('Error saving page selections:', insertError);
+      throw new Error('Failed to save page selections: ' + insertError.message);
+    }
+
+    console.log('Saved page selections with session ID:', sessionId);
     
     const redirectUrl = new URL('https://social-auto-flow.netlify.app/platforms/facebook/select-page');
-    redirectUrl.searchParams.set('pages', pagesBase64);
-    redirectUrl.searchParams.set('user_id', userId);
+    redirectUrl.searchParams.set('session_id', sessionId);
     
     return new Response(null, {
       status: 302,

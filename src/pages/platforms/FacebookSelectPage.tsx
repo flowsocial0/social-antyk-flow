@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Facebook, CheckCircle } from "lucide-react";
+import { Loader2, Facebook, CheckCircle, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 interface FacebookPage {
@@ -20,44 +20,89 @@ export default function FacebookSelectPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const pagesParam = searchParams.get("pages");
-    const userIdParam = searchParams.get("user_id");
+    const fetchPagesData = async () => {
+      const sessionId = searchParams.get("session_id");
+      
+      // Legacy support: check for old base64 pages parameter
+      const pagesParam = searchParams.get("pages");
+      const userIdParam = searchParams.get("user_id");
 
-    if (!pagesParam || !userIdParam) {
-      toast.error("Brak danych o stronach Facebook");
-      navigate("/platforms/facebook");
-      return;
-    }
+      if (pagesParam && userIdParam) {
+        // Legacy base64 decoding for backwards compatibility
+        try {
+          const decodedPages = JSON.parse(decodeURIComponent(atob(pagesParam)));
+          setPages(decodedPages);
+          setIsLoading(false);
+          return;
+        } catch (err) {
+          console.error("Error parsing legacy pages data:", err);
+        }
+      }
 
-    try {
-      // Decode base64 and parse JSON
-      const decodedPages = JSON.parse(decodeURIComponent(atob(pagesParam)));
-      setPages(decodedPages);
-      setUserId(userIdParam);
-      setIsLoading(false);
-    } catch (err) {
-      console.error("Error parsing pages data:", err);
-      toast.error("Błąd podczas odczytywania danych stron");
-      navigate("/platforms/facebook");
-    }
-  }, [searchParams, navigate]);
+      if (!sessionId) {
+        setError("Brak identyfikatora sesji. Spróbuj połączyć się ponownie z Facebookiem.");
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Fetch pages data from database using session_id
+        const { data, error: fetchError } = await supabase
+          .from('facebook_page_selections')
+          .select('pages_data, user_id, expires_at')
+          .eq('id', sessionId)
+          .maybeSingle();
+
+        if (fetchError) {
+          console.error("Error fetching page selections:", fetchError);
+          setError("Błąd podczas pobierania danych stron.");
+          setIsLoading(false);
+          return;
+        }
+
+        if (!data) {
+          setError("Sesja wygasła lub nie istnieje. Spróbuj połączyć się ponownie z Facebookiem.");
+          setIsLoading(false);
+          return;
+        }
+
+        // Check if session expired
+        if (data.expires_at && new Date(data.expires_at) < new Date()) {
+          setError("Sesja wygasła. Spróbuj połączyć się ponownie z Facebookiem.");
+          setIsLoading(false);
+          return;
+        }
+
+        setPages(data.pages_data as unknown as FacebookPage[]);
+        setIsLoading(false);
+      } catch (err) {
+        console.error("Error loading pages:", err);
+        setError("Nieoczekiwany błąd podczas ładowania stron.");
+        setIsLoading(false);
+      }
+    };
+
+    fetchPagesData();
+  }, [searchParams]);
 
   const handleSelectPage = async (page: FacebookPage) => {
-    if (!userId) {
-      toast.error("Brak identyfikatora użytkownika");
-      return;
-    }
-
     setIsSaving(true);
     setSelectedPageId(page.id);
 
     try {
+      // Get current user session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.user?.id) {
+        throw new Error("Nie jesteś zalogowany");
+      }
+
       const { data, error } = await supabase.functions.invoke("facebook-select-page", {
         body: {
-          userId,
+          userId: session.user.id,
           pageId: page.id,
           pageName: page.name,
           pageAccessToken: page.access_token
@@ -85,6 +130,22 @@ export default function FacebookSelectPage() {
           <CardContent className="flex flex-col items-center gap-4 py-8">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-muted-foreground">Ładowanie stron...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center gap-4 py-8">
+            <AlertCircle className="h-12 w-12 text-destructive" />
+            <p className="text-center text-muted-foreground">{error}</p>
+            <Button onClick={() => navigate("/platforms/facebook")} className="mt-4">
+              Wróć do ustawień Facebook
+            </Button>
           </CardContent>
         </Card>
       </div>

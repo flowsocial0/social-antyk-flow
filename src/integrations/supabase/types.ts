@@ -366,6 +366,30 @@ export type Database = {
         }
         Relationships: []
       }
+      facebook_page_selections: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          pages_data: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          pages_data: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          pages_data?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       tiktok_oauth_tokens: {
         Row: {
           access_token: string

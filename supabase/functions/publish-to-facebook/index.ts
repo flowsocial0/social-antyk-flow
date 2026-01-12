@@ -198,6 +198,18 @@ Deno.serve(async (req) => {
       // Fix "/ html" or ". html" patterns
       result = result.replace(/([\/\.])\s+(html?|php)\b/gi, '$1$2');
       
+      // Fix "sklep.antyk" patterns specifically - handles "p ,name, .html" -> "p,name.html"
+      result = result.replace(
+        /(https?:\/\/sklep\.antyk\.org\.pl\/p)\s*,?\s*([\w\-]+)\s*,?\s*\.?\s*(html?)/gi,
+        '$1,$2.$3'
+      );
+      
+      // Fix broken product URLs like "/p 123,p html" or "/p 123 html" -> "/p123,p.html"
+      result = result.replace(
+        /(\/p)\s+([\d\w\-,]+)\s*(\.?\s*html?)/gi,
+        '$1$2.html'
+      );
+      
       // Fix spaces within URL paths
       result = result.replace(
         /(https?:\/\/[^\s]+?)[\s\n]+([a-zA-Z0-9\-_,]+(?:\.html?)?)/gi,
@@ -314,6 +326,20 @@ Deno.serve(async (req) => {
             finalImageUrl = getStoragePublicUrl(book.storage_path);
             console.log('Using campaign book storage_path URL:', finalImageUrl);
           }
+        }
+      }
+
+      // For content/trivia posts, extract link from text for Facebook preview
+      if (campaignPost.type === 'content') {
+        // Extract first URL from text
+        const urlMatch = postText?.match(/(https?:\/\/[^\s\n,]+)/);
+        if (urlMatch) {
+          productUrl = validateUrl(urlMatch[1]);
+          console.log('Extracted URL from content post:', productUrl);
+        } else {
+          // Default bookstore URL if no URL found in text
+          productUrl = 'https://sklep.antyk.org.pl';
+          console.log('No URL in content post, using default bookstore URL');
         }
       }
     }
