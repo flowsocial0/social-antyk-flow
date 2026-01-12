@@ -69,7 +69,8 @@ const App = () => (
           <Route path="/book/:id/redirect" element={<BookRedirect />} />
           <Route path="/platforms/x" element={<PlatformX />} />
           <Route path="/platforms/facebook" element={<PlatformFacebook />} />
-          <Route path="/platforms/facebook/select-page" element={<FacebookSelectPage />} />
+          {/* Accept optional trailing segments to avoid OAuth redirect edge-cases */}
+          <Route path="/platforms/facebook/select-page/*" element={<FacebookSelectPage />} />
           <Route path="/platforms/instagram" element={<PlatformInstagram />} />
           <Route path="/platforms/youtube" element={<PlatformYouTube />} />
           <Route path="/platforms/linkedin" element={<PlatformLinkedIn />} />
