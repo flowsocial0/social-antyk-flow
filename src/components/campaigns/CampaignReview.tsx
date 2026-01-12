@@ -102,6 +102,31 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
             } as any)
             .eq('id', (post as any).bookId);
         }
+        
+        // Save post text to cache for future campaigns
+        if ((post as any).bookId && post.text) {
+          const platforms = config.targetPlatforms || ['x'];
+          
+          for (const platform of platforms) {
+            try {
+              await (supabase as any)
+                .from('book_campaign_texts')
+                .upsert({
+                  book_id: (post as any).bookId,
+                  platform: platform,
+                  post_type: post.type,
+                  text: post.text,
+                  source_campaign_id: campaignData.id,
+                  updated_at: new Date().toISOString()
+                }, {
+                  onConflict: 'book_id,platform,post_type'
+                });
+            } catch (cacheError) {
+              console.error('Error caching post text:', cacheError);
+              // Don't fail the whole operation if caching fails
+            }
+          }
+        }
       }
 
       toast.success(`Zaplanowano kampanię z ${localPosts.length} postami!`, {
