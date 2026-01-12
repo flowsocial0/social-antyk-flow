@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Calendar, TrendingUp, CheckCircle2, Clock, Trash2, AlertCircle, Plus, RefreshCw } from "lucide-react";
+import { ArrowLeft, Calendar, TrendingUp, CheckCircle2, Clock, Trash2, AlertCircle, Plus, RefreshCw, Pencil } from "lucide-react";
 import { CampaignPostCard } from "@/components/campaigns/CampaignPostCard";
 import { ResumeCampaignDialog } from "@/components/campaigns/ResumeCampaignDialog";
 import { format } from "date-fns";
@@ -51,6 +51,8 @@ const CampaignDetails = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isAddingPost, setIsAddingPost] = useState(false);
   const [isResumeDialogOpen, setIsResumeDialogOpen] = useState(false);
+  const [isEditNameDialogOpen, setIsEditNameDialogOpen] = useState(false);
+  const [editedName, setEditedName] = useState("");
   const [newPost, setNewPost] = useState({
     day: 1,
     time: "09:00",
@@ -117,6 +119,25 @@ const CampaignDetails = () => {
     },
     onError: () => {
       toast.error("Błąd podczas aktualizacji posta");
+    },
+  });
+
+  const updateCampaignNameMutation = useMutation({
+    mutationFn: async (newName: string) => {
+      const { error } = await (supabase as any)
+        .from('campaigns')
+        .update({ name: newName })
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaign', id] });
+      toast.success("Nazwa kampanii została zaktualizowana");
+      setIsEditNameDialogOpen(false);
+    },
+    onError: () => {
+      toast.error("Błąd podczas aktualizacji nazwy kampanii");
     },
   });
 
@@ -348,7 +369,20 @@ const CampaignDetails = () => {
                 Powrót do kampanii
               </Button>
               <div>
-                <h1 className="text-3xl font-bold text-primary-foreground">{campaign.name}</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-3xl font-bold text-primary-foreground">{campaign.name}</h1>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-primary-foreground hover:bg-white/10"
+                    onClick={() => {
+                      setEditedName(campaign.name);
+                      setIsEditNameDialogOpen(true);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </div>
                 <p className="text-sm text-primary-foreground/90 mt-1">
                   {campaign.description || "Szczegóły kampanii"}
                 </p>
@@ -628,6 +662,39 @@ const CampaignDetails = () => {
           }))}
         />
       )}
+
+      {/* Edit Campaign Name Dialog */}
+      <Dialog open={isEditNameDialogOpen} onOpenChange={setIsEditNameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edytuj nazwę kampanii</DialogTitle>
+            <DialogDescription>
+              Wprowadź nową nazwę dla tej kampanii.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="campaign-name">Nazwa kampanii</Label>
+            <Input
+              id="campaign-name"
+              value={editedName}
+              onChange={(e) => setEditedName(e.target.value)}
+              placeholder="Nazwa kampanii"
+              className="mt-2"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditNameDialogOpen(false)}>
+              Anuluj
+            </Button>
+            <Button
+              onClick={() => updateCampaignNameMutation.mutate(editedName)}
+              disabled={!editedName.trim() || updateCampaignNameMutation.isPending}
+            >
+              {updateCampaignNameMutation.isPending ? "Zapisywanie..." : "Zapisz"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
