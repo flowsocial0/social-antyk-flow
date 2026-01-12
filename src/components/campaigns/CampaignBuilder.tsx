@@ -15,6 +15,7 @@ export type CampaignPost = {
 };
 
 export type CampaignConfig = {
+  name?: string;
   durationDays: number;
   postsPerDay: number;
   startDate: string;

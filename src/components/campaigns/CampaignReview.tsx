@@ -48,8 +48,8 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
   const handleScheduleAll = async () => {
     setIsScheduling(true);
     try {
-      // Create campaign entry
-      const campaignName = `Kampania ${format(parseISO(config.startDate), 'dd.MM.yyyy', { locale: pl })}`;
+      // Use config.name or generate default
+      const campaignName = config.name || `Kampania ${format(parseISO(config.startDate), 'dd.MM.yyyy', { locale: pl })}`;
       const { data: campaignData, error: campaignError } = await (supabase as any)
         .from('campaigns')
         .insert({
