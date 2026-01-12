@@ -14,8 +14,10 @@ interface PlatformConnectionStatusProps {
 export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnectionStatusProps) => {
   const { toast } = useToast();
 
-  const { data: tokenData, isLoading } = useQuery({
+  const { data: tokenData, isLoading, refetch } = useQuery({
     queryKey: ["oauth-token", platform],
+    refetchOnWindowFocus: true,
+    staleTime: 0,
     queryFn: async () => {
       // Get current user session
       const { data: { session } } = await supabase.auth.getSession();
