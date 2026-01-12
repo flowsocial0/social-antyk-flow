@@ -13,8 +13,55 @@ function safeText(value: unknown): string {
   return s;
 }
 
+function fixBrokenUrls(text: string): string {
+  // Fix URLs that have spaces, newlines or other breaks in them
+  // Pattern: find URLs and remove any whitespace within them
+  
+  // First, find all potential URL patterns (broken or not)
+  let result = text;
+  
+  // Fix common patterns where URLs get broken by spaces/newlines
+  // Pattern 1: "https://..." followed by spaces/newlines and more URL parts
+  result = result.replace(
+    /(https?:\/\/[^\s,\n]*?)[\s\n]+([^\s,\n]*?\.(?:html?|php|aspx?|jsp|com|org|pl|net|eu)[^\s,\n]*)/gi,
+    '$1$2'
+  );
+  
+  // Pattern 2: URL path segments broken by spaces (e.g., "/path /more" -> "/path/more")
+  result = result.replace(
+    /(https?:\/\/[^\s,\n]+?)[\s\n]+([a-zA-Z0-9\-_]+(?:\/|\.html?|\.php|$))/gi,
+    (match, p1, p2) => {
+      // Only join if p2 looks like a URL continuation (starts with lowercase or is a file extension)
+      if (p2.match(/^[a-z0-9\-_\/]/i)) {
+        return p1 + p2;
+      }
+      return match;
+    }
+  );
+  
+  // Pattern 3: Fix spaces before common URL suffixes
+  result = result.replace(
+    /(https?:\/\/[^\s,\n]+?)[\s\n]+(html?|php|aspx?|jsp)\b/gi,
+    '$1.$2'
+  );
+  
+  // Pattern 4: Fix ".html" broken as ". html" or "/ html"
+  result = result.replace(/([\/\.])\s+(html?|php|aspx?|jsp)\b/gi, '$1$2');
+  
+  // Pattern 5: Fix comma or space right after URL path before extension
+  result = result.replace(
+    /(https?:\/\/[^\s,\n]+\/[^\s,\n]+?)\s*[,\s]+([a-zA-Z0-9\-_]+\.html?)/gi,
+    '$1,$2'
+  );
+  
+  return result;
+}
+
 function sanitizeGeneratedText(text: string, bookData?: any): string {
   let out = safeText(text);
+
+  // FIRST: Fix any broken URLs before other processing
+  out = fixBrokenUrls(out);
 
   // Replace common placeholders with real values (or empty strings)
   const url = safeText(bookData?.product_url) || "https://sklep.antyk.org.pl";
@@ -40,8 +87,20 @@ function sanitizeGeneratedText(text: string, bookData?: any): string {
   // Remove any remaining bracket placeholders
   out = out.replace(/\[[^\]]+\]/g, "");
 
-  // Final whitespace cleanup
+  // Extract URLs before whitespace cleanup to protect them
+  const urlPlaceholders: string[] = [];
+  out = out.replace(/(https?:\/\/[^\s,\n\]]+)/g, (match) => {
+    urlPlaceholders.push(match);
+    return `__URL_PLACEHOLDER_${urlPlaceholders.length - 1}__`;
+  });
+
+  // Final whitespace cleanup (now URLs are protected)
   out = out.replace(/\s{2,}/g, " ").trim();
+
+  // Restore URLs
+  out = out.replace(/__URL_PLACEHOLDER_(\d+)__/g, (_, index) => {
+    return urlPlaceholders[parseInt(index)];
+  });
 
   return out;
 }

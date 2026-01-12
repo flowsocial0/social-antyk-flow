@@ -75,6 +75,37 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function to fix broken URLs in text
+function fixUrlsInText(text: string): string {
+  if (!text) return text;
+  
+  let result = text;
+  
+  // Fix URLs that have spaces/newlines breaking them
+  // Pattern: https://domain.com/path with spaces before .html
+  result = result.replace(
+    /(https?:\/\/[^\s,\n]*?)[\s\n]+([^\s,\n]*?\.(?:html?|php))/gi,
+    '$1$2'
+  );
+  
+  // Fix "/ html" or ". html" patterns
+  result = result.replace(/([\/\.])\s+(html?|php)\b/gi, '$1$2');
+  
+  // Fix spaces within URL paths
+  result = result.replace(
+    /(https?:\/\/[^\s]+?)[\s\n]+([a-zA-Z0-9\-_,]+(?:\.html?)?)/gi,
+    (match, urlPart, continuation) => {
+      // Only fix if it looks like URL continuation
+      if (continuation.match(/^[a-z0-9\-_,]/i) && !continuation.match(/^[A-Z][a-z]/)) {
+        return urlPart + continuation;
+      }
+      return match;
+    }
+  );
+  
+  return result;
+}
+
 const BASE_URL = "https://api.x.com/2";
 const UPLOAD_URL = "https://upload.twitter.com/1.1/media/upload.json";
 
@@ -510,7 +541,7 @@ Deno.serve(async (req) => {
           );
         }
 
-        let tweetText = campaignPost.text + '\n\n(ai)';
+        let tweetText = fixUrlsInText(campaignPost.text) + '\n\n(ai)';
 
         let mediaIds: string[] = [];
         if (campaignPost.book?.image_url || campaignPost.book?.storage_path) {
@@ -703,10 +734,10 @@ Deno.serve(async (req) => {
         // Use platform-specific AI text (ai_text_x) first, then fallback to legacy ai_generated_text
         const aiTextForX = book.ai_text_x || book.ai_generated_text;
         if (aiTextForX) {
-          tweetText = `${aiTextForX}\n\n${book.product_url}\n\n(ai)`;
+          tweetText = `${fixUrlsInText(aiTextForX)}\n\n${book.product_url}\n\n(ai)`;
           console.log("Using AI-generated text for X from database");
         } else if (customText) {
-          tweetText = `${customText}\n\n(ai)`;
+          tweetText = `${fixUrlsInText(customText)}\n\n(ai)`;
           console.log("Using custom text parameter");
         } else {
           tweetText = `✨ LIMITOWANA OFERTA ✨\n\n📚 ${book.title}\n\n`;
