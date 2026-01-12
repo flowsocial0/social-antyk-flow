@@ -22,6 +22,7 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
   const [searchParams] = useSearchParams();
   const preSelectedPlatform = searchParams.get('platform') as PlatformId | null;
   
+  const [campaignName, setCampaignName] = useState("");
   const [durationDays, setDurationDays] = useState(7);
   const [postsPerDay, setPostsPerDay] = useState(2);
   const [startDate, setStartDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
@@ -148,7 +149,11 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
       return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
     });
     
+    // Generate default name if empty
+    const finalName = campaignName.trim() || `Kampania ${format(new Date(startDate), 'dd.MM.yyyy')}`;
+    
     onComplete({
+      name: finalName,
       durationDays,
       postsPerDay,
       startDate,
@@ -166,6 +171,24 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
     <div className="space-y-6">
       <Card className="p-6 bg-secondary/30">
         <h3 className="text-lg font-semibold mb-4">Parametry kampanii</h3>
+        
+        {/* Campaign Name */}
+        <div className="space-y-2 mb-6">
+          <Label htmlFor="campaignName" className="flex items-center gap-2">
+            Nazwa kampanii
+          </Label>
+          <Input
+            id="campaignName"
+            type="text"
+            value={campaignName}
+            onChange={(e) => setCampaignName(e.target.value)}
+            placeholder={`Kampania ${format(new Date(startDate), 'dd.MM.yyyy')}`}
+            className="max-w-md"
+          />
+          <p className="text-xs text-muted-foreground">
+            Jeśli pozostawisz puste, nazwa zostanie wygenerowana automatycznie
+          </p>
+        </div>
         
         {/* Use AI Checkbox */}
         <div className="flex items-center space-x-3 mb-6 p-4 bg-primary/5 rounded-lg border border-primary/20">

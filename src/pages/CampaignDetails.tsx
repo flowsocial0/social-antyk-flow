@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Calendar, TrendingUp, CheckCircle2, Clock, Trash2, AlertCircle, Plus } from "lucide-react";
+import { ArrowLeft, Calendar, TrendingUp, CheckCircle2, Clock, Trash2, AlertCircle, Plus, RefreshCw } from "lucide-react";
 import { CampaignPostCard } from "@/components/campaigns/CampaignPostCard";
+import { ResumeCampaignDialog } from "@/components/campaigns/ResumeCampaignDialog";
 import { format } from "date-fns";
 import { pl } from "date-fns/locale";
 import { toast } from "sonner";
@@ -49,6 +50,7 @@ const CampaignDetails = () => {
   const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [isAddingPost, setIsAddingPost] = useState(false);
+  const [isResumeDialogOpen, setIsResumeDialogOpen] = useState(false);
   const [newPost, setNewPost] = useState({
     day: 1,
     time: "09:00",
@@ -352,31 +354,41 @@ const CampaignDetails = () => {
                 </p>
               </div>
             </div>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" className="gap-2">
-                  <Trash2 className="h-4 w-4" />
-                  Usuń kampanię
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Czy na pewno chcesz usunąć tę kampanię?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Ta akcja jest nieodwracalna. Zostaną usunięte wszystkie posty związane z tą kampanią.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Anuluj</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => deleteCampaignMutation.mutate()}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    Usuń
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                className="gap-2"
+                onClick={() => setIsResumeDialogOpen(true)}
+              >
+                <RefreshCw className="h-4 w-4" />
+                Wznów kampanię
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" className="gap-2">
+                    <Trash2 className="h-4 w-4" />
+                    Usuń kampanię
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Czy na pewno chcesz usunąć tę kampanię?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Ta akcja jest nieodwracalna. Zostaną usunięte wszystkie posty związane z tą kampanią.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Anuluj</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteCampaignMutation.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Usuń
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         </div>
       </header>
@@ -589,6 +601,33 @@ const CampaignDetails = () => {
   })}
         </div>
       </main>
+
+      {/* Resume Campaign Dialog */}
+      {campaign && posts && (
+        <ResumeCampaignDialog
+          open={isResumeDialogOpen}
+          onOpenChange={setIsResumeDialogOpen}
+          campaign={{
+            id: campaign.id,
+            name: campaign.name,
+            duration_days: campaign.duration_days,
+            posts_per_day: campaign.posts_per_day,
+            start_date: campaign.start_date,
+            posting_times: campaign.posting_times || [],
+            target_platforms: campaign.target_platforms || ['x'],
+          }}
+          posts={posts.map((p: any) => ({
+            id: p.id,
+            day: p.day,
+            time: p.time,
+            type: p.type,
+            category: p.category,
+            text: p.text,
+            book_id: p.book_id,
+            platforms: p.platforms || campaign.target_platforms || ['x'],
+          }))}
+        />
+      )}
     </div>
   );
 };
