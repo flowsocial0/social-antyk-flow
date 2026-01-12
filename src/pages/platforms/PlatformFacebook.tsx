@@ -19,6 +19,7 @@ const PlatformFacebook = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const connected = params.get('connected');
+    const cancelled = params.get('cancelled');
     const error = params.get('error');
     const pageName = params.get('page_name');
 
@@ -26,6 +27,13 @@ const PlatformFacebook = () => {
       toast({
         title: "✅ Połączono z Facebook",
         description: pageName ? `Połączono jako strona: ${pageName}` : "Konto Facebook zostało pomyślnie połączone",
+      });
+      // Clean URL
+      window.history.replaceState({}, '', '/platforms/facebook');
+    } else if (cancelled === 'true') {
+      toast({
+        title: "Anulowano połączenie z Facebook",
+        description: error || "Autoryzacja została anulowana przez użytkownika",
       });
       // Clean URL
       window.history.replaceState({}, '', '/platforms/facebook');
