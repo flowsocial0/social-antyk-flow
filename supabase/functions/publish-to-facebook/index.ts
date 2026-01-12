@@ -144,6 +144,31 @@ Deno.serve(async (req) => {
     let postText = text;
     let productUrl = '';
 
+    // Helper function to validate and fix URL format
+    const validateUrl = (url: string): string => {
+      if (!url) return '';
+      let fixedUrl = url.trim();
+      
+      // Fix common URL issues - missing :// after protocol
+      if (fixedUrl.match(/^https?:[^/]/)) {
+        fixedUrl = fixedUrl.replace(/^(https?):([^/])/, '$1://$2');
+      }
+      
+      // Add https:// if missing protocol
+      if (!fixedUrl.match(/^https?:\/\//)) {
+        fixedUrl = 'https://' + fixedUrl;
+      }
+      
+      // Validate URL format
+      try {
+        new URL(fixedUrl);
+        return fixedUrl;
+      } catch {
+        console.warn('Invalid URL format, skipping:', url);
+        return '';
+      }
+    };
+
     // If it's a book post, get book details
     if (bookId) {
       const { data: book, error: bookError } = await supabase
@@ -157,7 +182,8 @@ Deno.serve(async (req) => {
         throw new Error('Book not found');
       }
 
-      productUrl = book.product_url || '';
+      productUrl = validateUrl(book.product_url || '');
+      console.log('Validated product URL:', productUrl);
 
       // Use platform-specific AI text (ai_text_facebook) first, then fallback to legacy ai_generated_text
       const aiTextForFacebook = book.ai_text_facebook || book.ai_generated_text;
@@ -165,7 +191,7 @@ Deno.serve(async (req) => {
         postText = aiTextForFacebook;
       } else {
         const price = book.promotional_price || book.sale_price;
-        postText = `📚 ${book.title}\n\n💰 Cena: ${price} zł\n\n🔗 Sprawdź szczegóły: ${productUrl}`;
+        postText = `📚 ${book.title}\n\n💰 Cena: ${price} zł${productUrl ? `\n\n🔗 Sprawdź szczegóły: ${productUrl}` : ''}`;
       }
     }
 
@@ -186,7 +212,7 @@ Deno.serve(async (req) => {
 
       // For sales posts, append book link
       if (campaignPost.type === 'sales' && campaignPost.books) {
-        productUrl = campaignPost.books.product_url || '';
+        productUrl = validateUrl(campaignPost.books.product_url || '');
         if (productUrl) {
           postText += `\n\n🔗 ${productUrl}`;
         }
@@ -208,7 +234,7 @@ Deno.serve(async (req) => {
       access_token: access_token,
     };
 
-    // Add link if available
+    // Add link only if it's a valid URL
     if (productUrl) {
       postData.link = productUrl;
     }
