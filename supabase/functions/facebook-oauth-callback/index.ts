@@ -17,11 +17,27 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
+    const errorParam = url.searchParams.get('error');
+    const errorDescription = url.searchParams.get('error_description');
     
     console.log('Received params:', { 
       code: code ? 'present' : 'missing', 
-      state: state || 'missing' 
+      state: state || 'missing',
+      error: errorParam || 'none'
     });
+
+    // Check if user cancelled or Facebook returned an error FIRST
+    if (errorParam) {
+      console.log('User cancelled or error from Facebook:', errorParam, errorDescription);
+      const redirectUrl = new URL('https://social-auto-flow.netlify.app/platforms/facebook');
+      redirectUrl.searchParams.set('cancelled', 'true');
+      redirectUrl.searchParams.set('error', errorDescription || errorParam);
+      
+      return new Response(null, {
+        status: 302,
+        headers: { 'Location': redirectUrl.toString() },
+      });
+    }
     
     if (!state) {
       throw new Error('Missing state parameter');

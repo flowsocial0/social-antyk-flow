@@ -177,10 +177,16 @@ export default function SocialAccounts() {
 
   const disconnectFacebook = async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Musisz być zalogowany');
+        return;
+      }
+      
       const { error } = await (supabase as any)
         .from('facebook_oauth_tokens')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+        .eq('user_id', session.user.id);
       
       if (error) throw error;
       
