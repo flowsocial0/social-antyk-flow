@@ -107,48 +107,76 @@ Deno.serve(async (req) => {
       throw new Error('No Facebook Pages found. You need to be an admin of at least one Facebook Page to publish posts.');
     }
 
-    // Use the first page (in production, let user choose)
-    const page = pagesData.data[0];
-    const pageAccessToken = page.access_token;
-    const pageId = page.id;
-    const pageName = page.name;
+    const pages = pagesData.data;
+    console.log(`Found ${pages.length} Facebook Page(s)`);
 
-    console.log('Using Facebook Page:', pageName, pageId);
+    // If only one page, save it automatically
+    if (pages.length === 1) {
+      const page = pages[0];
+      const pageAccessToken = page.access_token;
+      const pageId = page.id;
+      const pageName = page.name;
 
-    // Calculate expiration (long-lived tokens last ~60 days)
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 60);
+      console.log('Single page found, saving automatically:', pageName, pageId);
 
-    // Store Page Access Token (upsert based on user_id)
-    console.log('Storing token for userId:', userId, 'pageId:', pageId, 'pageName:', pageName);
-    
-    const { data: tokenRecord, error: insertError } = await supabase
-      .from('facebook_oauth_tokens')
-      .upsert({
-        user_id: userId,
-        access_token: pageAccessToken,
-        token_type: 'Bearer',
-        expires_at: expiresAt.toISOString(),
-        page_id: pageId,
-        page_name: pageName,
-        scope: 'pages_manage_posts,pages_read_engagement'
-      }, {
-        onConflict: 'user_id'
-      })
-      .select()
-      .single();
+      // Calculate expiration (long-lived tokens last ~60 days)
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 60);
 
-    if (insertError) {
-      console.error('Error storing Facebook token:', insertError);
-      throw new Error('Failed to store Facebook token: ' + insertError.message);
+      // Store Page Access Token (upsert based on user_id)
+      const { data: tokenRecord, error: insertError } = await supabase
+        .from('facebook_oauth_tokens')
+        .upsert({
+          user_id: userId,
+          access_token: pageAccessToken,
+          token_type: 'Bearer',
+          expires_at: expiresAt.toISOString(),
+          page_id: pageId,
+          page_name: pageName,
+          scope: 'pages_manage_posts,pages_read_engagement'
+        }, {
+          onConflict: 'user_id'
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Error storing Facebook token:', insertError);
+        throw new Error('Failed to store Facebook token: ' + insertError.message);
+      }
+
+      console.log('Successfully stored Facebook Page token:', tokenRecord);
+
+      // Redirect user back to the application
+      const redirectUrl = new URL('https://social-auto-flow.netlify.app/platforms/facebook');
+      redirectUrl.searchParams.set('connected', 'true');
+      redirectUrl.searchParams.set('page_name', pageName);
+      
+      return new Response(null, {
+        status: 302,
+        headers: {
+          'Location': redirectUrl.toString(),
+        },
+      });
     }
 
-    console.log('Successfully stored Facebook Page token:', tokenRecord);
+    // Multiple pages found - redirect to selection page
+    console.log('Multiple pages found, redirecting to selection page');
+    
+    // Prepare pages data for URL (only essential info)
+    const pagesForSelection = pages.map((page: any) => ({
+      id: page.id,
+      name: page.name,
+      category: page.category || null,
+      access_token: page.access_token
+    }));
 
-    // Redirect user back to the application
-    const redirectUrl = new URL('https://social-auto-flow.netlify.app/platforms/facebook');
-    redirectUrl.searchParams.set('connected', 'true');
-    redirectUrl.searchParams.set('page_name', pageName);
+    // Encode pages data as base64 for URL safety
+    const pagesBase64 = btoa(encodeURIComponent(JSON.stringify(pagesForSelection)));
+    
+    const redirectUrl = new URL('https://social-auto-flow.netlify.app/platforms/facebook/select-page');
+    redirectUrl.searchParams.set('pages', pagesBase64);
+    redirectUrl.searchParams.set('user_id', userId);
     
     return new Response(null, {
       status: 302,
@@ -156,6 +184,7 @@ Deno.serve(async (req) => {
         'Location': redirectUrl.toString(),
       },
     });
+
   } catch (error) {
     console.error('Facebook OAuth callback error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

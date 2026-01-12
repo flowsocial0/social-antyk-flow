@@ -18,6 +18,7 @@ import BookPreview from "./pages/BookPreview";
 import BookRedirect from "./pages/BookRedirect";
 import PlatformX from "./pages/platforms/PlatformX";
 import PlatformFacebook from "./pages/platforms/PlatformFacebook";
+import FacebookSelectPage from "./pages/platforms/FacebookSelectPage";
 import PlatformInstagram from "./pages/platforms/PlatformInstagram";
 import PlatformYouTube from "./pages/platforms/PlatformYouTube";
 import PlatformLinkedIn from "./pages/platforms/PlatformLinkedIn";
@@ -68,6 +69,7 @@ const App = () => (
           <Route path="/book/:id/redirect" element={<BookRedirect />} />
           <Route path="/platforms/x" element={<PlatformX />} />
           <Route path="/platforms/facebook" element={<PlatformFacebook />} />
+          <Route path="/platforms/facebook/select-page" element={<FacebookSelectPage />} />
           <Route path="/platforms/instagram" element={<PlatformInstagram />} />
           <Route path="/platforms/youtube" element={<PlatformYouTube />} />
           <Route path="/platforms/linkedin" element={<PlatformLinkedIn />} />
