@@ -39,6 +39,9 @@ verify_jwt = false
 [functions.facebook-oauth-callback]
 verify_jwt = false
 
+[functions.facebook-select-page]
+verify_jwt = false
+
 [functions.facebook-data-deletion]
 verify_jwt = false
 
