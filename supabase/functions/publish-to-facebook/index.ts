@@ -157,6 +157,9 @@ Deno.serve(async (req) => {
       }
       let fixedUrl = url.trim();
       
+      // Remove any whitespace, newlines within the URL
+      fixedUrl = fixedUrl.replace(/\s+/g, '');
+      
       // Fix common URL issues - missing :// after protocol
       if (fixedUrl.match(/^https?:[^/]/)) {
         console.log('validateUrl: fixing missing :// in URL:', url);
@@ -177,6 +180,37 @@ Deno.serve(async (req) => {
         console.warn('validateUrl: Invalid URL format after fixing, skipping. Original:', url, 'Fixed attempt:', fixedUrl);
         return '';
       }
+    };
+
+    // Helper function to fix broken URLs in text
+    const fixUrlsInText = (text: string): string => {
+      if (!text) return text;
+      
+      let result = text;
+      
+      // Fix URLs that have spaces/newlines breaking them
+      // Pattern: https://domain.com/path with spaces before .html
+      result = result.replace(
+        /(https?:\/\/[^\s,\n]*?)[\s\n]+([^\s,\n]*?\.(?:html?|php))/gi,
+        '$1$2'
+      );
+      
+      // Fix "/ html" or ". html" patterns
+      result = result.replace(/([\/\.])\s+(html?|php)\b/gi, '$1$2');
+      
+      // Fix spaces within URL paths
+      result = result.replace(
+        /(https?:\/\/[^\s]+?)[\s\n]+([a-zA-Z0-9\-_,]+(?:\.html?)?)/gi,
+        (match, urlPart, continuation) => {
+          // Only fix if it looks like URL continuation
+          if (continuation.match(/^[a-z0-9\-_,]/i) && !continuation.match(/^[A-Z][a-z]/)) {
+            return urlPart + continuation;
+          }
+          return match;
+        }
+      );
+      
+      return result;
     };
 
     // Helper function to get public URL from storage path
@@ -282,6 +316,11 @@ Deno.serve(async (req) => {
           }
         }
       }
+    }
+
+    // Fix any broken URLs in the text before publishing
+    if (postText) {
+      postText = fixUrlsInText(postText);
     }
 
     // Add AI disclaimer for Facebook
