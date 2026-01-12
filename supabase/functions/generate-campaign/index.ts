@@ -278,10 +278,16 @@ Przykład: [{"position":1,"type":"sales","category":"sales"},{"position":2,"type
 async function generatePostsContent(body: any, apiKey: string) {
   const { structure, targetPlatforms, selectedBooks, cachedTexts, regenerateTexts } = body;
 
+  console.log("=== generatePostsContent START ===");
   console.log("Generating content for posts:", structure.length);
   console.log("Target platforms:", targetPlatforms);
   console.log("Selected books:", selectedBooks?.length || 0);
-  console.log("Using cached texts:", !regenerateTexts && cachedTexts ? Object.keys(cachedTexts).length : 0);
+  console.log("regenerateTexts flag:", regenerateTexts);
+  console.log("cachedTexts received:", cachedTexts ? `object with ${Object.keys(cachedTexts).length} book IDs` : "null/undefined");
+  if (cachedTexts && Object.keys(cachedTexts).length > 0) {
+    console.log("First few cached book IDs:", Object.keys(cachedTexts).slice(0, 5).join(", "));
+  }
+  console.log("Will use cached texts:", !regenerateTexts && cachedTexts ? Object.keys(cachedTexts).length : 0);
   
   // Check if Facebook is in target platforms
   const hasFacebook = targetPlatforms && targetPlatforms.some((p: any) => p.id === 'facebook' || p === 'facebook');
