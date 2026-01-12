@@ -100,6 +100,24 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
 
   const isConnected = !!tokenData;
 
+  // Get account name based on platform
+  const getAccountName = (): string | null => {
+    if (!tokenData) return null;
+    
+    if (platform === "x") {
+      return tokenData.screen_name ? `@${tokenData.screen_name}` : null;
+    }
+    if (platform === "facebook") {
+      return tokenData.page_name || null;
+    }
+    if (platform === "tiktok") {
+      return tokenData.open_id ? `ID: ${tokenData.open_id.substring(0, 8)}...` : null;
+    }
+    return null;
+  };
+
+  const accountName = getAccountName();
+
   if (isLoading) {
     return (
       <Card>
@@ -137,6 +155,11 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
         {isConnected ? (
           <>
             <div className="space-y-2">
+              {accountName && (
+                <p className="text-sm font-medium text-foreground">
+                  {accountName}
+                </p>
+              )}
               <p className="text-sm text-muted-foreground">
                 Konto zostało autoryzowane i jest gotowe do publikacji
               </p>
