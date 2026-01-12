@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,13 +19,13 @@ const Login = () => {
     // Check if user is already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate("/");
+        navigate("/dashboard");
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
-        navigate("/");
+        navigate("/dashboard");
       }
     });
 
@@ -108,6 +108,23 @@ const Login = () => {
               )}
             </Button>
           </form>
+          
+          {/* Footer links */}
+          <div className="mt-6 pt-4 border-t border-border text-center text-sm text-muted-foreground">
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <Link to="/terms" className="hover:text-foreground transition-colors">
+                Regulamin
+              </Link>
+              <span>•</span>
+              <Link to="/privacy" className="hover:text-foreground transition-colors">
+                Polityka Prywatności
+              </Link>
+              <span>•</span>
+              <Link to="/data-deletion" className="hover:text-foreground transition-colors">
+                Usuwanie danych
+              </Link>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
