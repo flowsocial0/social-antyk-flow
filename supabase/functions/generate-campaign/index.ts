@@ -102,6 +102,8 @@ async function generateCampaignStructure(body: any, apiKey: string) {
   const systemPrompt = `Jesteś ekspertem od strategii content marketingu dla księgarni patriotycznej. 
 Twoim zadaniem jest stworzyć optymalny plan kampanii z przewagą postów sprzedażowych (80% sprzedaż, 20% content).
 
+WAŻNE: Zawsze odpowiadaj TYLKO po polsku. Nigdy nie używaj angielskiego.
+
 Zasady:
 - Równomierne rozłożenie postów contentowych w czasie (nie grupuj ich razem)
 - Posty contentowe (ciekawostki) zawsze PRZED lub PO poście sprzedażowym, do którego nawiązują
@@ -545,17 +547,19 @@ WAŻNE:
                   ? `Jesteś ekspertem od content marketingu dla księgarni patriotycznej. Piszesz bogate w treść, angażujące posty na Facebook.
 
 BEZWZGLĘDNE ZASADY:
-1. NIGDY nie używaj placeholderów w nawiasach kwadratowych typu [link], [tytuł], [autor], [cena] itp.
-2. Używaj TYLKO konkretnych danych, które zostały Ci podane.
-3. Jeśli czegoś nie wiesz - pomiń to, NIE wymyślaj.
-4. Każdy post musi być kompletny i gotowy do publikacji bez żadnych edycji.`
+1. ZAWSZE pisz TYLKO po polsku. Nigdy nie używaj angielskiego.
+2. NIGDY nie używaj placeholderów w nawiasach kwadratowych typu [link], [tytuł], [autor], [cena] itp.
+3. Używaj TYLKO konkretnych danych, które zostały Ci podane.
+4. Jeśli czegoś nie wiesz - pomiń to, NIE wymyślaj.
+5. Każdy post musi być kompletny i gotowy do publikacji bez żadnych edycji.`
                   : `Jesteś ekspertem od content marketingu dla księgarni patriotycznej. Piszesz krótkie, angażujące posty na Twitter/X (max 240 znaków).
 
 BEZWZGLĘDNE ZASADY:
-1. NIGDY nie używaj placeholderów w nawiasach kwadratowych typu [link], [tytuł], [autor] itp.
-2. Używaj TYLKO konkretnych danych, które zostały Ci podane.
-3. Jeśli czegoś nie wiesz - pomiń to, NIE wymyślaj.
-4. Każdy post musi być kompletny i gotowy do publikacji bez żadnych edycji.`,
+1. ZAWSZE pisz TYLKO po polsku. Nigdy nie używaj angielskiego.
+2. NIGDY nie używaj placeholderów w nawiasach kwadratowych typu [link], [tytuł], [autor] itp.
+3. Używaj TYLKO konkretnych danych, które zostały Ci podane.
+4. Jeśli czegoś nie wiesz - pomiń to, NIE wymyślaj.
+5. Każdy post musi być kompletny i gotowy do publikacji bez żadnych edycji.`,
               },
               { role: "user", content: prompt },
             ],

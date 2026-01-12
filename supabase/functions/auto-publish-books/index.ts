@@ -263,11 +263,15 @@ Deno.serve(async (req) => {
             continue;
           }
 
+          // Get book image URL for the post
+          const bookImageUrl = post.book?.image_url || null;
+          
           const { data, error: publishError } = await supabase.functions.invoke(publishFunctionName, {
             body: { 
               campaignPostId: post.id,
               platform: platform,
-              userId: platformUserId
+              userId: platformUserId,
+              imageUrl: bookImageUrl
             }
           });
 
