@@ -24,6 +24,7 @@ export type CampaignConfig = {
   targetPlatforms?: PlatformId[];
   selectedBooks?: string[];
   useAI?: boolean;
+  regenerateTexts?: boolean;
 };
 
 export const CampaignBuilder = () => {

@@ -25,6 +25,30 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
   const handleGenerateWithAI = async () => {
     setIsGenerating(true);
     try {
+      // Fetch cached texts if not regenerating
+      let cachedTexts: Record<string, Record<string, string>> = {};
+      
+      if (!config.regenerateTexts && config.selectedBooks && config.selectedBooks.length > 0) {
+        console.log("Fetching cached texts for selected books...");
+        const { data: cached, error: cacheError } = await supabase
+          .from('book_campaign_texts')
+          .select('*')
+          .in('book_id', config.selectedBooks);
+        
+        if (cacheError) {
+          console.error("Error fetching cached texts:", cacheError);
+        } else if (cached && cached.length > 0) {
+          cached.forEach((item: any) => {
+            if (!cachedTexts[item.book_id]) {
+              cachedTexts[item.book_id] = {};
+            }
+            // Key: platform_type (e.g., "x_sales", "facebook_content")
+            cachedTexts[item.book_id][`${item.platform}_${item.post_type}`] = item.text;
+          });
+          console.log(`Found ${cached.length} cached texts for ${Object.keys(cachedTexts).length} books`);
+        }
+      }
+      
       // Step 1: Generate campaign structure
       console.log("Generating campaign structure...");
       const structureResponse = await supabase.functions.invoke('generate-campaign', {
@@ -56,7 +80,9 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
           action: 'generate_posts',
           structure,
           targetPlatforms: config.targetPlatforms,
-          selectedBooks: config.selectedBooks
+          selectedBooks: config.selectedBooks,
+          cachedTexts,
+          regenerateTexts: config.regenerateTexts
         }
       });
 

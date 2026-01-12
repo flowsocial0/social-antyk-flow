@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Clock, ArrowRight, Plus, X, ArrowUpDown, AlertCircle, Sparkles } from "lucide-react";
+import { Calendar, Clock, ArrowRight, Plus, X, ArrowUpDown, AlertCircle, Sparkles, RefreshCw } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import type { CampaignConfig } from "./CampaignBuilder";
@@ -32,6 +32,7 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
   );
   const [selectedBooks, setSelectedBooks] = useState<string[]>([]);
   const [useAI, setUseAI] = useState(true);
+  const [regenerateTexts, setRegenerateTexts] = useState(false);
   const [connectedPlatforms, setConnectedPlatforms] = useState<Record<PlatformId, boolean>>(
     {} as Record<PlatformId, boolean>
   );
@@ -161,7 +162,8 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
       postingTimes: sortedTimes,
       targetPlatforms,
       selectedBooks,
-      useAI
+      useAI,
+      regenerateTexts
     });
   };
 
@@ -191,7 +193,7 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
         </div>
         
         {/* Use AI Checkbox */}
-        <div className="flex items-center space-x-3 mb-6 p-4 bg-primary/5 rounded-lg border border-primary/20">
+        <div className="flex items-center space-x-3 mb-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
           <Checkbox
             id="useAI"
             checked={useAI}
@@ -206,6 +208,26 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
               {useAI 
                 ? "Grok AI wygeneruje unikalne, angażujące treści dla każdego posta" 
                 : "Posty zostaną utworzone z opisów książek z bazy danych"}
+            </p>
+          </div>
+        </div>
+        
+        {/* Regenerate Texts Checkbox */}
+        <div className="flex items-center space-x-3 mb-6 p-4 bg-amber-500/5 rounded-lg border border-amber-500/20">
+          <Checkbox
+            id="regenerateTexts"
+            checked={regenerateTexts}
+            onCheckedChange={(checked) => setRegenerateTexts(checked === true)}
+          />
+          <div className="flex-1">
+            <Label htmlFor="regenerateTexts" className="flex items-center gap-2 cursor-pointer">
+              <RefreshCw className="h-4 w-4 text-amber-500" />
+              <span className="font-medium">Generuj nowe teksty</span>
+            </Label>
+            <p className="text-xs text-muted-foreground mt-1">
+              {regenerateTexts 
+                ? "Nowe teksty zostaną wygenerowane dla wszystkich książek" 
+                : "Użyj tekstów z poprzednich kampanii (jeśli istnieją)"}
             </p>
           </div>
         </div>

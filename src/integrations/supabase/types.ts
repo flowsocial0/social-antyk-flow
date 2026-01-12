@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      book_campaign_texts: {
+        Row: {
+          book_id: string
+          created_at: string | null
+          id: string
+          platform: string
+          post_type: string
+          source_campaign_id: string | null
+          text: string
+          updated_at: string | null
+        }
+        Insert: {
+          book_id: string
+          created_at?: string | null
+          id?: string
+          platform: string
+          post_type: string
+          source_campaign_id?: string | null
+          text: string
+          updated_at?: string | null
+        }
+        Update: {
+          book_id?: string
+          created_at?: string | null
+          id?: string
+          platform?: string
+          post_type?: string
+          source_campaign_id?: string | null
+          text?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_campaign_texts_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "book_campaign_texts_source_campaign_id_fkey"
+            columns: ["source_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       book_platform_content: {
         Row: {
           ai_generated_text: string | null

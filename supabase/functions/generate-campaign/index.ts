@@ -276,11 +276,12 @@ Przykład: [{"position":1,"type":"sales","category":"sales"},{"position":2,"type
 }
 
 async function generatePostsContent(body: any, apiKey: string) {
-  const { structure, targetPlatforms, selectedBooks } = body;
+  const { structure, targetPlatforms, selectedBooks, cachedTexts, regenerateTexts } = body;
 
   console.log("Generating content for posts:", structure.length);
   console.log("Target platforms:", targetPlatforms);
   console.log("Selected books:", selectedBooks?.length || 0);
+  console.log("Using cached texts:", !regenerateTexts && cachedTexts ? Object.keys(cachedTexts).length : 0);
   
   // Check if Facebook is in target platforms
   const hasFacebook = targetPlatforms && targetPlatforms.some((p: any) => p.id === 'facebook' || p === 'facebook');
@@ -483,6 +484,21 @@ WAŻNE: NIE używaj placeholderów w nawiasach kwadratowych. NIE dodawaj informa
           bookData = booksForSales[salesBookIndex % booksForSales.length];
           salesBookIndex++;
           
+          // Check for cached text FIRST
+          const primaryPlatform = hasFacebook && !hasX ? 'facebook' : 'x';
+          const cacheKey = `${primaryPlatform}_sales`;
+          
+          if (!regenerateTexts && cachedTexts && cachedTexts[bookData.id] && cachedTexts[bookData.id][cacheKey]) {
+            console.log(`Using cached sales text for book ${bookData.id}`);
+            return {
+              type: item.type,
+              category: item.category,
+              text: cachedTexts[bookData.id][cacheKey],
+              bookId: bookData.id,
+              fromCache: true
+            };
+          }
+          
           // Fallback URL in case product_url is null
           const bookUrl = bookData.product_url || "https://sklep.antyk.org.pl";
 
@@ -540,8 +556,26 @@ KRYTYCZNE ZASADY:
             nearestBook = allBooksForContent[Math.floor(Math.random() * allBooksForContent.length)];
           }
           
+          // Check for cached content text FIRST
+          if (nearestBook) {
+            const primaryPlatform = hasFacebook && !hasX ? 'facebook' : 'x';
+            const cacheKey = `${primaryPlatform}_content`;
+            
+            if (!regenerateTexts && cachedTexts && cachedTexts[nearestBook.id] && cachedTexts[nearestBook.id][cacheKey]) {
+              console.log(`Using cached content text for book ${nearestBook.id}`);
+              return {
+                type: item.type,
+                category: item.category,
+                text: cachedTexts[nearestBook.id][cacheKey],
+                bookId: nearestBook.id,
+                fromCache: true
+              };
+            }
+          }
+          
           // If we found a book, create trivia specifically about its topic
           if (nearestBook) {
+            bookData = nearestBook; // Set bookData for the return value
             const bookUrl = nearestBook.product_url || "https://sklep.antyk.org.pl";
             const triviaContext = `Stwórz ciekawostkę BEZPOŚREDNIO związaną z tematyką tego produktu:
 Tytuł: ${nearestBook.title}
