@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { Footer } from "@/components/layout/Footer";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -63,71 +64,74 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">SocialFlow</CardTitle>
-          <CardDescription className="text-center">Zaloguj się do panelu zarządzania</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="twoj@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Hasło</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Logowanie...
-                </>
-              ) : (
-                "Zaloguj się"
-              )}
-            </Button>
-          </form>
+    <div className="min-h-screen bg-background flex flex-col">
+      <div className="flex-1 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold text-center">SocialFlow</CardTitle>
+            <CardDescription className="text-center">Zaloguj się do panelu zarządzania</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="twoj@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Hasło</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Logowanie...
+                  </>
+                ) : (
+                  "Zaloguj się"
+                )}
+              </Button>
+            </form>
 
-          <p>Login: antyk@ksiegarnia.pl</p>
-          <p>password: sukces jest w naszych rekach</p>
+            <p>Login: antyk@ksiegarnia.pl</p>
+            <p>password: sukces jest w naszych rekach</p>
 
-          {/* Footer links */}
-          <div className="mt-6 pt-4 border-t border-border text-center text-sm text-muted-foreground">
-            <div className="flex items-center justify-center gap-2 flex-wrap">
-              <Link to="/terms" className="hover:text-foreground transition-colors">
-                Regulamin
-              </Link>
-              <span>•</span>
-              <Link to="/privacy" className="hover:text-foreground transition-colors">
-                Polityka Prywatności
-              </Link>
-              <span>•</span>
-              <Link to="/data-deletion" className="hover:text-foreground transition-colors">
-                Usuwanie danych
-              </Link>
+            {/* Footer links */}
+            <div className="mt-6 pt-4 border-t border-border text-center text-sm text-muted-foreground">
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <Link to="/terms" className="hover:text-foreground transition-colors">
+                  Regulamin Social Auto Flow
+                </Link>
+                <span>•</span>
+                <Link to="/privacy" className="hover:text-foreground transition-colors">
+                  Polityka Prywatności Social Auto Flow
+                </Link>
+                <span>•</span>
+                <Link to="/data-deletion" className="hover:text-foreground transition-colors">
+                  Usuwanie danych
+                </Link>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
+      <Footer />
     </div>
   );
 };

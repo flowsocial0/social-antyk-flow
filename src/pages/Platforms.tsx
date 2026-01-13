@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft } from "lucide-react";
 import { getAllPlatforms, getActivePlatforms, getComingSoonPlatforms, getPlannedPlatforms } from "@/config/platforms";
+import { Footer } from "@/components/layout/Footer";
 
 const Platforms = () => {
   const navigate = useNavigate();
@@ -41,8 +42,8 @@ const Platforms = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      <div className="container mx-auto p-6 space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
+      <div className="flex-1 container mx-auto p-6 space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -93,6 +94,8 @@ const Platforms = () => {
           </div>
         )}
       </div>
+      
+      <Footer />
     </div>
   );
 };

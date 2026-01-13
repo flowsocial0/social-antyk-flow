@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Sparkles, Plus } from "lucide-react";
 import { CampaignsList } from "@/components/campaigns/CampaignsList";
+import { Footer } from "@/components/layout/Footer";
 import type { User } from "@supabase/supabase-js";
 
 const Campaigns = () => {
@@ -45,7 +46,7 @@ const Campaigns = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b border-border bg-gradient-primary shadow-sm">
         <div className="container mx-auto px-4 py-6">
@@ -81,9 +82,11 @@ const Campaigns = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="flex-1 container mx-auto px-4 py-8">
         <CampaignsList />
       </main>
+      
+      <Footer />
     </div>
   );
 };
