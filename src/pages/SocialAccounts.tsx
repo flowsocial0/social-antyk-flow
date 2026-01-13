@@ -34,8 +34,17 @@ export default function SocialAccounts() {
     // Handle Instagram callback errors
     if (params.get('instagram') === 'error') {
       const message = params.get('message');
+      const errorMessages: Record<string, string> = {
+        'no_pages_permission': 'Nie udzielono zgody na dostęp do stron Facebook. Spróbuj ponownie i zaznacz wszystkie zgody.',
+        'no_instagram_permission': 'Nie udzielono zgody na dostęp do Instagram. Spróbuj ponownie i zaznacz wszystkie zgody.',
+        'no_pages_found': 'Nie znaleziono żadnych stron Facebook, których jesteś administratorem. Utwórz stronę lub zostań adminem istniejącej.',
+        'no_instagram_account': 'Żadna z Twoich stron Facebook nie ma podłączonego konta Instagram Professional. Podłącz konto IG do strony w Meta Business Suite.',
+        'pages_fetch_failed': 'Nie udało się pobrać listy stron. Spróbuj ponownie.',
+        'token_exchange_failed': 'Błąd autoryzacji. Spróbuj ponownie.',
+        'save_failed': 'Nie udało się zapisać połączenia. Spróbuj ponownie.',
+      };
       toast.error('Błąd połączenia Instagram', {
-        description: message || 'Spróbuj ponownie'
+        description: errorMessages[message || ''] || message || 'Spróbuj ponownie'
       });
       window.history.replaceState({}, '', '/settings/social-accounts');
     }

@@ -90,7 +90,35 @@ serve(async (req) => {
     const expiresAt = new Date(Date.now() + expiresIn * 1000);
     console.log('Got long-lived token, expires in:', expiresIn, 'seconds');
 
-    // Step 3: Get user's Facebook pages
+    // Step 3: Check granted permissions first
+    console.log('Checking granted permissions...');
+    const permissionsResponse = await fetch(
+      `https://graph.facebook.com/v21.0/me/permissions?access_token=${accessToken}`
+    );
+    const permissionsData = await permissionsResponse.json();
+    console.log('Granted permissions:', JSON.stringify(permissionsData));
+    
+    const grantedPermissions = (permissionsData.data || [])
+      .filter((p: any) => p.status === 'granted')
+      .map((p: any) => p.permission);
+    console.log('Granted permission names:', grantedPermissions);
+    
+    // Check if pages_show_list permission was granted
+    const hasPagesPermission = grantedPermissions.includes('pages_show_list');
+    const hasInstagramPermission = grantedPermissions.includes('instagram_basic') || 
+                                    grantedPermissions.includes('instagram_content_publish');
+    
+    if (!hasPagesPermission) {
+      console.log('Missing pages_show_list permission');
+      return Response.redirect(`${FRONTEND_URL}/settings/social-accounts?instagram=error&message=no_pages_permission`, 302);
+    }
+    
+    if (!hasInstagramPermission) {
+      console.log('Missing Instagram permissions');
+      return Response.redirect(`${FRONTEND_URL}/settings/social-accounts?instagram=error&message=no_instagram_permission`, 302);
+    }
+
+    // Step 4: Get user's Facebook pages
     console.log('Fetching Facebook pages...');
     const pagesResponse = await fetch(
       `https://graph.facebook.com/v21.0/me/accounts?access_token=${accessToken}`
@@ -106,8 +134,8 @@ serve(async (req) => {
     console.log('Found', pages.length, 'Facebook pages');
 
     if (pages.length === 0) {
-      console.log('No Facebook pages found');
-      return Response.redirect(`${FRONTEND_URL}/settings/social-accounts?instagram=error&message=no_pages`, 302);
+      console.log('No Facebook pages found - user may not be admin of any page');
+      return Response.redirect(`${FRONTEND_URL}/settings/social-accounts?instagram=error&message=no_pages_found`, 302);
     }
 
     // Step 4: Find Instagram Business Account connected to pages
