@@ -21,6 +21,9 @@ verify_jwt = false
 [functions.publish-to-tiktok]
 verify_jwt = false
 
+[functions.publish-to-instagram]
+verify_jwt = false
+
 [functions.twitter-oauth-start]
 verify_jwt = false
 
@@ -43,6 +46,12 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.facebook-data-deletion]
+verify_jwt = false
+
+[functions.instagram-oauth-start]
+verify_jwt = false
+
+[functions.instagram-oauth-callback]
 verify_jwt = false
 
 [functions.tiktok-oauth-start]

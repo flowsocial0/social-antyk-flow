@@ -438,6 +438,48 @@ export type Database = {
         }
         Relationships: []
       }
+      instagram_oauth_tokens: {
+        Row: {
+          access_token: string
+          created_at: string | null
+          expires_at: string | null
+          facebook_page_id: string | null
+          id: string
+          instagram_account_id: string
+          instagram_username: string | null
+          scope: string | null
+          token_type: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string | null
+          expires_at?: string | null
+          facebook_page_id?: string | null
+          id?: string
+          instagram_account_id: string
+          instagram_username?: string | null
+          scope?: string | null
+          token_type?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string | null
+          expires_at?: string | null
+          facebook_page_id?: string | null
+          id?: string
+          instagram_account_id?: string
+          instagram_username?: string | null
+          scope?: string | null
+          token_type?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       tiktok_oauth_tokens: {
         Row: {
           access_token: string

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Twitter, Facebook, CheckCircle2, XCircle, Loader2, Video, ArrowLeft } from "lucide-react";
+import { Twitter, Facebook, Instagram, CheckCircle2, XCircle, Loader2, Video, ArrowLeft } from "lucide-react";
 import { Footer } from "@/components/layout/Footer";
 
 export default function SocialAccounts() {
@@ -12,20 +12,31 @@ export default function SocialAccounts() {
   const [isLoadingX, setIsLoadingX] = useState(false);
   const [isLoadingFB, setIsLoadingFB] = useState(false);
   const [isLoadingTikTok, setIsLoadingTikTok] = useState(false);
+  const [isLoadingIG, setIsLoadingIG] = useState(false);
   const [xConnected, setXConnected] = useState(false);
   const [fbConnected, setFbConnected] = useState(false);
   const [tiktokConnected, setTiktokConnected] = useState(false);
+  const [igConnected, setIgConnected] = useState(false);
   const [xUsername, setXUsername] = useState<string | null>(null);
   const [fbPageName, setFbPageName] = useState<string | null>(null);
   const [tiktokOpenId, setTiktokOpenId] = useState<string | null>(null);
+  const [igUsername, setIgUsername] = useState<string | null>(null);
 
   useEffect(() => {
     checkConnections();
     
     // Auto-refresh after OAuth callback
     const params = new URLSearchParams(window.location.search);
-    if (params.get('connected') === 'true' || params.get('success')) {
+    if (params.get('connected') === 'true' || params.get('success') || params.get('instagram') === 'connected') {
       checkConnections();
+      window.history.replaceState({}, '', '/settings/social-accounts');
+    }
+    // Handle Instagram callback errors
+    if (params.get('instagram') === 'error') {
+      const message = params.get('message');
+      toast.error('Błąd połączenia Instagram', {
+        description: message || 'Spróbuj ponownie'
+      });
       window.history.replaceState({}, '', '/settings/social-accounts');
     }
   }, []);
@@ -69,6 +80,18 @@ export default function SocialAccounts() {
     if (tiktokData) {
       setTiktokConnected(true);
       setTiktokOpenId((tiktokData as any).open_id ?? null);
+    }
+
+    // Check Instagram connection
+    const { data: igData } = await (supabase as any)
+      .from('instagram_oauth_tokens')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .maybeSingle();
+
+    if (igData) {
+      setIgConnected(true);
+      setIgUsername((igData as any).instagram_username ?? null);
     }
   };
 
@@ -276,6 +299,68 @@ export default function SocialAccounts() {
     }
   };
 
+  const connectInstagram = async () => {
+    setIsLoadingIG(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Musisz być zalogowany', {
+          description: 'Zaloguj się, aby połączyć konto Instagram'
+        });
+        setIsLoadingIG(false);
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('instagram-oauth-start', {
+        body: { userId: session.user.id }
+      });
+      
+      if (error) throw error;
+      
+      if (data?.authUrl) {
+        if (data.state) {
+          sessionStorage.setItem('instagram_oauth_state', data.state);
+        }
+        sessionStorage.setItem('instagram_user_id', session.user.id);
+        window.location.href = data.authUrl;
+      }
+    } catch (error: any) {
+      console.error('Error connecting Instagram:', error);
+      toast.error('Nie udało się połączyć z Instagram', {
+        description: error.message
+      });
+    } finally {
+      setIsLoadingIG(false);
+    }
+  };
+
+  const disconnectInstagram = async () => {
+    setIsLoadingIG(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Musisz być zalogowany');
+        return;
+      }
+
+      const { error } = await (supabase as any)
+        .from('instagram_oauth_tokens')
+        .delete()
+        .eq('user_id', session.user.id);
+      
+      if (error) throw error;
+      
+      setIgConnected(false);
+      setIgUsername(null);
+      toast.success('Odłączono konto Instagram');
+    } catch (error: any) {
+      console.error('Error disconnecting Instagram:', error);
+      toast.error('Nie udało się odłączyć konta Instagram');
+    } finally {
+      setIsLoadingIG(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <div className="flex-1 container mx-auto p-6 max-w-4xl">
@@ -452,6 +537,65 @@ export default function SocialAccounts() {
               </div>
             </div>
           </Card>
+
+          {/* Instagram */}
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-gradient-to-br from-pink-500/20 to-purple-500/20">
+                  <Instagram className="h-6 w-6 text-pink-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold flex items-center gap-2">
+                    Instagram
+                    {igConnected && (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    )}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {igConnected 
+                      ? `Połączono${igUsername ? ` jako @${igUsername}` : ''}`
+                      : 'Nie połączono'
+                    }
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Wymaga konta Business/Creator połączonego ze stroną Facebook
+                  </p>
+                </div>
+              </div>
+              
+              <div>
+                {igConnected ? (
+                  <Button
+                    variant="outline"
+                    onClick={disconnectInstagram}
+                    disabled={isLoadingIG}
+                    className="gap-2"
+                  >
+                    {isLoadingIG ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <XCircle className="h-4 w-4" />
+                    )}
+                    Odłącz
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={connectInstagram}
+                    disabled={isLoadingIG}
+                    className="gap-2"
+                  >
+                    {isLoadingIG ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Instagram className="h-4 w-4" />
+                    )}
+                    Połącz
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Card>
         </div>
 
         <Card className="p-6 mt-6 bg-muted/30">
@@ -461,6 +605,7 @@ export default function SocialAccounts() {
             <li>• Tokeny dostępu są bezpiecznie przechowywane w bazie danych</li>
             <li>• Możesz odłączyć konto w dowolnym momencie</li>
             <li>• Facebook wymaga uprawnienia do zarządzania postami na stronie</li>
+            <li>• Instagram wymaga konta Business/Creator połączonego ze stroną Facebook</li>
           </ul>
         </Card>
       </div>

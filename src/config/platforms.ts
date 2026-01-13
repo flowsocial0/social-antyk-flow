@@ -68,9 +68,9 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-pink-500/20',
     gradientTo: 'to-purple-600/20',
     path: '/platforms/instagram',
-    status: 'coming-soon',
+    status: 'active',
     priority: 3,
-    mediaType: 'both',
+    mediaType: 'image-only', // Instagram requires image, text-only not allowed
   },
   youtube: {
     id: 'youtube',
