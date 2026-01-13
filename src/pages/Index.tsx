@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
-import { RecentActivity } from "@/components/dashboard/RecentActivity";
+
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { GeneralBooksList } from "@/components/books/GeneralBooksList";
 import { Footer } from "@/components/layout/Footer";
@@ -85,9 +85,6 @@ const Index = () => {
 
         {/* General Books List */}
         <GeneralBooksList />
-
-        {/* Recent Activity */}
-        <RecentActivity />
       </main>
       
       <Footer />
