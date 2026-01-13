@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const FRONTEND_URL = 'https://social-auto-flow.lovable.app';
+const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'https://socialautoflow.pl';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {

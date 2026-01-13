@@ -26,10 +26,12 @@ Deno.serve(async (req) => {
       error: errorParam || 'none'
     });
 
+    const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'https://socialautoflow.pl';
+
     // Check if user cancelled or Facebook returned an error FIRST
     if (errorParam) {
       console.log('User cancelled or error from Facebook:', errorParam, errorDescription);
-      const redirectUrl = new URL('https://social-auto-flow.netlify.app/platforms/facebook');
+      const redirectUrl = new URL(`${FRONTEND_URL}/platforms/facebook`);
       redirectUrl.searchParams.set('cancelled', 'true');
       redirectUrl.searchParams.set('error', errorDescription || errorParam);
       
@@ -164,7 +166,7 @@ Deno.serve(async (req) => {
       console.log('Successfully stored Facebook Page token:', tokenRecord);
 
       // Redirect user back to the application
-      const redirectUrl = new URL('https://social-auto-flow.netlify.app/platforms/facebook');
+      const redirectUrl = new URL(`${FRONTEND_URL}/platforms/facebook`);
       redirectUrl.searchParams.set('connected', 'true');
       redirectUrl.searchParams.set('page_name', pageName);
       
@@ -208,7 +210,7 @@ Deno.serve(async (req) => {
 
     console.log('Saved page selections with session ID:', sessionId);
     
-    const redirectUrl = new URL('https://social-auto-flow.netlify.app/platforms/facebook/select-page');
+    const redirectUrl = new URL(`${FRONTEND_URL}/platforms/facebook/select-page`);
     redirectUrl.searchParams.set('session_id', sessionId);
     
     return new Response(null, {
@@ -221,9 +223,10 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Facebook OAuth callback error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const FRONTEND_URL_FALLBACK = Deno.env.get('FRONTEND_URL') || 'https://socialautoflow.pl';
     
     // Redirect back to app with error
-    const redirectUrl = new URL('https://social-auto-flow.netlify.app/platforms/facebook');
+    const redirectUrl = new URL(`${FRONTEND_URL_FALLBACK}/platforms/facebook`);
     redirectUrl.searchParams.set('error', errorMessage);
     
     return new Response(null, {
