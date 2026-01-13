@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Twitter, Facebook, CheckCircle2, XCircle, Loader2, Video, ArrowLeft } from "lucide-react";
+import { Footer } from "@/components/layout/Footer";
 
 export default function SocialAccounts() {
   const navigate = useNavigate();
@@ -276,191 +277,195 @@ export default function SocialAccounts() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="mb-8">
-        <Button 
-          variant="ghost" 
-          onClick={() => navigate("/")} 
-          className="mb-4 gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Powrót do aplikacji
-        </Button>
-        <h1 className="text-3xl font-bold mb-2">Konta społecznościowe</h1>
-        <p className="text-muted-foreground">
-          Zarządzaj połączonymi kontami mediów społecznościowych
-        </p>
-      </div>
+    <div className="min-h-screen bg-background flex flex-col">
+      <div className="flex-1 container mx-auto p-6 max-w-4xl">
+        <div className="mb-8">
+          <Button 
+            variant="ghost" 
+            onClick={() => navigate("/")} 
+            className="mb-4 gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Powrót do aplikacji
+          </Button>
+          <h1 className="text-3xl font-bold mb-2">Konta społecznościowe</h1>
+          <p className="text-muted-foreground">
+            Zarządzaj połączonymi kontami mediów społecznościowych
+          </p>
+        </div>
 
-      <div className="space-y-4">
-        {/* X / Twitter */}
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-blue-500/10">
-                <Twitter className="h-6 w-6 text-blue-500" />
+        <div className="space-y-4">
+          {/* X / Twitter */}
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-blue-500/10">
+                  <Twitter className="h-6 w-6 text-blue-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold flex items-center gap-2">
+                    X (Twitter)
+                    {xConnected && (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    )}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {xConnected 
+                      ? `Połączono ${xUsername ? `jako @${xUsername}` : ''}`
+                      : 'Nie połączono'
+                    }
+                  </p>
+                </div>
               </div>
+              
               <div>
-                <h3 className="font-semibold flex items-center gap-2">
-                  X (Twitter)
-                  {xConnected && (
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  )}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {xConnected 
-                    ? `Połączono ${xUsername ? `jako @${xUsername}` : ''}`
-                    : 'Nie połączono'
-                  }
-                </p>
-              </div>
-            </div>
-            
-            <div>
-              {xConnected ? (
-                <Button
-                  variant="outline"
-                  onClick={disconnectX}
-                  className="gap-2"
-                >
-                  <XCircle className="h-4 w-4" />
-                  Odłącz
-                </Button>
-              ) : (
-                <Button
-                  onClick={connectX}
-                  disabled={isLoadingX}
-                  className="gap-2"
-                >
-                  {isLoadingX ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Twitter className="h-4 w-4" />
-                  )}
-                  Połącz
-                </Button>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        {/* Facebook */}
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-blue-600/10">
-                <Facebook className="h-6 w-6 text-blue-600" />
-              </div>
-              <div>
-                <h3 className="font-semibold flex items-center gap-2">
-                  Facebook
-                  {fbConnected && (
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  )}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {fbConnected 
-                    ? `Połączono${fbPageName ? ` - ${fbPageName}` : ''}`
-                    : 'Nie połączono'
-                  }
-                </p>
-              </div>
-            </div>
-            
-            <div>
-              {fbConnected ? (
-                <Button
-                  variant="outline"
-                  onClick={disconnectFacebook}
-                  className="gap-2"
-                >
-                  <XCircle className="h-4 w-4" />
-                  Odłącz
-                </Button>
-              ) : (
-                <Button
-                  onClick={connectFacebook}
-                  disabled={isLoadingFB}
-                  className="gap-2"
-                >
-                  {isLoadingFB ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Facebook className="h-4 w-4" />
-                  )}
-                  Połącz
-                </Button>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        {/* TikTok */}
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-gradient-to-br from-slate-900/20 to-pink-500/20">
-                <Video className="h-6 w-6 text-slate-900" />
-              </div>
-              <div>
-                <h3 className="font-semibold flex items-center gap-2">
-                  TikTok
-                  {tiktokConnected && (
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  )}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {tiktokConnected 
-                    ? `Połączono${tiktokOpenId ? ` (${tiktokOpenId.substring(0, 8)}...)` : ''}`
-                    : 'Nie połączono'
-                  }
-                </p>
-              </div>
-            </div>
-            
-            <div>
-              {tiktokConnected ? (
-                <Button
-                  variant="outline"
-                  onClick={disconnectTikTok}
-                  disabled={isLoadingTikTok}
-                  className="gap-2"
-                >
-                  {isLoadingTikTok ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
+                {xConnected ? (
+                  <Button
+                    variant="outline"
+                    onClick={disconnectX}
+                    className="gap-2"
+                  >
                     <XCircle className="h-4 w-4" />
-                  )}
-                  Odłącz
-                </Button>
-              ) : (
-                <Button
-                  onClick={connectTikTok}
-                  disabled={isLoadingTikTok}
-                  className="gap-2"
-                >
-                  {isLoadingTikTok ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Video className="h-4 w-4" />
-                  )}
-                  Połącz
-                </Button>
-              )}
+                    Odłącz
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={connectX}
+                    disabled={isLoadingX}
+                    className="gap-2"
+                  >
+                    {isLoadingX ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Twitter className="h-4 w-4" />
+                    )}
+                    Połącz
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
+          </Card>
+
+          {/* Facebook */}
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-blue-600/10">
+                  <Facebook className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold flex items-center gap-2">
+                    Facebook
+                    {fbConnected && (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    )}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {fbConnected 
+                      ? `Połączono${fbPageName ? ` - ${fbPageName}` : ''}`
+                      : 'Nie połączono'
+                    }
+                  </p>
+                </div>
+              </div>
+              
+              <div>
+                {fbConnected ? (
+                  <Button
+                    variant="outline"
+                    onClick={disconnectFacebook}
+                    className="gap-2"
+                  >
+                    <XCircle className="h-4 w-4" />
+                    Odłącz
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={connectFacebook}
+                    disabled={isLoadingFB}
+                    className="gap-2"
+                  >
+                    {isLoadingFB ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Facebook className="h-4 w-4" />
+                    )}
+                    Połącz
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          {/* TikTok */}
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-gradient-to-br from-slate-900/20 to-pink-500/20">
+                  <Video className="h-6 w-6 text-slate-900" />
+                </div>
+                <div>
+                  <h3 className="font-semibold flex items-center gap-2">
+                    TikTok
+                    {tiktokConnected && (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    )}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {tiktokConnected 
+                      ? `Połączono${tiktokOpenId ? ` (${tiktokOpenId.substring(0, 8)}...)` : ''}`
+                      : 'Nie połączono'
+                    }
+                  </p>
+                </div>
+              </div>
+              
+              <div>
+                {tiktokConnected ? (
+                  <Button
+                    variant="outline"
+                    onClick={disconnectTikTok}
+                    disabled={isLoadingTikTok}
+                    className="gap-2"
+                  >
+                    {isLoadingTikTok ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <XCircle className="h-4 w-4" />
+                    )}
+                    Odłącz
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={connectTikTok}
+                    disabled={isLoadingTikTok}
+                    className="gap-2"
+                  >
+                    {isLoadingTikTok ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Video className="h-4 w-4" />
+                    )}
+                    Połącz
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <Card className="p-6 mt-6 bg-muted/30">
+          <h3 className="font-semibold mb-2">Informacje</h3>
+          <ul className="text-sm text-muted-foreground space-y-1">
+            <li>• Aby publikować posty, musisz najpierw połączyć odpowiednie konta</li>
+            <li>• Tokeny dostępu są bezpiecznie przechowywane w bazie danych</li>
+            <li>• Możesz odłączyć konto w dowolnym momencie</li>
+            <li>• Facebook wymaga uprawnienia do zarządzania postami na stronie</li>
+          </ul>
         </Card>
       </div>
-
-      <Card className="p-6 mt-6 bg-muted/30">
-        <h3 className="font-semibold mb-2">Informacje</h3>
-        <ul className="text-sm text-muted-foreground space-y-1">
-          <li>• Aby publikować posty, musisz najpierw połączyć odpowiednie konta</li>
-          <li>• Tokeny dostępu są bezpiecznie przechowywane w bazie danych</li>
-          <li>• Możesz odłączyć konto w dowolnym momencie</li>
-          <li>• Facebook wymaga uprawnienia do zarządzania postami na stronie</li>
-        </ul>
-      </Card>
+      
+      <Footer />
     </div>
   );
 }

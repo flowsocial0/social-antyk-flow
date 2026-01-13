@@ -7,6 +7,7 @@ import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { GeneralBooksList } from "@/components/books/GeneralBooksList";
+import { Footer } from "@/components/layout/Footer";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@supabase/supabase-js";
 
@@ -57,7 +58,7 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b border-border bg-gradient-primary shadow-sm">
         <div className="container mx-auto px-4 py-6">
@@ -75,7 +76,7 @@ const Index = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8 space-y-8">
+      <main className="flex-1 container mx-auto px-4 py-8 space-y-8">
         {/* Stats Overview */}
         <DashboardStats />
 
@@ -88,6 +89,8 @@ const Index = () => {
         {/* Recent Activity */}
         <RecentActivity />
       </main>
+      
+      <Footer />
     </div>
   );
 };

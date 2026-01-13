@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { CampaignBuilder } from "@/components/campaigns/CampaignBuilder";
+import { Footer } from "@/components/layout/Footer";
 import type { User } from "@supabase/supabase-js";
 
 const CampaignsNew = () => {
@@ -46,7 +47,7 @@ const CampaignsNew = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b border-border bg-gradient-primary shadow-sm">
         <div className="container mx-auto px-4 py-6">
@@ -73,11 +74,13 @@ const CampaignsNew = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="flex-1 container mx-auto px-4 py-8">
         <Card className="p-8 bg-gradient-card border-border/50 shadow-card">
           <CampaignBuilder />
         </Card>
       </main>
+      
+      <Footer />
     </div>
   );
 };
