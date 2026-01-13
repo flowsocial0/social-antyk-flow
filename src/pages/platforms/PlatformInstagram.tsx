@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Search, Instagram } from "lucide-react";
+import { Instagram } from "lucide-react";
 import { PlatformConnectionStatus } from "@/components/platforms/PlatformConnectionStatus";
 import { PlatformStats } from "@/components/platforms/PlatformStats";
 import { PlatformAnalytics } from "@/components/platforms/PlatformAnalytics";
 import { PlatformBooksList } from "@/components/platforms/PlatformBooksList";
+import { Footer } from "@/components/layout/Footer";
+import { Card } from "@/components/ui/card";
+import { AlertTriangle } from "lucide-react";
 
 const PlatformInstagram = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      <div className="container mx-auto p-6 space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
+      <main className="flex-1 container mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -35,6 +37,24 @@ const PlatformInstagram = () => {
           </div>
         </div>
 
+        {/* Requirements Notice */}
+        <Card className="p-4 border-amber-500/50 bg-amber-500/10">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+            <div className="space-y-1">
+              <h4 className="font-medium text-amber-700 dark:text-amber-400">
+                Wymagania Instagram API
+              </h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• Konto Instagram musi być typu <strong>Business</strong> lub <strong>Creator</strong></li>
+                <li>• Konto musi być połączone ze <strong>stroną Facebook</strong></li>
+                <li>• Posty muszą zawierać <strong>obraz</strong> - posty tylko tekstowe nie są obsługiwane</li>
+                <li>• Obrazy muszą być publicznie dostępne pod URL</li>
+              </ul>
+            </div>
+          </div>
+        </Card>
+
         {/* Connection Status & Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <PlatformConnectionStatus platform="instagram" />
@@ -50,7 +70,9 @@ const PlatformInstagram = () => {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
         />
-      </div>
+      </main>
+      
+      <Footer />
     </div>
   );
 };
