@@ -34,52 +34,230 @@ serve(async (req) => {
   }
 
   try {
-    const { bookId, userId, caption, imageUrl } = await req.json();
+    console.log('=== Publish to Instagram Request ===');
+    
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    console.log('Publishing to Instagram:', { bookId, userId, hasCaption: !!caption, hasImage: !!imageUrl });
+    let userId: string | null = null;
+    let bookId: string | undefined;
+    let contentId: string | undefined;
+    let campaignPostId: string | undefined;
+    let caption: string | undefined;
+    let imageUrl: string | undefined;
+    let testConnection: boolean | undefined;
+    let userIdFromBody: string | undefined;
+
+    try {
+      const body = await req.json();
+      bookId = body.bookId;
+      contentId = body.contentId;
+      campaignPostId = body.campaignPostId;
+      caption = body.caption || body.text;
+      imageUrl = body.imageUrl;
+      testConnection = body.testConnection;
+      userIdFromBody = body.userId;
+      
+      console.log('Request body:', { 
+        bookId, 
+        contentId,
+        campaignPostId,
+        caption: caption ? 'present' : undefined,
+        imageUrl: imageUrl ? 'present' : undefined, 
+        testConnection,
+        userId: userIdFromBody ? 'present' : undefined
+      });
+    } catch (_) {
+      testConnection = true;
+      console.log('No valid JSON body, treating as test connection');
+    }
+
+    // Method 1: userId passed directly in body (from auto-publish with service role)
+    if (userIdFromBody) {
+      userId = userIdFromBody;
+      console.log('Using userId from request body:', userId);
+    } else {
+      // Method 2: Get user_id from Authorization header (direct user call)
+      const authHeader = req.headers.get('authorization');
+      console.log('Authorization header:', authHeader ? 'present' : 'MISSING');
+      
+      if (authHeader) {
+        const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          global: { headers: { Authorization: authHeader } }
+        });
+
+        const { data: { user }, error: userError } = await supabaseAnon.auth.getUser();
+        if (!userError && user) {
+          userId = user.id;
+          console.log('User ID from JWT:', userId);
+        } else {
+          console.log('Failed to get user from JWT:', userError?.message);
+        }
+      }
+    }
 
     if (!userId) {
-      throw new Error('Missing userId');
+      throw new Error('Musisz być zalogowany aby publikować na Instagram');
     }
 
-    if (!imageUrl) {
-      throw new Error('Instagram requires an image. Text-only posts are not supported.');
-    }
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Get Instagram token from database
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
+    console.log('Fetching Instagram token for user:', userId);
+    
     const { data: tokenData, error: tokenError } = await supabase
       .from('instagram_oauth_tokens')
       .select('*')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
-    if (tokenError || !tokenData) {
-      console.error('Token not found:', tokenError);
-      throw new Error('Instagram account not connected. Please connect your account first.');
+    if (tokenError) {
+      console.error('Error fetching Instagram token:', tokenError);
+      throw new Error('Błąd pobierania tokenu Instagram: ' + tokenError.message);
+    }
+    
+    if (!tokenData) {
+      console.error('No Instagram token found for user:', userId);
+      throw new Error('Instagram nie jest połączony. Połącz konto Instagram w ustawieniach.');
     }
 
-    const { access_token, instagram_account_id, expires_at } = tokenData;
+    const { access_token, instagram_account_id, instagram_username, expires_at } = tokenData;
+    console.log('Found Instagram token:', { instagram_account_id, instagram_username, expires_at });
 
     // Check if token is expired
     if (expires_at && new Date(expires_at) < new Date()) {
-      throw new Error('Instagram access token has expired. Please reconnect your account.');
+      throw new Error('Token Instagram wygasł. Połącz ponownie konto Instagram.');
     }
 
-    console.log('Found Instagram account:', instagram_account_id);
+    // If it's just a connection test, return success
+    const isTest = Boolean(testConnection) || (!bookId && !contentId && !campaignPostId && !caption);
+    console.log('Is test connection:', isTest);
+    
+    if (isTest) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          connected: true,
+          accountName: instagram_username,
+          accountId: instagram_account_id,
+          platform: 'instagram',
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
+    // Helper function to get public URL from storage path
+    const getStoragePublicUrl = (storagePath: string): string => {
+      if (!storagePath) return '';
+      const bucketName = 'ObrazkiKsiazek';
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${bucketName}/${storagePath}`;
+      console.log('Generated storage public URL:', publicUrl);
+      return publicUrl;
+    };
+
+    let postCaption = caption || '';
+    let finalImageUrl = imageUrl || '';
+
+    // If bookId provided, get book data
+    if (bookId) {
+      console.log('Fetching book data for bookId:', bookId);
+      const { data: book, error: bookError } = await supabase
+        .from('books')
+        .select('*')
+        .eq('id', bookId)
+        .single();
+
+      if (bookError) {
+        console.error('Error fetching book:', bookError);
+        throw new Error('Nie znaleziono książki');
+      }
+
+      console.log('Book data:', { 
+        title: book?.title, 
+        image_url: book?.image_url ? 'present' : 'missing',
+        storage_path: book?.storage_path ? 'present' : 'missing',
+      });
+
+      // Get AI text for Instagram (use ai_generated_text as fallback since we don't have ai_text_instagram yet)
+      if (!postCaption) {
+        postCaption = book.ai_generated_text || '';
+        
+        // If no AI text, create basic caption
+        if (!postCaption) {
+          const price = book.promotional_price || book.sale_price;
+          postCaption = `📚 ${book.title}`;
+          if (book.author) postCaption += `\n✍️ ${book.author}`;
+          if (price) postCaption += `\n💰 ${price} zł`;
+          if (book.product_url) postCaption += `\n\n🔗 Link w bio`;
+        }
+      }
+
+      // Get image URL
+      if (!finalImageUrl) {
+        if (book.image_url) {
+          finalImageUrl = book.image_url;
+          console.log('Using book.image_url:', finalImageUrl);
+        } else if (book.storage_path) {
+          finalImageUrl = getStoragePublicUrl(book.storage_path);
+          console.log('Using storage_path URL:', finalImageUrl);
+        }
+      }
+    }
+
+    // If campaignPostId provided, get campaign post data
+    if (campaignPostId) {
+      console.log('Fetching campaign post data for campaignPostId:', campaignPostId);
+      const { data: campaignPost, error: campaignError } = await supabase
+        .from('campaign_posts')
+        .select('*, book:books(*)')
+        .eq('id', campaignPostId)
+        .single();
+
+      if (campaignError) {
+        console.error('Error fetching campaign post:', campaignError);
+        throw new Error('Nie znaleziono posta kampanii');
+      }
+
+      postCaption = campaignPost.text;
+      
+      // Get image from book if available
+      if (campaignPost.book && !finalImageUrl) {
+        if (campaignPost.book.image_url) {
+          finalImageUrl = campaignPost.book.image_url;
+        } else if (campaignPost.book.storage_path) {
+          finalImageUrl = getStoragePublicUrl(campaignPost.book.storage_path);
+        }
+      }
+    }
+
+    // Instagram REQUIRES an image
+    if (!finalImageUrl) {
+      throw new Error('Instagram wymaga obrazu. Posty tylko tekstowe nie są obsługiwane. Dodaj obraz do książki.');
+    }
+
+    // Add AI disclaimer
+    if (postCaption) {
+      postCaption += '\n\n#książki #antykwariat';
+      postCaption += '\n\nTekst wygenerowany przez AI';
+    }
+
+    console.log('=== Final Publishing Data ===');
+    console.log('Caption length:', postCaption?.length);
+    console.log('Image URL:', finalImageUrl);
 
     // Step 1: Create media container
     console.log('Creating media container...');
     const containerParams = new URLSearchParams({
-      image_url: imageUrl,
+      image_url: finalImageUrl,
       access_token: access_token,
     });
 
-    if (caption) {
-      containerParams.set('caption', caption);
+    if (postCaption) {
+      containerParams.set('caption', postCaption);
     }
 
     const containerResponse = await fetch(
@@ -95,18 +273,18 @@ serve(async (req) => {
 
     if (containerData.error) {
       console.error('Error creating container:', containerData.error);
-      throw new Error(containerData.error.message || 'Failed to create media container');
+      throw new Error(containerData.error.message || 'Nie udało się utworzyć kontenera mediów');
     }
 
     const containerId = containerData.id;
     console.log('Created container:', containerId);
 
-    // Step 2: Wait for container to be ready (for video/carousel, images are usually instant)
+    // Step 2: Wait for container to be ready
     console.log('Waiting for container to be ready...');
     const isReady = await waitForContainer(containerId, access_token);
     
     if (!isReady) {
-      throw new Error('Container processing timed out');
+      throw new Error('Przetwarzanie kontenera przekroczyło limit czasu');
     }
 
     // Step 3: Publish the container
@@ -127,14 +305,26 @@ serve(async (req) => {
 
     if (publishData.error) {
       console.error('Error publishing:', publishData.error);
-      throw new Error(publishData.error.message || 'Failed to publish to Instagram');
+      throw new Error(publishData.error.message || 'Nie udało się opublikować na Instagram');
     }
 
     const mediaId = publishData.id;
     console.log('Published successfully! Media ID:', mediaId);
 
-    // Update book status if bookId provided
-    if (bookId) {
+    // Update book_platform_content if contentId provided
+    if (contentId) {
+      await supabase
+        .from('book_platform_content')
+        .update({
+          published: true,
+          published_at: new Date().toISOString(),
+          post_id: mediaId,
+        })
+        .eq('id', contentId);
+    }
+
+    // Update book status if bookId provided (legacy behavior)
+    if (bookId && !contentId) {
       await supabase
         .from('books')
         .update({
@@ -148,7 +338,9 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         mediaId,
-        message: 'Successfully published to Instagram',
+        postId: mediaId,
+        message: 'Pomyślnie opublikowano na Instagram',
+        results: [{ success: true, platform: 'instagram', postId: mediaId }]
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -156,12 +348,13 @@ serve(async (req) => {
     );
 
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = error instanceof Error ? error.message : 'Nieznany błąd';
     console.error('Error in publish-to-instagram:', error);
     return new Response(
       JSON.stringify({
         success: false,
         error: errorMessage,
+        results: [{ success: false, platform: 'instagram', error: errorMessage }]
       }),
       {
         status: 400,
