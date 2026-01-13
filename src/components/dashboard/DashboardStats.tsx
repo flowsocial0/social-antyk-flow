@@ -102,10 +102,10 @@ export const DashboardStats = () => {
     },
     {
       title: "Aktywne platformy",
-      value: `4/13`,
+      value: `3/13`,
       icon: Activity,
       description: "Połączone",
-      trend: "X, Facebook, TikTok",
+      trend: "X, Facebook, TikTok, Instagram",
     },
   ];
 
