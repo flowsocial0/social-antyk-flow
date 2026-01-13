@@ -109,6 +109,16 @@ Deno.serve(async (req) => {
     const xUserId = xTokenData?.user_id;
     console.log('X user ID for publishing:', xUserId || 'none');
 
+    // Get first available user with Instagram token for Instagram posts
+    const { data: igTokenData } = await supabase
+      .from('instagram_oauth_tokens')
+      .select('user_id')
+      .limit(1)
+      .maybeSingle();
+    
+    const instagramUserId = igTokenData?.user_id;
+    console.log('Instagram user ID for publishing:', instagramUserId || 'none');
+
     if ((!contentToPublish || contentToPublish.length === 0) && 
         (!campaignPostsToPublish || campaignPostsToPublish.length === 0)) {
       return new Response(
@@ -140,6 +150,9 @@ Deno.serve(async (req) => {
             break;
           case 'facebook':
             publishFunctionName = 'publish-to-facebook';
+            break;
+          case 'instagram':
+            publishFunctionName = 'publish-to-instagram';
             break;
           // Add more platforms as they are implemented
           default:
@@ -232,6 +245,9 @@ Deno.serve(async (req) => {
             case 'facebook':
               publishFunctionName = 'publish-to-facebook';
               break;
+            case 'instagram':
+              publishFunctionName = 'publish-to-instagram';
+              break;
             default:
               console.error(`No publish function for platform: ${platform}`);
               platformFailCount++;
@@ -244,6 +260,8 @@ Deno.serve(async (req) => {
             platformUserId = facebookUserId;
           } else if (platform === 'x') {
             platformUserId = xUserId;
+          } else if (platform === 'instagram') {
+            platformUserId = instagramUserId;
           }
 
           if (!platformUserId) {

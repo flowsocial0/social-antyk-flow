@@ -234,6 +234,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
       const functionName = platform === 'x' ? 'publish-to-x' : 
                           platform === 'facebook' ? 'publish-to-facebook' : 
                           platform === 'tiktok' ? 'publish-to-tiktok' :
+                          platform === 'instagram' ? 'publish-to-instagram' :
                           'publish-to-x'; // fallback to X for other platforms
 
       const { data, error } = await supabase.functions.invoke(functionName, {
