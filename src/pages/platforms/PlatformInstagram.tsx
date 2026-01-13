@@ -43,13 +43,29 @@ const PlatformInstagram = () => {
             <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
             <div className="space-y-1">
               <h4 className="font-medium text-amber-700 dark:text-amber-400">
-                Wymagania Instagram API
+                Wymagania Instagram API - checklista przed połączeniem
               </h4>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Konto Instagram musi być typu <strong>Business</strong> lub <strong>Creator</strong></li>
-                <li>• Konto musi być połączone ze <strong>stroną Facebook</strong></li>
-                <li>• Posty muszą zawierać <strong>obraz</strong> - posty tylko tekstowe nie są obsługiwane</li>
-                <li>• Obrazy muszą być publicznie dostępne pod URL</li>
+              <ul className="text-sm text-muted-foreground space-y-2">
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-500">1.</span>
+                  <span>Konto Instagram musi być typu <strong>Business</strong> lub <strong>Creator</strong> (Ustawienia → Typ konta → Przełącz na profesjonalne)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-500">2.</span>
+                  <span>Musisz być <strong>administratorem strony Facebook</strong></span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-500">3.</span>
+                  <span>Konto Instagram musi być <strong>połączone z tą stroną Facebook</strong> w Meta Business Suite (Ustawienia → Konta → Instagram accounts → Dodaj)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-500">4.</span>
+                  <span>Podczas autoryzacji <strong>zaznacz wszystkie zgody</strong> (Zarządzaj stronami, Instagram)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-500">5.</span>
+                  <span>Posty muszą zawierać <strong>obraz</strong> - posty tylko tekstowe nie są obsługiwane. Obrazy muszą być publicznie dostępne.</span>
+                </li>
               </ul>
             </div>
           </div>
