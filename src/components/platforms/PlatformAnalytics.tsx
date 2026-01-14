@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, TrendingUp, Calendar, CheckCircle2, Clock, Sparkles } from "lucide-react";
+import { Loader2, TrendingUp, Calendar, Clock, Sparkles, Megaphone } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 interface PlatformAnalyticsProps {
@@ -10,21 +10,40 @@ interface PlatformAnalyticsProps {
 
 export const PlatformAnalytics = ({ platform }: PlatformAnalyticsProps) => {
   const { data: analytics, isLoading } = useQuery({
-    queryKey: ["platform-analytics", platform],
+    queryKey: ["platform-campaign-analytics", platform],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("book_platform_content")
-        .select("*")
-        .eq("platform", platform);
+      // Get all campaign posts for this platform
+      const { data: campaignPosts, error } = await supabase
+        .from("campaign_posts")
+        .select(`
+          id,
+          status,
+          scheduled_at,
+          published_at,
+          type,
+          category,
+          campaign_id,
+          campaigns!inner(target_platforms)
+        `);
 
       if (error) throw error;
+
+      // Filter by platform - target_platforms is JSON array
+      const platformPosts = campaignPosts?.filter((post: any) => {
+        const platforms = post.campaigns?.target_platforms;
+        if (!platforms) return false;
+        if (Array.isArray(platforms)) {
+          return platforms.includes(platform);
+        }
+        return false;
+      }) || [];
 
       // Calculate weekly stats
       const now = new Date();
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       
-      const publishedLastWeek = data.filter((c: any) => {
-        if (!c.published_at) return false;
+      const publishedLastWeek = platformPosts.filter((c: any) => {
+        if (!c.published_at || c.status !== 'published') return false;
         const publishedDate = new Date(c.published_at);
         return publishedDate >= weekAgo && publishedDate <= now;
       });
@@ -36,8 +55,8 @@ export const PlatformAnalytics = ({ platform }: PlatformAnalyticsProps) => {
         const dayStart = new Date(date.setHours(0, 0, 0, 0));
         const dayEnd = new Date(date.setHours(23, 59, 59, 999));
         
-        const published = data.filter((c: any) => {
-          if (!c.published_at) return false;
+        const published = platformPosts.filter((c: any) => {
+          if (!c.published_at || c.status !== 'published') return false;
           const publishedDate = new Date(c.published_at);
           return publishedDate >= dayStart && publishedDate <= dayEnd;
         }).length;
@@ -48,20 +67,20 @@ export const PlatformAnalytics = ({ platform }: PlatformAnalyticsProps) => {
         });
       }
 
-      const total = data.length;
-      const published = data.filter((c: any) => c.published).length;
-      const scheduled = data.filter((c: any) => c.auto_publish_enabled && !c.published).length;
-      const withAI = data.filter((c: any) => c.ai_generated_text).length;
+      const total = platformPosts.length;
+      const published = platformPosts.filter((c: any) => c.status === 'published').length;
+      const scheduled = platformPosts.filter((c: any) => c.status === 'scheduled').length;
+      const contentPosts = platformPosts.filter((c: any) => c.type === 'content').length;
+      const salesPosts = platformPosts.filter((c: any) => c.type === 'sales').length;
       const publishedRate = total > 0 ? Math.round((published / total) * 100) : 0;
-      const aiUsageRate = total > 0 ? Math.round((withAI / total) * 100) : 0;
 
       return {
         total,
         published,
         scheduled,
-        withAI,
+        contentPosts,
+        salesPosts,
         publishedRate,
-        aiUsageRate,
         publishedLastWeek: publishedLastWeek.length,
         dailyData,
       };
@@ -72,7 +91,7 @@ export const PlatformAnalytics = ({ platform }: PlatformAnalyticsProps) => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Analityka</CardTitle>
+          <CardTitle>Analityka kampanii</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center p-8">
@@ -96,21 +115,21 @@ export const PlatformAnalytics = ({ platform }: PlatformAnalyticsProps) => {
       value: analytics?.publishedLastWeek || 0,
       icon: Calendar,
       color: "text-blue-500",
-      description: "Publikacji w ostatnich 7 dniach",
+      description: "Publikacji z kampanii",
     },
     {
       label: "Zaplanowane",
       value: analytics?.scheduled || 0,
       icon: Clock,
       color: "text-yellow-500",
-      description: "Oczekujących na publikację",
+      description: "Postów oczekujących",
     },
     {
-      label: "Wykorzystanie AI",
-      value: `${analytics?.aiUsageRate}%`,
-      icon: Sparkles,
+      label: "Content / Sprzedaż",
+      value: `${analytics?.contentPosts || 0}/${analytics?.salesPosts || 0}`,
+      icon: Megaphone,
       color: "text-purple-500",
-      description: `${analytics?.withAI} z ${analytics?.total} z tekstem AI`,
+      description: "Proporcja typów postów",
     },
   ];
 
@@ -118,7 +137,7 @@ export const PlatformAnalytics = ({ platform }: PlatformAnalyticsProps) => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Analityka szczegółowa</CardTitle>
+          <CardTitle>Analityka kampanii</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Stats Grid */}
@@ -140,7 +159,7 @@ export const PlatformAnalytics = ({ platform }: PlatformAnalyticsProps) => {
 
           {/* Chart */}
           <div className="space-y-2">
-            <h3 className="text-sm font-medium">Publikacje w ostatnim tygodniu</h3>
+            <h3 className="text-sm font-medium">Publikacje z kampanii w ostatnim tygodniu</h3>
             <ResponsiveContainer width="100%" height={200}>
               <AreaChart data={analytics?.dailyData || []}>
                 <defs>
