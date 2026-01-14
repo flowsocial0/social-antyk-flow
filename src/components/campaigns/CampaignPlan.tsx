@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Sparkles, ArrowLeft, BookOpen, TrendingUp, FileText } from "lucide-react";
+import { Loader2, Sparkles, ArrowLeft, BookOpen, TrendingUp, FileText, CheckCircle2 } from "lucide-react";
 import type { CampaignConfig, CampaignPost } from "./CampaignBuilder";
+
+type GenerationStage = 'idle' | 'fetching_cache' | 'generating_structure' | 'generating_posts' | 'scheduling';
 
 interface CampaignPlanProps {
   config: CampaignConfig;
@@ -15,6 +18,9 @@ interface CampaignPlanProps {
 export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [plan, setPlan] = useState<any>(null);
+  const [generationStage, setGenerationStage] = useState<GenerationStage>('idle');
+  const [stageProgress, setStageProgress] = useState(0);
+  const [elapsedTime, setElapsedTime] = useState(0);
 
   const totalPosts = config.durationDays * config.postsPerDay;
   const contentRatio = config.contentRatio ?? 20; // Default to 20% if not set
@@ -22,8 +28,88 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
   const salesPosts = totalPosts - contentPosts;
   const useAI = config.useAI !== false; // Default to true
 
+  // Timer effect for elapsed time
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (isGenerating) {
+      interval = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      setElapsedTime(0);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isGenerating]);
+
+  // Animated progress within each stage
+  useEffect(() => {
+    if (generationStage === 'idle' || generationStage === 'scheduling') {
+      return;
+    }
+
+    // Reset progress when stage changes
+    setStageProgress(0);
+    
+    const targetProgress = generationStage === 'generating_posts' ? 95 : 85;
+    const duration = generationStage === 'generating_posts' ? 45000 : 10000; // 45s for posts, 10s for structure
+    const increment = targetProgress / (duration / 100);
+    
+    const interval = setInterval(() => {
+      setStageProgress(prev => {
+        if (prev >= targetProgress) {
+          return prev;
+        }
+        return Math.min(prev + increment, targetProgress);
+      });
+    }, 100);
+    
+    return () => clearInterval(interval);
+  }, [generationStage]);
+
+  const getStageInfo = () => {
+    switch (generationStage) {
+      case 'fetching_cache':
+        return { 
+          step: 1, 
+          total: 4, 
+          label: 'Pobieranie zapisanych tekstów...', 
+          percentage: 10,
+          completed: false 
+        };
+      case 'generating_structure':
+        return { 
+          step: 2, 
+          total: 4, 
+          label: 'AI tworzy strukturę kampanii...', 
+          percentage: 25 + (stageProgress * 0.25),
+          completed: false 
+        };
+      case 'generating_posts':
+        return { 
+          step: 3, 
+          total: 4, 
+          label: `AI generuje treści ${totalPosts} postów...`, 
+          percentage: 50 + (stageProgress * 0.45),
+          completed: false 
+        };
+      case 'scheduling':
+        return { 
+          step: 4, 
+          total: 4, 
+          label: 'Planowanie harmonogramu...', 
+          percentage: 98,
+          completed: false 
+        };
+      default:
+        return { step: 0, total: 4, label: '', percentage: 0, completed: false };
+    }
+  };
+
   const handleGenerateWithAI = async () => {
     setIsGenerating(true);
+    setGenerationStage('fetching_cache');
     try {
       // Fetch cached texts if not regenerating
       let cachedTexts: Record<string, Record<string, string>> = {};
@@ -65,6 +151,7 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
       }
       
       // Step 1: Generate campaign structure
+      setGenerationStage('generating_structure');
       console.log("Generating campaign structure...");
       const structureResponse = await supabase.functions.invoke('generate-campaign', {
         body: {
@@ -89,6 +176,7 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
       console.log("Structure generated:", structure);
 
       // Step 2: Generate content for each post
+      setGenerationStage('generating_posts');
       console.log("Generating post content...");
       console.log("Passing cachedTexts to edge function, keys count:", Object.keys(cachedTexts).length);
       
@@ -114,6 +202,7 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
       console.log("Posts generated:", generatedPosts.length);
 
       // Step 3: Schedule posts
+      setGenerationStage('scheduling');
       const scheduledPosts = scheduleGeneratedPosts(generatedPosts);
 
       setPlan({ structure });
@@ -126,6 +215,8 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
       });
     } finally {
       setIsGenerating(false);
+      setGenerationStage('idle');
+      setStageProgress(0);
     }
   };
 
@@ -393,17 +484,57 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
             </Button>
           </div>
         ) : (
-          <Card className="p-6 bg-primary/5 border-primary/20">
-            <div className="flex flex-col items-center gap-4">
-              <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <div className="text-center">
-                <p className="font-semibold">
-                  {useAI ? "Grok AI tworzy Twoją kampanię..." : "Tworzę kampanię z opisów książek..."}
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {useAI ? "To może potrwać 30-60 sekund" : "To zajmie tylko chwilę"}
-                </p>
+          <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/30 shadow-lg animate-in fade-in duration-300">
+            <div className="flex flex-col gap-6">
+              {/* Stage indicators */}
+              <div className="flex items-center justify-between gap-2">
+                {['fetching_cache', 'generating_structure', 'generating_posts', 'scheduling'].map((stage, index) => {
+                  const stageNames = ['Cache', 'Struktura', 'Treści', 'Plan'];
+                  const currentStageIndex = ['fetching_cache', 'generating_structure', 'generating_posts', 'scheduling'].indexOf(generationStage);
+                  const isCompleted = index < currentStageIndex;
+                  const isCurrent = stage === generationStage;
+                  
+                  return (
+                    <div key={stage} className="flex items-center gap-2 flex-1">
+                      <div className={`
+                        w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
+                        ${isCompleted ? 'bg-green-500 text-white' : isCurrent ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}
+                      `}>
+                        {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
+                      </div>
+                      <span className={`text-xs font-medium hidden sm:inline ${isCurrent ? 'text-primary' : 'text-muted-foreground'}`}>
+                        {stageNames[index]}
+                      </span>
+                      {index < 3 && (
+                        <div className={`flex-1 h-0.5 ${isCompleted ? 'bg-green-500' : 'bg-muted'}`} />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
+
+              {/* Main progress indicator */}
+              <div className="flex items-center gap-4">
+                <Loader2 className="h-10 w-10 animate-spin text-primary flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="font-semibold text-lg">{getStageInfo().label}</p>
+                    <span className="text-2xl font-bold text-primary">{Math.round(getStageInfo().percentage)}%</span>
+                  </div>
+                  <Progress value={getStageInfo().percentage} className="h-3" />
+                </div>
+              </div>
+
+              {/* Time and info */}
+              <div className="flex justify-between items-center text-sm text-muted-foreground">
+                <span>Etap {getStageInfo().step} z {getStageInfo().total}</span>
+                <span>Czas: {Math.floor(elapsedTime / 60)}:{(elapsedTime % 60).toString().padStart(2, '0')}</span>
+              </div>
+
+              {/* Warning */}
+              <p className="text-xs text-center text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-md py-2 px-3">
+                ⏳ Proszę nie zamykać tej strony - generowanie jest w toku...
+              </p>
             </div>
           </Card>
         )}
