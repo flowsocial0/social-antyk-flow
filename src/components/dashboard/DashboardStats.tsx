@@ -4,21 +4,40 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export const DashboardStats = () => {
-  // Fetch active campaigns count
+  // Fetch active campaigns - campaign is active if it has at least 1 scheduled post and is not paused
   const { data: campaignsData } = useQuery({
-    queryKey: ["campaigns-stats"],
+    queryKey: ["campaigns-stats-active"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Get all campaigns
+      const { data: campaigns, error: campaignsError } = await supabase
         .from("campaigns")
         .select("id, status");
-      if (error) throw error;
+      if (campaignsError) throw campaignsError;
+
+      const totalCampaigns = campaigns?.length || 0;
+
+      // Get campaigns that have at least 1 scheduled post remaining
+      const { data: scheduledPosts, error: postsError } = await supabase
+        .from("campaign_posts")
+        .select("campaign_id")
+        .eq("status", "scheduled");
+      if (postsError) throw postsError;
+
+      // Get unique campaign IDs with scheduled posts
+      const campaignIdsWithScheduledPosts = [...new Set(scheduledPosts?.map(p => p.campaign_id) || [])];
+
+      // Active = has scheduled posts AND is not paused
+      const activeCampaigns = campaigns?.filter(c => 
+        campaignIdsWithScheduledPosts.includes(c.id) && c.status !== 'paused'
+      ).length || 0;
+
       return {
-        total: data?.length || 0,
-        active: data?.filter(c => c.status === 'active').length || 0
+        total: totalCampaigns,
+        active: activeCampaigns
       };
     },
-    staleTime: 300000,
-    refetchInterval: 300000,
+    staleTime: 180000,
+    refetchInterval: 180000,
   });
 
   // Fetch scheduled campaign posts (next 7 days)
@@ -79,11 +98,27 @@ export const DashboardStats = () => {
     refetchInterval: 300000,
   });
 
+  // Fetch total books count
+  const { data: booksCount } = useQuery({
+    queryKey: ["total-books-count"],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("books")
+        .select("*", { count: "exact", head: true });
+
+      if (error) throw error;
+      return count || 0;
+    },
+    staleTime: 300000,
+    refetchInterval: 300000,
+  });
+
   const activeCampaigns = campaignsData?.active || 0;
   const totalCampaigns = campaignsData?.total || 0;
   const scheduledCount = scheduledPosts?.length || 0;
   const publishedMonthCount = publishedThisMonth?.length || 0;
   const publishedTotalCount = totalPublished || 0;
+  const totalBooks = booksCount || 0;
 
   const stats = [
     {
@@ -91,7 +126,7 @@ export const DashboardStats = () => {
       value: activeCampaigns.toString(),
       icon: Megaphone,
       description: `z ${totalCampaigns} wszystkich`,
-      trend: "Publikacje automatyczne",
+      trend: "Kampanie z zaplanowanymi postami",
     },
     {
       title: "Zaplanowane posty",
@@ -108,11 +143,11 @@ export const DashboardStats = () => {
       trend: `${publishedTotalCount} łącznie`,
     },
     {
-      title: "Aktywne platformy",
-      value: `4/13`,
-      icon: Activity,
-      description: "Połączone",
-      trend: "X, Facebook, TikTok, Instagram",
+      title: "Książki w bazie",
+      value: totalBooks.toString(),
+      icon: BookOpen,
+      description: "Produkty do promocji",
+      trend: "Dostępne w kampaniach",
     },
   ];
 
