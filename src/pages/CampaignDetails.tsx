@@ -6,7 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Calendar, TrendingUp, CheckCircle2, Clock, Trash2, AlertCircle, Plus, RefreshCw, Pencil, Pause } from "lucide-react";
+import {
+  ArrowLeft,
+  Calendar,
+  TrendingUp,
+  CheckCircle2,
+  Clock,
+  Trash2,
+  AlertCircle,
+  Plus,
+  RefreshCw,
+  Pencil,
+  Pause,
+} from "lucide-react";
 import { CampaignPostCard } from "@/components/campaigns/CampaignPostCard";
 import { ResumeCampaignDialog } from "@/components/campaigns/ResumeCampaignDialog";
 import { format } from "date-fns";
@@ -36,13 +48,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const CampaignDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -72,13 +78,9 @@ const CampaignDetails = () => {
   }, [navigate]);
 
   const { data: campaign, isLoading: campaignLoading } = useQuery({
-    queryKey: ['campaign', id],
+    queryKey: ["campaign", id],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from('campaigns')
-        .select('*')
-        .eq('id', id)
-        .single();
+      const { data, error } = await (supabase as any).from("campaigns").select("*").eq("id", id).single();
 
       if (error) throw error;
       return data;
@@ -87,16 +89,18 @@ const CampaignDetails = () => {
   });
 
   const { data: posts, isLoading: postsLoading } = useQuery({
-    queryKey: ['campaign-posts', id],
-  queryFn: async () => {
-    const { data, error } = await (supabase as any)
-      .from('campaign_posts')
-      .select(`
+    queryKey: ["campaign-posts", id],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("campaign_posts")
+        .select(
+          `
         *,
         book:books(id, title, image_url, product_url)
-      `)
-      .eq('campaign_id', id)
-      .order('scheduled_at', { ascending: true });
+      `,
+        )
+        .eq("campaign_id", id)
+        .order("scheduled_at", { ascending: true });
 
       if (error) throw error;
       return data;
@@ -105,16 +109,16 @@ const CampaignDetails = () => {
   });
 
   const updatePostMutation = useMutation({
-  mutationFn: async ({ postId, text }: { postId: string; text: string }) => {
-    const { error } = await (supabase as any)
-      .from('campaign_posts')
-      .update({ text } as any)
-      .eq('id', postId);
+    mutationFn: async ({ postId, text }: { postId: string; text: string }) => {
+      const { error } = await (supabase as any)
+        .from("campaign_posts")
+        .update({ text } as any)
+        .eq("id", postId);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['campaign-posts', id] });
+      queryClient.invalidateQueries({ queryKey: ["campaign-posts", id] });
       toast.success("Post zaktualizowany");
     },
     onError: () => {
@@ -124,15 +128,12 @@ const CampaignDetails = () => {
 
   const updateCampaignNameMutation = useMutation({
     mutationFn: async (newName: string) => {
-      const { error } = await (supabase as any)
-        .from('campaigns')
-        .update({ name: newName })
-        .eq('id', id);
+      const { error } = await (supabase as any).from("campaigns").update({ name: newName }).eq("id", id);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['campaign', id] });
+      queryClient.invalidateQueries({ queryKey: ["campaign", id] });
       toast.success("Nazwa kampanii została zaktualizowana");
       setIsEditNameDialogOpen(false);
     },
@@ -142,17 +143,14 @@ const CampaignDetails = () => {
   });
 
   const deleteCampaignMutation = useMutation({
-  mutationFn: async () => {
-    const { error } = await (supabase as any)
-      .from('campaigns')
-      .delete()
-      .eq('id', id);
+    mutationFn: async () => {
+      const { error } = await (supabase as any).from("campaigns").delete().eq("id", id);
 
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Kampania została usunięta");
-      navigate('/campaigns');
+      navigate("/campaigns");
     },
     onError: () => {
       toast.error("Błąd podczas usuwania kampanii");
@@ -161,15 +159,12 @@ const CampaignDetails = () => {
 
   const deletePostMutation = useMutation({
     mutationFn: async (postId: string) => {
-      const { error } = await (supabase as any)
-        .from('campaign_posts')
-        .delete()
-        .eq('id', postId);
+      const { error } = await (supabase as any).from("campaign_posts").delete().eq("id", postId);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['campaign-posts', id] });
+      queryClient.invalidateQueries({ queryKey: ["campaign-posts", id] });
       toast.success("Post został usunięty");
     },
     onError: () => {
@@ -182,14 +177,16 @@ const CampaignDetails = () => {
       const post = posts?.find((p: any) => p.id === postId);
       if (!post) throw new Error("Post nie został znaleziony");
 
-      const { data, error } = await supabase.functions.invoke('generate-campaign', {
+      const { data, error } = await supabase.functions.invoke("generate-campaign", {
         body: {
-          action: 'generate_posts',
-          structure: [{
-            position: post.day,
-            type: post.type,
-            category: post.category,
-          }],
+          action: "generate_posts",
+          structure: [
+            {
+              position: post.day,
+              type: post.type,
+              category: post.category,
+            },
+          ],
         },
       });
 
@@ -200,14 +197,14 @@ const CampaignDetails = () => {
 
       const newText = data.posts[0].text;
       const { error: updateError } = await (supabase as any)
-        .from('campaign_posts')
+        .from("campaign_posts")
         .update({ text: newText } as any)
-        .eq('id', postId);
+        .eq("id", postId);
 
       if (updateError) throw updateError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['campaign-posts', id] });
+      queryClient.invalidateQueries({ queryKey: ["campaign-posts", id] });
       toast.success("Tekst został zregenerowany");
     },
     onError: (error: any) => {
@@ -219,32 +216,30 @@ const CampaignDetails = () => {
   const addPostMutation = useMutation({
     mutationFn: async () => {
       if (!campaign) throw new Error("Kampania nie została załadowana");
-      
+
       // Calculate scheduled_at based on campaign start date, day and time
       const startDate = new Date(campaign.start_date);
       const scheduledDate = new Date(startDate);
       scheduledDate.setDate(scheduledDate.getDate() + newPost.day - 1);
-      const [hours, minutes] = newPost.time.split(':').map(Number);
+      const [hours, minutes] = newPost.time.split(":").map(Number);
       scheduledDate.setHours(hours, minutes, 0, 0);
 
-      const { error } = await (supabase as any)
-        .from('campaign_posts')
-        .insert({
-          campaign_id: id,
-          day: newPost.day,
-          time: newPost.time,
-          type: newPost.type,
-          category: newPost.category,
-          text: newPost.text,
-          scheduled_at: scheduledDate.toISOString(),
-          status: 'scheduled',
-          platforms: campaign.target_platforms || ['x'],
-        });
+      const { error } = await (supabase as any).from("campaign_posts").insert({
+        campaign_id: id,
+        day: newPost.day,
+        time: newPost.time,
+        type: newPost.type,
+        category: newPost.category,
+        text: newPost.text,
+        scheduled_at: scheduledDate.toISOString(),
+        status: "scheduled",
+        platforms: campaign.target_platforms || ["x"],
+      });
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['campaign-posts', id] });
+      queryClient.invalidateQueries({ queryKey: ["campaign-posts", id] });
       toast.success("Post został dodany");
       setIsAddingPost(false);
       setNewPost({
@@ -263,14 +258,14 @@ const CampaignDetails = () => {
   const updateScheduleMutation = useMutation({
     mutationFn: async ({ postId, scheduledAt }: { postId: string; scheduledAt: string }) => {
       const { error } = await (supabase as any)
-        .from('campaign_posts')
+        .from("campaign_posts")
         .update({ scheduled_at: scheduledAt } as any)
-        .eq('id', postId);
+        .eq("id", postId);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['campaign-posts', id] });
+      queryClient.invalidateQueries({ queryKey: ["campaign-posts", id] });
       toast.success("Godzina publikacji zaktualizowana");
     },
     onError: () => {
@@ -282,22 +277,22 @@ const CampaignDetails = () => {
     mutationFn: async (postId: string) => {
       const scheduledAt = new Date();
       scheduledAt.setMinutes(scheduledAt.getMinutes() + 2);
-      
+
       // Keep error information but update schedule and status
       const { error } = await (supabase as any)
-        .from('campaign_posts')
-        .update({ 
-          status: 'scheduled',
+        .from("campaign_posts")
+        .update({
+          status: "scheduled",
           scheduled_at: scheduledAt.toISOString(),
           published_at: null,
           next_retry_at: null, // Clear automatic retry time since user is manually retrying
         } as any)
-        .eq('id', postId);
+        .eq("id", postId);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['campaign-posts', id] });
+      queryClient.invalidateQueries({ queryKey: ["campaign-posts", id] });
       toast.success("Post zostanie ponownie wysłany za 2 minuty");
     },
     onError: () => {
@@ -309,24 +304,24 @@ const CampaignDetails = () => {
     mutationFn: async () => {
       // Update campaign status to paused
       const { error: campaignError } = await (supabase as any)
-        .from('campaigns')
-        .update({ status: 'paused' })
-        .eq('id', id);
+        .from("campaigns")
+        .update({ status: "paused" })
+        .eq("id", id);
 
       if (campaignError) throw campaignError;
 
       // Also pause all scheduled posts in this campaign
       const { error: postsError } = await (supabase as any)
-        .from('campaign_posts')
-        .update({ status: 'paused' })
-        .eq('campaign_id', id)
-        .eq('status', 'scheduled');
+        .from("campaign_posts")
+        .update({ status: "paused" })
+        .eq("campaign_id", id)
+        .eq("status", "scheduled");
 
       if (postsError) throw postsError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['campaign', id] });
-      queryClient.invalidateQueries({ queryKey: ['campaign-posts', id] });
+      queryClient.invalidateQueries({ queryKey: ["campaign", id] });
+      queryClient.invalidateQueries({ queryKey: ["campaign-posts", id] });
       toast.success("Kampania została zatrzymana. Posty nie będą publikowane.");
     },
     onError: () => {
@@ -350,36 +345,63 @@ const CampaignDetails = () => {
     );
   }
 
-  const publishedCount = posts.filter(p => p.status === 'published').length;
-  const scheduledCount = posts.filter(p => p.status === 'scheduled').length;
-  const failedCount = posts.filter(p => p.status === 'failed').length;
-  const pausedCount = posts.filter(p => p.status === 'paused').length;
+  const publishedCount = posts.filter((p) => p.status === "published").length;
+  const scheduledCount = posts.filter((p) => p.status === "scheduled").length;
+  const failedCount = posts.filter((p) => p.status === "failed").length;
+  const pausedCount = posts.filter((p) => p.status === "paused").length;
   const progress = posts.length > 0 ? (publishedCount / posts.length) * 100 : 0;
 
   // Group posts by day
-  const postsByDay = (posts as any[]).reduce((acc: Record<number, any[]>, post: any) => {
-    const day = post.day as number;
-    if (!acc[day]) {
-      acc[day] = [];
-    }
-    acc[day].push(post);
-    return acc;
-  }, {} as Record<number, any[]>);
+  const postsByDay = (posts as any[]).reduce(
+    (acc: Record<number, any[]>, post: any) => {
+      const day = post.day as number;
+      if (!acc[day]) {
+        acc[day] = [];
+      }
+      acc[day].push(post);
+      return acc;
+    },
+    {} as Record<number, any[]>,
+  );
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'draft':
-        return <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" /> Szkic</Badge>;
-      case 'scheduled':
-        return <Badge variant="outline" className="gap-1"><Calendar className="h-3 w-3" /> Zaplanowana</Badge>;
-      case 'active':
-        return <Badge className="gap-1 bg-gradient-primary"><TrendingUp className="h-3 w-3" /> Aktywna</Badge>;
-      case 'completed':
-        return <Badge variant="secondary" className="gap-1 bg-green-500/10 text-green-600 border-green-500/20"><CheckCircle2 className="h-3 w-3" /> Zakończona</Badge>;
-      case 'cancelled':
-        return <Badge variant="secondary" className="gap-1 bg-red-500/10 text-red-600 border-red-500/20"><AlertCircle className="h-3 w-3" /> Anulowana</Badge>;
-      case 'paused':
-        return <Badge variant="secondary" className="gap-1 bg-yellow-500/10 text-yellow-600 border-yellow-500/20"><Pause className="h-3 w-3" /> Zatrzymana</Badge>;
+      case "draft":
+        return (
+          <Badge variant="secondary" className="gap-1">
+            <Clock className="h-3 w-3" /> Szkic
+          </Badge>
+        );
+      case "scheduled":
+        return (
+          <Badge variant="outline" className="gap-1">
+            <Calendar className="h-3 w-3" /> Zaplanowana
+          </Badge>
+        );
+      case "active":
+        return (
+          <Badge className="gap-1 bg-gradient-primary">
+            <TrendingUp className="h-3 w-3" /> Aktywna
+          </Badge>
+        );
+      case "completed":
+        return (
+          <Badge variant="secondary" className="gap-1 bg-green-500/10 text-green-600 border-green-500/20">
+            <CheckCircle2 className="h-3 w-3" /> Zakończona
+          </Badge>
+        );
+      case "cancelled":
+        return (
+          <Badge variant="secondary" className="gap-1 bg-red-500/10 text-red-600 border-red-500/20">
+            <AlertCircle className="h-3 w-3" /> Anulowana
+          </Badge>
+        );
+      case "paused":
+        return (
+          <Badge variant="secondary" className="gap-1 bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+            <Pause className="h-3 w-3" /> Zatrzymana
+          </Badge>
+        );
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -420,21 +442,21 @@ const CampaignDetails = () => {
                 </p>
               </div>
             </div>
+            <p>Akcje kampanii:</p>
             <div className="flex gap-2">
-              {campaign.status !== 'paused' && campaign.status !== 'completed' && (
+              {campaign.status !== "paused" && campaign.status !== "completed" && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="outline" className="gap-2">
                       <Pause className="h-4 w-4" />
-                      Zatrzymaj kampanię
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Czy na pewno chcesz zatrzymać tę kampanię?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Wszystkie zaplanowane posty zostaną wstrzymane i nie będą automatycznie publikowane.
-                        Możesz wznowić kampanię w każdej chwili.
+                        Wszystkie zaplanowane posty zostaną wstrzymane i nie będą automatycznie publikowane. Możesz
+                        wznowić kampanię w każdej chwili.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -449,19 +471,13 @@ const CampaignDetails = () => {
                   </AlertDialogContent>
                 </AlertDialog>
               )}
-              <Button
-                variant="secondary"
-                className="gap-2"
-                onClick={() => setIsResumeDialogOpen(true)}
-              >
+              <Button variant="secondary" className="gap-2" onClick={() => setIsResumeDialogOpen(true)}>
                 <RefreshCw className="h-4 w-4" />
-                Wznów kampanię
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" className="gap-2">
                     <Trash2 className="h-4 w-4" />
-                    Usuń kampanię
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
@@ -504,7 +520,7 @@ const CampaignDetails = () => {
                 {format(
                   new Date(new Date(campaign.start_date).getTime() + campaign.duration_days * 24 * 60 * 60 * 1000),
                   "d MMM yyyy",
-                  { locale: pl }
+                  { locale: pl },
                 )}
               </p>
             </div>
@@ -575,9 +591,7 @@ const CampaignDetails = () => {
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Dodaj nowy post</DialogTitle>
-                  <DialogDescription>
-                    Stwórz nowy post i dodaj go do harmonogramu kampanii
-                  </DialogDescription>
+                  <DialogDescription>Stwórz nowy post i dodaj go do harmonogramu kampanii</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -663,42 +677,42 @@ const CampaignDetails = () => {
             </Dialog>
           </div>
 
-  {Object.entries(postsByDay as Record<string, any[]>).map(([day, dayPosts]) => {
-    const dayDate = new Date(campaign.start_date);
-    dayDate.setDate(dayDate.getDate() + parseInt(day) - 1);
+          {Object.entries(postsByDay as Record<string, any[]>).map(([day, dayPosts]) => {
+            const dayDate = new Date(campaign.start_date);
+            dayDate.setDate(dayDate.getDate() + parseInt(day) - 1);
 
-    return (
-      <Card key={day} className="p-6 bg-gradient-card border-border/50">
-        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-          <Calendar className="h-5 w-5 text-primary" />
-          Dzień {day} - {format(dayDate, "EEEE, d MMMM yyyy", { locale: pl })}
-        </h3>
-        <div className="grid gap-4 md:grid-cols-2">
-          {(dayPosts as any[]).map((post) => (
-            <CampaignPostCard
-              key={post.id}
-              post={post}
-              onSave={async (postId, text) => {
-                await updatePostMutation.mutateAsync({ postId, text });
-              }}
-              onRegenerate={async (postId) => {
-                await regeneratePostMutation.mutateAsync(postId);
-              }}
-              onDelete={async (postId) => {
-                await deletePostMutation.mutateAsync(postId);
-              }}
-              onUpdateSchedule={async (postId, scheduledAt) => {
-                await updateScheduleMutation.mutateAsync({ postId, scheduledAt });
-              }}
-              onRetry={async (postId) => {
-                await retryPostMutation.mutateAsync(postId);
-              }}
-            />
-          ))}
-        </div>
-      </Card>
-    );
-  })}
+            return (
+              <Card key={day} className="p-6 bg-gradient-card border-border/50">
+                <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  Dzień {day} - {format(dayDate, "EEEE, d MMMM yyyy", { locale: pl })}
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {(dayPosts as any[]).map((post) => (
+                    <CampaignPostCard
+                      key={post.id}
+                      post={post}
+                      onSave={async (postId, text) => {
+                        await updatePostMutation.mutateAsync({ postId, text });
+                      }}
+                      onRegenerate={async (postId) => {
+                        await regeneratePostMutation.mutateAsync(postId);
+                      }}
+                      onDelete={async (postId) => {
+                        await deletePostMutation.mutateAsync(postId);
+                      }}
+                      onUpdateSchedule={async (postId, scheduledAt) => {
+                        await updateScheduleMutation.mutateAsync({ postId, scheduledAt });
+                      }}
+                      onRetry={async (postId) => {
+                        await retryPostMutation.mutateAsync(postId);
+                      }}
+                    />
+                  ))}
+                </div>
+              </Card>
+            );
+          })}
         </div>
       </main>
 
@@ -714,7 +728,7 @@ const CampaignDetails = () => {
             posts_per_day: campaign.posts_per_day,
             start_date: campaign.start_date,
             posting_times: campaign.posting_times || [],
-            target_platforms: campaign.target_platforms || ['x'],
+            target_platforms: campaign.target_platforms || ["x"],
           }}
           posts={posts.map((p: any) => ({
             id: p.id,
@@ -724,7 +738,7 @@ const CampaignDetails = () => {
             category: p.category,
             text: p.text,
             book_id: p.book_id,
-            platforms: p.platforms || campaign.target_platforms || ['x'],
+            platforms: p.platforms || campaign.target_platforms || ["x"],
           }))}
         />
       )}
@@ -734,9 +748,7 @@ const CampaignDetails = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edytuj nazwę kampanii</DialogTitle>
-            <DialogDescription>
-              Wprowadź nową nazwę dla tej kampanii.
-            </DialogDescription>
+            <DialogDescription>Wprowadź nową nazwę dla tej kampanii.</DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Label htmlFor="campaign-name">Nazwa kampanii</Label>
