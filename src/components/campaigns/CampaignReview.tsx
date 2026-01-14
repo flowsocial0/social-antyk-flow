@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -19,6 +20,8 @@ interface CampaignReviewProps {
 
 export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) => {
   const [isScheduling, setIsScheduling] = useState(false);
+  const [schedulingProgress, setSchedulingProgress] = useState(0);
+  const [scheduledCount, setScheduledCount] = useState(0);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editedText, setEditedText] = useState("");
   const [localPosts, setLocalPosts] = useState(posts);
@@ -47,6 +50,12 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
 
   const handleScheduleAll = async () => {
     setIsScheduling(true);
+    setSchedulingProgress(0);
+    setScheduledCount(0);
+    
+    const totalSteps = localPosts.length + 1; // +1 for campaign creation
+    let completedSteps = 0;
+    
     try {
       // Use config.name or generate default
       const campaignName = config.name || `Kampania ${format(parseISO(config.startDate), 'dd.MM.yyyy', { locale: pl })}`;
@@ -68,9 +77,13 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
         .single();
 
       if (campaignError) throw campaignError;
+      
+      completedSteps++;
+      setSchedulingProgress(Math.round((completedSteps / totalSteps) * 100));
 
       // Create entries in campaign_posts table
-      for (const post of localPosts) {
+      for (let i = 0; i < localPosts.length; i++) {
+        const post = localPosts[i];
         const { error: postError } = await (supabase as any).from('campaign_posts').insert({
           campaign_id: campaignData.id,
           day: post.day,
@@ -127,6 +140,11 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
             }
           }
         }
+        
+        // Update progress
+        completedSteps++;
+        setScheduledCount(i + 1);
+        setSchedulingProgress(Math.round((completedSteps / totalSteps) * 100));
       }
 
       toast.success(`Zaplanowano kampanię z ${localPosts.length} postami!`, {
@@ -144,6 +162,8 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
       });
     } finally {
       setIsScheduling(false);
+      setSchedulingProgress(0);
+      setScheduledCount(0);
     }
   };
 
@@ -353,34 +373,55 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
           })}
       </div>
 
-      <div className="flex gap-3 justify-between pt-6 border-t">
-        <Button
-          variant="outline"
-          onClick={onBack}
-          disabled={isScheduling}
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Wstecz
-        </Button>
+      <div className="flex flex-col gap-4 pt-6 border-t">
+        {isScheduling && (
+          <Card className="p-4 bg-primary/5 border-primary/20">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Planowanie postów...</span>
+                <span className="text-sm text-muted-foreground">
+                  {scheduledCount} / {localPosts.length} ({schedulingProgress}%)
+                </span>
+              </div>
+              <Progress value={schedulingProgress} className="h-2" />
+              <p className="text-xs text-muted-foreground">
+                {scheduledCount === 0 
+                  ? "Tworzenie kampanii..." 
+                  : `Zaplanowano ${scheduledCount} z ${localPosts.length} postów`}
+              </p>
+            </div>
+          </Card>
+        )}
         
-        <Button
-          onClick={handleScheduleAll}
-          disabled={isScheduling}
-          size="lg"
-          className="min-w-[200px]"
-        >
-          {isScheduling ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Planowanie...
-            </>
-          ) : (
-            <>
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Zaplanuj kampanię
-            </>
-          )}
-        </Button>
+        <div className="flex gap-3 justify-between">
+          <Button
+            variant="outline"
+            onClick={onBack}
+            disabled={isScheduling}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Wstecz
+          </Button>
+          
+          <Button
+            onClick={handleScheduleAll}
+            disabled={isScheduling}
+            size="lg"
+            className="min-w-[200px]"
+          >
+            {isScheduling ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Planowanie... {schedulingProgress}%
+              </>
+            ) : (
+              <>
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Zaplanuj kampanię
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );
