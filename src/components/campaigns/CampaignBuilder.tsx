@@ -25,6 +25,7 @@ export type CampaignConfig = {
   selectedBooks?: string[];
   useAI?: boolean;
   regenerateTexts?: boolean;
+  contentRatio?: number; // 0-100, percentage of content posts
 };
 
 export const CampaignBuilder = () => {

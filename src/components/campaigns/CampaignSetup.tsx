@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Clock, ArrowRight, Plus, X, ArrowUpDown, AlertCircle, Sparkles, RefreshCw } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Calendar, Clock, ArrowRight, Plus, X, ArrowUpDown, AlertCircle, Sparkles, RefreshCw, Percent } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import type { CampaignConfig } from "./CampaignBuilder";
@@ -33,6 +34,7 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
   const [selectedBooks, setSelectedBooks] = useState<string[]>([]);
   const [useAI, setUseAI] = useState(true);
   const [regenerateTexts, setRegenerateTexts] = useState(false);
+  const [contentRatio, setContentRatio] = useState(20); // Default 20% content, 80% sales
   const [connectedPlatforms, setConnectedPlatforms] = useState<Record<PlatformId, boolean>>(
     {} as Record<PlatformId, boolean>
   );
@@ -139,7 +141,7 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
   };
 
   const totalPosts = durationDays * postsPerDay;
-  const contentPosts = Math.floor(totalPosts * 0.2);
+  const contentPosts = Math.floor(totalPosts * (contentRatio / 100));
   const salesPosts = totalPosts - contentPosts;
 
   const handleSubmit = () => {
@@ -163,7 +165,8 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
       targetPlatforms,
       selectedBooks,
       useAI,
-      regenerateTexts
+      regenerateTexts,
+      contentRatio
     });
   };
 
@@ -274,6 +277,33 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
             />
           </div>
 
+          {/* Content/Sales Ratio Slider */}
+          <div className="space-y-4">
+            <Label className="flex items-center gap-2">
+              <Percent className="h-4 w-4" />
+              Proporcja postów contentowych vs sprzedażowych
+            </Label>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-muted-foreground w-24">Content: {contentRatio}%</span>
+              <Slider
+                value={[contentRatio]}
+                onValueChange={(value) => setContentRatio(value[0])}
+                min={0}
+                max={100}
+                step={5}
+                className="flex-1 max-w-md"
+              />
+              <span className="text-sm text-muted-foreground w-28">Sprzedaż: {100 - contentRatio}%</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {contentRatio === 0 && "Tylko posty sprzedażowe - bezpośrednia promocja książek"}
+              {contentRatio > 0 && contentRatio < 30 && "Większość postów sprzedażowych z odrobiną contentu"}
+              {contentRatio >= 30 && contentRatio <= 50 && "Zrównoważona mieszanka contentu i sprzedaży"}
+              {contentRatio > 50 && contentRatio < 100 && "Większość postów contentowych, mniej promocji"}
+              {contentRatio === 100 && "Tylko posty contentowe - ciekawostki, zagadki, wydarzenia"}
+            </p>
+          </div>
+
           {/* Posting times */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -362,11 +392,11 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
             <p className="text-3xl font-bold text-primary">{totalPosts}</p>
           </div>
           <div>
-            <p className="text-sm text-muted-foreground">Posty contentowe (20%)</p>
+            <p className="text-sm text-muted-foreground">Posty contentowe ({contentRatio}%)</p>
             <p className="text-3xl font-bold text-blue-500">{contentPosts}</p>
           </div>
           <div>
-            <p className="text-sm text-muted-foreground">Posty sprzedażowe (80%)</p>
+            <p className="text-sm text-muted-foreground">Posty sprzedażowe ({100 - contentRatio}%)</p>
             <p className="text-3xl font-bold text-green-500">{salesPosts}</p>
           </div>
           <div>
@@ -377,11 +407,11 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
         
         <div className="mt-4 p-4 bg-secondary/50 rounded-lg">
           <p className="text-sm text-muted-foreground mb-2">
-            <strong>Strategia 20/80:</strong>
+            <strong>Strategia {contentRatio}/{100 - contentRatio}:</strong>
           </p>
           <ul className="text-sm space-y-1 text-muted-foreground">
-            <li>• 20% postów to wartościowy content (ciekawostki, zagadki, wydarzenia)</li>
-            <li>• 80% postów to bezpośrednia promocja i sprzedaż książek</li>
+            <li>• {contentRatio}% postów to wartościowy content (ciekawostki, zagadki, wydarzenia)</li>
+            <li>• {100 - contentRatio}% postów to bezpośrednia promocja i sprzedaż książek</li>
             <li>• {useAI ? "Grok AI automatycznie dobierze odpowiednie typy postów" : "Treści zostaną pobrane z opisów książek w bazie"}</li>
           </ul>
         </div>
