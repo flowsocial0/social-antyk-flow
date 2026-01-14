@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Twitter, Facebook, Instagram, CheckCircle2, XCircle, Loader2, Video, ArrowLeft } from "lucide-react";
+import { Twitter, Facebook, Instagram, Youtube, CheckCircle2, XCircle, Loader2, Video, ArrowLeft } from "lucide-react";
 import { Footer } from "@/components/layout/Footer";
 
 export default function SocialAccounts() {
@@ -13,22 +13,32 @@ export default function SocialAccounts() {
   const [isLoadingFB, setIsLoadingFB] = useState(false);
   const [isLoadingTikTok, setIsLoadingTikTok] = useState(false);
   const [isLoadingIG, setIsLoadingIG] = useState(false);
+  const [isLoadingYT, setIsLoadingYT] = useState(false);
   const [xConnected, setXConnected] = useState(false);
   const [fbConnected, setFbConnected] = useState(false);
   const [tiktokConnected, setTiktokConnected] = useState(false);
   const [igConnected, setIgConnected] = useState(false);
+  const [ytConnected, setYtConnected] = useState(false);
   const [xUsername, setXUsername] = useState<string | null>(null);
   const [fbPageName, setFbPageName] = useState<string | null>(null);
   const [tiktokOpenId, setTiktokOpenId] = useState<string | null>(null);
   const [igUsername, setIgUsername] = useState<string | null>(null);
+  const [ytChannelName, setYtChannelName] = useState<string | null>(null);
 
   useEffect(() => {
     checkConnections();
     
     // Auto-refresh after OAuth callback
     const params = new URLSearchParams(window.location.search);
-    if (params.get('connected') === 'true' || params.get('success') || params.get('instagram') === 'connected') {
+    if (params.get('connected') === 'true' || params.get('success') || params.get('instagram') === 'connected' || params.get('youtube') === 'connected') {
       checkConnections();
+      window.history.replaceState({}, '', '/settings/social-accounts');
+    }
+    // Handle YouTube callback errors
+    if (params.get('youtube') === 'error') {
+      toast.error('Błąd połączenia YouTube', {
+        description: 'Spróbuj ponownie'
+      });
       window.history.replaceState({}, '', '/settings/social-accounts');
     }
     // Handle Instagram callback errors
@@ -101,6 +111,18 @@ export default function SocialAccounts() {
     if (igData) {
       setIgConnected(true);
       setIgUsername((igData as any).instagram_username ?? null);
+    }
+
+    // Check YouTube connection
+    const { data: ytData } = await (supabase as any)
+      .from('youtube_oauth_tokens')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .maybeSingle();
+
+    if (ytData) {
+      setYtConnected(true);
+      setYtChannelName((ytData as any).channel_title ?? null);
     }
   };
 
@@ -370,6 +392,68 @@ export default function SocialAccounts() {
     }
   };
 
+  const connectYouTube = async () => {
+    setIsLoadingYT(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Musisz być zalogowany', {
+          description: 'Zaloguj się, aby połączyć konto YouTube'
+        });
+        setIsLoadingYT(false);
+        return;
+      }
+
+      const redirectUri = `${window.location.origin}/oauth/youtube/callback`;
+      const { data, error } = await supabase.functions.invoke('youtube-oauth-start', {
+        body: { redirectUri }
+      });
+      
+      if (error) throw error;
+      
+      if (data?.authUrl) {
+        if (data.state) {
+          sessionStorage.setItem('youtube_oauth_state', data.state);
+        }
+        window.location.href = data.authUrl;
+      }
+    } catch (error: any) {
+      console.error('Error connecting YouTube:', error);
+      toast.error('Nie udało się połączyć z YouTube', {
+        description: error.message
+      });
+    } finally {
+      setIsLoadingYT(false);
+    }
+  };
+
+  const disconnectYouTube = async () => {
+    setIsLoadingYT(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Musisz być zalogowany');
+        return;
+      }
+
+      const { error } = await (supabase as any)
+        .from('youtube_oauth_tokens')
+        .delete()
+        .eq('user_id', session.user.id);
+      
+      if (error) throw error;
+      
+      setYtConnected(false);
+      setYtChannelName(null);
+      toast.success('Odłączono konto YouTube');
+    } catch (error: any) {
+      console.error('Error disconnecting YouTube:', error);
+      toast.error('Nie udało się odłączyć konta YouTube');
+    } finally {
+      setIsLoadingYT(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <div className="flex-1 container mx-auto p-6 max-w-4xl">
@@ -598,6 +682,65 @@ export default function SocialAccounts() {
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <Instagram className="h-4 w-4" />
+                    )}
+                    Połącz
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          {/* YouTube */}
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-red-500/10">
+                  <Youtube className="h-6 w-6 text-red-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold flex items-center gap-2">
+                    YouTube
+                    {ytConnected && (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    )}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {ytConnected 
+                      ? `Połączono${ytChannelName ? ` - ${ytChannelName}` : ''}`
+                      : 'Nie połączono'
+                    }
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Wymaga kanału YouTube z możliwością uploadowania
+                  </p>
+                </div>
+              </div>
+              
+              <div>
+                {ytConnected ? (
+                  <Button
+                    variant="outline"
+                    onClick={disconnectYouTube}
+                    disabled={isLoadingYT}
+                    className="gap-2"
+                  >
+                    {isLoadingYT ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <XCircle className="h-4 w-4" />
+                    )}
+                    Odłącz
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={connectYouTube}
+                    disabled={isLoadingYT}
+                    className="gap-2"
+                  >
+                    {isLoadingYT ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Youtube className="h-4 w-4" />
                     )}
                     Połącz
                   </Button>
