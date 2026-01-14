@@ -223,11 +223,20 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
   };
 
   const publishMutation = useMutation({
-    mutationFn: async ({ contentId, bookId }: { contentId: string; bookId: string }) => {
+    mutationFn: async ({ contentId, bookId, book }: { contentId: string; bookId: string; book?: any }) => {
       // Get current session for Authorization header
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('Musisz być zalogowany aby publikować');
+      }
+
+      // For video-only platforms, check if video is available
+      const isVideoOnlyPlatform = platformRequiresVideo(platform as PlatformId);
+      if (isVideoOnlyPlatform && book) {
+        const hasVideo = !!(book.video_url || book.video_storage_path);
+        if (!hasVideo) {
+          throw new Error(`Platforma ${platform.toUpperCase()} wymaga wideo. Proszę najpierw dodać wideo do tej książki.`);
+        }
       }
 
       // Select the correct function based on platform
@@ -235,6 +244,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                           platform === 'facebook' ? 'publish-to-facebook' : 
                           platform === 'tiktok' ? 'publish-to-tiktok' :
                           platform === 'instagram' ? 'publish-to-instagram' :
+                          platform === 'youtube' ? 'publish-to-youtube' :
                           'publish-to-x'; // fallback to X for other platforms
 
       const { data, error } = await supabase.functions.invoke(functionName, {
@@ -265,7 +275,12 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["platform-content"] });
-      const platformName = platform === 'x' ? 'X' : platform === 'facebook' ? 'Facebooku' : platform;
+      const platformName = platform === 'x' ? 'X' : 
+                          platform === 'facebook' ? 'Facebooku' : 
+                          platform === 'youtube' ? 'YouTube' :
+                          platform === 'instagram' ? 'Instagramie' :
+                          platform === 'tiktok' ? 'TikToku' :
+                          platform;
       toast({
         title: "✅ Opublikowano pomyślnie",
         description: `Post został opublikowany na ${platformName}`,
@@ -307,11 +322,11 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
     return data.id;
   };
 
-  const handlePublish = async (contentId: string, bookId: string) => {
+  const handlePublish = async (contentId: string, bookId: string, book?: any) => {
     try {
       const actualContentId = await ensureContentExists(bookId, contentId);
       setPublishingIds((prev) => new Set(prev).add(actualContentId));
-      publishMutation.mutate({ contentId: actualContentId, bookId });
+      publishMutation.mutate({ contentId: actualContentId, bookId, book });
     } catch (error) {
       toast({
         title: "Błąd",
@@ -321,7 +336,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
     }
   };
 
-  const handleRepublish = async (contentId: string, bookId: string) => {
+  const handleRepublish = async (contentId: string, bookId: string, book?: any) => {
     try {
       // Reset published status
       const { error: resetError } = await (supabase as any)
@@ -336,7 +351,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
 
       // Proceed with publication
       setPublishingIds((prev) => new Set(prev).add(contentId));
-      publishMutation.mutate({ contentId, bookId });
+      publishMutation.mutate({ contentId, bookId, book });
     } catch (error) {
       toast({
         title: "Błąd",
@@ -414,6 +429,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
     const booksWithoutAI = items.filter((c: any) => {
       const platformAiText = platform === 'x' ? c.book.ai_text_x : 
                              platform === 'facebook' ? c.book.ai_text_facebook : 
+                             platform === 'youtube' ? c.book.ai_text_youtube :
                              null;
       return !platformAiText;
     });
@@ -449,6 +465,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
         // Update book table with platform-specific AI text
         const updateField = platform === 'x' ? 'ai_text_x' : 
                            platform === 'facebook' ? 'ai_text_facebook' : 
+                           platform === 'youtube' ? 'ai_text_youtube' :
                            'ai_generated_text';
         
         const { error: updateError } = await supabase
@@ -570,6 +587,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
               // Check platform-specific AI text from books table
               const platformAiText = platform === 'x' ? book.ai_text_x : 
                                      platform === 'facebook' ? book.ai_text_facebook : 
+                                     platform === 'youtube' ? book.ai_text_youtube :
                                      null;
               const hasAiText = !!platformAiText;
               const canPublish = isVideoOnlyPlatform ? hasVideo : hasAiText;
@@ -630,9 +648,9 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                       <Button
                         size="sm"
                         variant={canPublish ? "destructive" : "outline"}
-                        onClick={() => handlePublish(content.id, book.id)}
+                        onClick={() => handlePublish(content.id, book.id, book)}
                         disabled={!canPublish || isPublishing}
-                        title={!canPublish ? "Najpierw wygeneruj tekst AI" : "Opublikuj"}
+                        title={!canPublish ? (isVideoOnlyPlatform ? "Najpierw dodaj wideo" : "Najpierw wygeneruj tekst AI") : "Opublikuj"}
                       >
                         {isPublishing ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
