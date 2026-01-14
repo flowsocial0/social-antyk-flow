@@ -141,8 +141,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // If contentId is provided, get userId from content
-    if (requestData.contentId) {
+    // If contentId is provided, try to get userId from content
+    if (requestData.contentId && !userId) {
       console.log('[YouTube] Fetching content for contentId:', requestData.contentId);
       
       const { data: content, error: contentError } = await supabase
@@ -151,9 +151,24 @@ Deno.serve(async (req) => {
         .eq('id', requestData.contentId)
         .single();
 
-      if (!contentError && content) {
+      if (!contentError && content && content.user_id) {
         userId = content.user_id;
         console.log('[YouTube] Got userId from content:', userId);
+      }
+    }
+
+    // If still no userId, get the first available YouTube token user
+    if (!userId) {
+      console.log('[YouTube] No userId provided, fetching from youtube_oauth_tokens...');
+      const { data: tokenData, error: tokenError } = await supabase
+        .from('youtube_oauth_tokens')
+        .select('user_id')
+        .limit(1)
+        .single();
+
+      if (!tokenError && tokenData) {
+        userId = tokenData.user_id;
+        console.log('[YouTube] Got userId from tokens table:', userId);
       }
     }
 
