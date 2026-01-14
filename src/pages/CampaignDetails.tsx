@@ -442,7 +442,6 @@ const CampaignDetails = () => {
                 </p>
               </div>
             </div>
-            <p>Akcje kampanii:</p>
             <div className="flex gap-2">
               {campaign.status !== "paused" && campaign.status !== "completed" && (
                 <AlertDialog>
