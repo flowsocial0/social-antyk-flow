@@ -1,104 +1,111 @@
 import { Card } from "@/components/ui/card";
-import { BookOpen, Calendar, TrendingUp, Activity } from "lucide-react";
+import { BookOpen, Calendar, TrendingUp, Activity, Megaphone } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
 
 export const DashboardStats = () => {
-  // Fetch books count (without 1000 limit)
-  const { data: booksCount } = useQuery({
-    queryKey: ["books-count"],
+  // Fetch active campaigns count
+  const { data: campaignsData } = useQuery({
+    queryKey: ["campaigns-stats"],
     queryFn: async () => {
-      const { count, error } = await supabase.from("books").select("*", { count: "exact", head: true });
+      const { data, error } = await supabase
+        .from("campaigns")
+        .select("id, status");
       if (error) throw error;
-      return count || 0;
+      return {
+        total: data?.length || 0,
+        active: data?.filter(c => c.status === 'active').length || 0
+      };
     },
-    staleTime: 300000, // 5 minutes
-    refetchInterval: 300000, // Refetch every 5 minutes
+    staleTime: 300000,
+    refetchInterval: 300000,
   });
 
-  // Fetch scheduled posts (next 7 days)
-  const { data: scheduledBooks } = useQuery({
-    queryKey: ["scheduled-books"],
+  // Fetch scheduled campaign posts (next 7 days)
+  const { data: scheduledPosts } = useQuery({
+    queryKey: ["scheduled-campaign-posts"],
     queryFn: async () => {
       const now = new Date();
       const next7Days = new Date();
       next7Days.setDate(now.getDate() + 7);
 
       const { data, error } = await supabase
-        .from("books")
-        .select("*")
-        .eq("published", false)
-        .eq("auto_publish_enabled", true)
-        .gte("scheduled_publish_at", now.toISOString())
-        .lte("scheduled_publish_at", next7Days.toISOString());
+        .from("campaign_posts")
+        .select("id")
+        .eq("status", "scheduled")
+        .gte("scheduled_at", now.toISOString())
+        .lte("scheduled_at", next7Days.toISOString());
 
       if (error) throw error;
       return data;
     },
-    staleTime: 180000, // 3 minutes
-    refetchInterval: 180000, // Refetch every 3 minutes
+    staleTime: 180000,
+    refetchInterval: 180000,
   });
 
-  // Fetch published this month
+  // Fetch published campaign posts this month
   const { data: publishedThisMonth } = useQuery({
-    queryKey: ["published-this-month"],
+    queryKey: ["published-campaign-posts-this-month"],
     queryFn: async () => {
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
       const { data, error } = await supabase
-        .from("books")
-        .select("*")
-        .eq("published", true)
-        .gte("updated_at", startOfMonth.toISOString());
+        .from("campaign_posts")
+        .select("id")
+        .eq("status", "published")
+        .gte("published_at", startOfMonth.toISOString());
 
       if (error) throw error;
       return data;
     },
-    staleTime: 300000, // 5 minutes
-    refetchInterval: 300000, // Refetch every 5 minutes
+    staleTime: 300000,
+    refetchInterval: 300000,
   });
 
-  // Check Twitter connection
-  const { data: twitterTokens } = useQuery({
-    queryKey: ["twitter-tokens"],
+  // Fetch total published all time
+  const { data: totalPublished } = useQuery({
+    queryKey: ["total-published-campaign-posts"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("twitter_oauth_tokens").select("*").limit(1).maybeSingle();
+      const { count, error } = await supabase
+        .from("campaign_posts")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "published");
 
       if (error) throw error;
-      return data;
+      return count || 0;
     },
-    staleTime: 600000, // 10 minutes
-    refetchInterval: false, // Don't auto-refetch, only on mount/focus
+    staleTime: 300000,
+    refetchInterval: 300000,
   });
 
-  const totalBooks = booksCount || 0;
-  const scheduledCount = scheduledBooks?.length || 0;
-  const publishedCount = publishedThisMonth?.length || 0;
-  const connectedPlatforms = twitterTokens ? 1 : 0;
+  const activeCampaigns = campaignsData?.active || 0;
+  const totalCampaigns = campaignsData?.total || 0;
+  const scheduledCount = scheduledPosts?.length || 0;
+  const publishedMonthCount = publishedThisMonth?.length || 0;
+  const publishedTotalCount = totalPublished || 0;
 
   const stats = [
     {
-      title: "Wszystkie książki",
-      value: totalBooks.toString(),
-      icon: BookOpen,
-      description: "W bibliotece",
-      trend: "+0 w tym tygodniu",
+      title: "Aktywne kampanie",
+      value: activeCampaigns.toString(),
+      icon: Megaphone,
+      description: `z ${totalCampaigns} wszystkich`,
+      trend: "Publikacje automatyczne",
     },
     {
       title: "Zaplanowane posty",
       value: scheduledCount.toString(),
       icon: Calendar,
       description: "Następne 7 dni",
-      trend: "0 dzisiaj",
+      trend: "W ramach kampanii",
     },
     {
-      title: "Opublikowane",
-      value: publishedCount.toString(),
+      title: "Opublikowane (miesiąc)",
+      value: publishedMonthCount.toString(),
       icon: TrendingUp,
       description: "W tym miesiącu",
-      trend: "+0% vs. ostatni miesiąc",
+      trend: `${publishedTotalCount} łącznie`,
     },
     {
       title: "Aktywne platformy",
