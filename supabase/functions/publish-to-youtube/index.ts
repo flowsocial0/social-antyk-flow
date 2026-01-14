@@ -118,13 +118,14 @@ Deno.serve(async (req) => {
       const typedBook = book as Book;
       console.log('[YouTube] Book found:', typedBook.title);
 
-      // Get video URL from book
-      if (typedBook.video_storage_path) {
-        videoUrl = getPublicUrl(typedBook.video_storage_path, supabaseUrl);
-        console.log('[YouTube] Using video from storage:', videoUrl);
-      } else if (typedBook.video_url) {
+      // Get video URL from book - prefer video_url (full URL) over storage_path
+      if (typedBook.video_url) {
         videoUrl = typedBook.video_url;
-        console.log('[YouTube] Using external video URL:', videoUrl);
+        console.log('[YouTube] Using video URL:', videoUrl);
+      } else if (typedBook.video_storage_path) {
+        // Fallback to storage path - assumes bucket is ObrazkiKsiazek
+        videoUrl = `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${typedBook.video_storage_path}`;
+        console.log('[YouTube] Using video from storage path:', videoUrl);
       }
 
       // Get title and description
