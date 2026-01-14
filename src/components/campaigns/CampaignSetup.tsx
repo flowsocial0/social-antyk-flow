@@ -358,12 +358,16 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
             </div>
             <div className="space-y-2">
               {postingTimes.map((time, index) => (
-                <div key={index} className="flex gap-2">
+                <div key={index} className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 border rounded-md px-3 py-2 bg-background min-w-[100px]">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">{time}</span>
+                  </div>
                   <Input
                     type="time"
                     value={time}
                     onChange={(e) => handleTimeChange(index, e.target.value)}
-                    className="max-w-xs"
+                    className="max-w-[150px]"
                   />
                   {postingTimes.length > 1 && (
                     <Button
