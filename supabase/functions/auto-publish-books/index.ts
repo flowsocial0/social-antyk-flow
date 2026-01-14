@@ -121,6 +121,16 @@ Deno.serve(async (req) => {
     const instagramUserId = igTokenData?.user_id;
     console.log('Instagram user ID for publishing:', instagramUserId || 'none');
 
+    // Get first available user with YouTube token for YouTube posts
+    const { data: ytTokenData } = await supabase
+      .from('youtube_oauth_tokens')
+      .select('user_id')
+      .limit(1)
+      .maybeSingle();
+    
+    const youtubeUserId = ytTokenData?.user_id;
+    console.log('YouTube user ID for publishing:', youtubeUserId || 'none');
+
     if ((!contentToPublish || contentToPublish.length === 0) && 
         (!campaignPostsToPublish || campaignPostsToPublish.length === 0)) {
       return new Response(
@@ -155,6 +165,9 @@ Deno.serve(async (req) => {
             break;
           case 'instagram':
             publishFunctionName = 'publish-to-instagram';
+            break;
+          case 'youtube':
+            publishFunctionName = 'publish-to-youtube';
             break;
           // Add more platforms as they are implemented
           default:
@@ -250,6 +263,9 @@ Deno.serve(async (req) => {
             case 'instagram':
               publishFunctionName = 'publish-to-instagram';
               break;
+            case 'youtube':
+              publishFunctionName = 'publish-to-youtube';
+              break;
             default:
               console.error(`No publish function for platform: ${platform}`);
               platformFailCount++;
@@ -264,6 +280,8 @@ Deno.serve(async (req) => {
             platformUserId = xUserId;
           } else if (platform === 'instagram') {
             platformUserId = instagramUserId;
+          } else if (platform === 'youtube') {
+            platformUserId = youtubeUserId;
           }
 
           if (!platformUserId) {

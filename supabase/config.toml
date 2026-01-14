@@ -24,6 +24,9 @@ verify_jwt = false
 [functions.publish-to-instagram]
 verify_jwt = false
 
+[functions.publish-to-youtube]
+verify_jwt = false
+
 [functions.twitter-oauth-start]
 verify_jwt = false
 
@@ -61,6 +64,12 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.tiktok-oauth-revoke]
+verify_jwt = false
+
+[functions.youtube-oauth-start]
+verify_jwt = false
+
+[functions.youtube-oauth-callback]
 verify_jwt = false
 
 [functions.sync-books-from-xml]

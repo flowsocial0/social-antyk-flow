@@ -80,7 +80,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-red-500/20',
     gradientTo: 'to-red-600/20',
     path: '/platforms/youtube',
-    status: 'coming-soon',
+    status: 'active',
     priority: 4,
     mediaType: 'video-only',
   },
