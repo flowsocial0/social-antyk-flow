@@ -17,9 +17,9 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
   const [plan, setPlan] = useState<any>(null);
 
   const totalPosts = config.durationDays * config.postsPerDay;
-  // If only 1 post, make it a sales post
-  const salesPosts = totalPosts === 1 ? 1 : Math.floor(totalPosts * 0.8);
-  const contentPosts = totalPosts - salesPosts;
+  const contentRatio = config.contentRatio ?? 20; // Default to 20% if not set
+  const contentPosts = totalPosts === 1 ? 0 : Math.floor(totalPosts * (contentRatio / 100));
+  const salesPosts = totalPosts - contentPosts;
   const useAI = config.useAI !== false; // Default to true
 
   const handleGenerateWithAI = async () => {
@@ -320,7 +320,7 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
           <Card className="p-4 bg-green-500/10 border-green-500/20">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="h-5 w-5 text-green-500" />
-              <h4 className="font-semibold">Sprzedaż (80%)</h4>
+              <h4 className="font-semibold">Sprzedaż ({100 - contentRatio}%)</h4>
             </div>
             <p className="text-2xl font-bold text-green-500">{salesPosts} postów</p>
             <p className="text-sm text-muted-foreground mt-1">
@@ -331,7 +331,7 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
           <Card className="p-4 bg-blue-500/10 border-blue-500/20">
             <div className="flex items-center gap-2 mb-2">
               <BookOpen className="h-5 w-5 text-blue-500" />
-              <h4 className="font-semibold">Content (20%)</h4>
+              <h4 className="font-semibold">Content ({contentRatio}%)</h4>
             </div>
             <p className="text-2xl font-bold text-blue-500">{contentPosts} postów</p>
             <p className="text-sm text-muted-foreground mt-1">
