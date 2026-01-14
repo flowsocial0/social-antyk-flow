@@ -43,7 +43,7 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
     };
   }, [isGenerating]);
 
-  // Animated progress within each stage
+  // Animated progress within each stage - based on 2.5s per post
   useEffect(() => {
     if (generationStage === 'idle' || generationStage === 'scheduling') {
       return;
@@ -52,9 +52,15 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
     // Reset progress when stage changes
     setStageProgress(0);
     
-    const targetProgress = generationStage === 'generating_posts' ? 95 : 85;
-    const duration = generationStage === 'generating_posts' ? 45000 : 10000; // 45s for posts, 10s for structure
-    const increment = targetProgress / (duration / 100);
+    const targetProgress = 95;
+    // For generating_posts: 2.5 seconds per post
+    // For other stages: fixed 5 seconds
+    const duration = generationStage === 'generating_posts' 
+      ? totalPosts * 2500 // 2.5s per post in ms
+      : 5000;
+    
+    const updateInterval = 100; // Update every 100ms
+    const increment = targetProgress / (duration / updateInterval);
     
     const interval = setInterval(() => {
       setStageProgress(prev => {
@@ -63,10 +69,10 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
         }
         return Math.min(prev + increment, targetProgress);
       });
-    }, 100);
+    }, updateInterval);
     
     return () => clearInterval(interval);
-  }, [generationStage]);
+  }, [generationStage, totalPosts]);
 
   const getStageInfo = () => {
     switch (generationStage) {
