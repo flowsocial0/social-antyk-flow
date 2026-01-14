@@ -158,6 +158,17 @@ async function generateCampaignStructure(body: any, apiKey: string) {
 
   console.log("Generating campaign structure:", { totalPosts, contentPosts, salesPosts });
 
+  // For large campaigns (>50 posts), generate structure locally without AI
+  // This avoids Grok API token limits and is much faster
+  if (totalPosts > 50) {
+    console.log(`Large campaign detected (${totalPosts} posts) - generating structure locally`);
+    const structure = generateLocalStructure(totalPosts, contentPosts, salesPosts);
+    console.log(`Generated local structure with ${structure.length} posts`);
+    return new Response(JSON.stringify({ success: true, structure }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const systemPrompt = `Jesteś ekspertem od strategii content marketingu dla księgarni patriotycznej. 
 Twoim zadaniem jest stworzyć optymalny plan kampanii z przewagą postów sprzedażowych (80% sprzedaż, 20% content).
 
@@ -194,6 +205,9 @@ Zwróć TYLKO tablicę JSON z ${totalPosts} obiektami, każdy w formacie:
 
 Przykład: [{"position":1,"type":"sales","category":"sales"},{"position":2,"type":"content","category":"trivia"},{"position":3,"type":"sales","category":"sales"}]`;
 
+  // Dynamic max_tokens based on post count (each post needs ~50-60 tokens in JSON)
+  const estimatedTokens = Math.min(Math.max(totalPosts * 60, 1500), 8000);
+
   const response = await fetch("https://api.x.ai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -207,7 +221,7 @@ Przykład: [{"position":1,"type":"sales","category":"sales"},{"position":2,"type
         { role: "user", content: userPrompt },
       ],
       temperature: 0.7,
-      max_tokens: 3000,
+      max_tokens: estimatedTokens,
     }),
   });
 
@@ -264,7 +278,9 @@ Przykład: [{"position":1,"type":"sales","category":"sales"},{"position":2,"type
     if (jsonMatch) {
       structure = JSON.parse(jsonMatch[0]);
     } else {
-      throw new Error("Could not parse structure from Grok response");
+      // Fallback to local generation if AI parsing fails
+      console.warn("Could not parse Grok response, falling back to local structure generation");
+      structure = generateLocalStructure(totalPosts, contentPosts, salesPosts);
     }
   }
 
@@ -273,6 +289,53 @@ Przykład: [{"position":1,"type":"sales","category":"sales"},{"position":2,"type
   return new Response(JSON.stringify({ success: true, structure }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+// Generate campaign structure locally without AI
+function generateLocalStructure(totalPosts: number, contentPosts: number, salesPosts: number): any[] {
+  const structure: any[] = [];
+  
+  // Calculate interval for content posts (spread evenly)
+  // e.g., 80 sales + 20 content = every 5th post is content
+  const contentInterval = contentPosts > 0 ? Math.floor(totalPosts / contentPosts) : Infinity;
+  
+  let contentCount = 0;
+  let salesCount = 0;
+  
+  for (let i = 1; i <= totalPosts; i++) {
+    // Place content post at regular intervals, but not as first post
+    const shouldBeContent = contentPosts > 0 && 
+                           contentCount < contentPosts && 
+                           i > 1 && 
+                           (i % contentInterval === 0 || 
+                            (totalPosts - i < contentPosts - contentCount)); // Ensure remaining content posts are placed
+    
+    if (shouldBeContent && salesCount > 0) {
+      structure.push({
+        position: i,
+        type: "content",
+        category: "trivia"
+      });
+      contentCount++;
+    } else if (salesCount < salesPosts) {
+      structure.push({
+        position: i,
+        type: "sales",
+        category: "sales"
+      });
+      salesCount++;
+    } else {
+      // Fallback: add remaining as content
+      structure.push({
+        position: i,
+        type: "content",
+        category: "trivia"
+      });
+      contentCount++;
+    }
+  }
+  
+  return structure;
 }
 
 async function generatePostsContent(body: any, apiKey: string) {
