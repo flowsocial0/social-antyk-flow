@@ -386,9 +386,7 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
                     <Loader2 className="w-6 h-6 text-primary animate-spin" />
                   </div>
                   <div>
-                    <span className="text-base font-semibold text-foreground">
-                      Planowanie kampanii - pozostań tu aż się skończy
-                    </span>
+                    <span className="text-base font-semibold text-foreground">Planowanie kampanii...</span>
                     <p className="text-sm text-muted-foreground">
                       {scheduledCount === 0
                         ? "Tworzenie kampanii w bazie danych..."
