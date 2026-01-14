@@ -79,6 +79,7 @@ export type Database = {
           published_at: string | null
           scheduled_publish_at: string | null
           updated_at: string
+          youtube_video_id: string | null
         }
         Insert: {
           ai_generated_text?: string | null
@@ -96,6 +97,7 @@ export type Database = {
           published_at?: string | null
           scheduled_publish_at?: string | null
           updated_at?: string
+          youtube_video_id?: string | null
         }
         Update: {
           ai_generated_text?: string | null
@@ -113,6 +115,7 @@ export type Database = {
           published_at?: string | null
           scheduled_publish_at?: string | null
           updated_at?: string
+          youtube_video_id?: string | null
         }
         Relationships: [
           {
@@ -129,6 +132,7 @@ export type Database = {
           ai_generated_text: string | null
           ai_text_facebook: string | null
           ai_text_x: string | null
+          ai_text_youtube: string | null
           author: string | null
           auto_publish_enabled: boolean | null
           campaign_post_count: number | null
@@ -158,6 +162,7 @@ export type Database = {
           ai_generated_text?: string | null
           ai_text_facebook?: string | null
           ai_text_x?: string | null
+          ai_text_youtube?: string | null
           author?: string | null
           auto_publish_enabled?: boolean | null
           campaign_post_count?: number | null
@@ -187,6 +192,7 @@ export type Database = {
           ai_generated_text?: string | null
           ai_text_facebook?: string | null
           ai_text_x?: string | null
+          ai_text_youtube?: string | null
           author?: string | null
           auto_publish_enabled?: boolean | null
           campaign_post_count?: number | null
