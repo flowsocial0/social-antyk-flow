@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Calendar, TrendingUp, CheckCircle2, Clock, Trash2, AlertCircle, Plus, RefreshCw, Pencil } from "lucide-react";
+import { ArrowLeft, Calendar, TrendingUp, CheckCircle2, Clock, Trash2, AlertCircle, Plus, RefreshCw, Pencil, Pause } from "lucide-react";
 import { CampaignPostCard } from "@/components/campaigns/CampaignPostCard";
 import { ResumeCampaignDialog } from "@/components/campaigns/ResumeCampaignDialog";
 import { format } from "date-fns";
@@ -305,6 +305,35 @@ const CampaignDetails = () => {
     },
   });
 
+  const pauseCampaignMutation = useMutation({
+    mutationFn: async () => {
+      // Update campaign status to paused
+      const { error: campaignError } = await (supabase as any)
+        .from('campaigns')
+        .update({ status: 'paused' })
+        .eq('id', id);
+
+      if (campaignError) throw campaignError;
+
+      // Also pause all scheduled posts in this campaign
+      const { error: postsError } = await (supabase as any)
+        .from('campaign_posts')
+        .update({ status: 'paused' })
+        .eq('campaign_id', id)
+        .eq('status', 'scheduled');
+
+      if (postsError) throw postsError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaign', id] });
+      queryClient.invalidateQueries({ queryKey: ['campaign-posts', id] });
+      toast.success("Kampania została zatrzymana. Posty nie będą publikowane.");
+    },
+    onError: () => {
+      toast.error("Błąd podczas zatrzymywania kampanii");
+    },
+  });
+
   if (campaignLoading || postsLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -324,6 +353,7 @@ const CampaignDetails = () => {
   const publishedCount = posts.filter(p => p.status === 'published').length;
   const scheduledCount = posts.filter(p => p.status === 'scheduled').length;
   const failedCount = posts.filter(p => p.status === 'failed').length;
+  const pausedCount = posts.filter(p => p.status === 'paused').length;
   const progress = posts.length > 0 ? (publishedCount / posts.length) * 100 : 0;
 
   // Group posts by day
@@ -348,6 +378,8 @@ const CampaignDetails = () => {
         return <Badge variant="secondary" className="gap-1 bg-green-500/10 text-green-600 border-green-500/20"><CheckCircle2 className="h-3 w-3" /> Zakończona</Badge>;
       case 'cancelled':
         return <Badge variant="secondary" className="gap-1 bg-red-500/10 text-red-600 border-red-500/20"><AlertCircle className="h-3 w-3" /> Anulowana</Badge>;
+      case 'paused':
+        return <Badge variant="secondary" className="gap-1 bg-yellow-500/10 text-yellow-600 border-yellow-500/20"><Pause className="h-3 w-3" /> Zatrzymana</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -389,6 +421,34 @@ const CampaignDetails = () => {
               </div>
             </div>
             <div className="flex gap-2">
+              {campaign.status !== 'paused' && campaign.status !== 'completed' && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                      <Pause className="h-4 w-4" />
+                      Zatrzymaj kampanię
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Czy na pewno chcesz zatrzymać tę kampanię?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Wszystkie zaplanowane posty zostaną wstrzymane i nie będą automatycznie publikowane.
+                        Możesz wznowić kampanię w każdej chwili.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Anuluj</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => pauseCampaignMutation.mutate()}
+                        className="bg-yellow-600 text-white hover:bg-yellow-700"
+                      >
+                        Zatrzymaj
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
               <Button
                 variant="secondary"
                 className="gap-2"
@@ -489,6 +549,12 @@ const CampaignDetails = () => {
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-red-600" />
                   <span>{failedCount} błędów</span>
+                </div>
+              )}
+              {pausedCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <Pause className="h-4 w-4 text-yellow-600" />
+                  <span>{pausedCount} wstrzymanych</span>
                 </div>
               )}
             </div>
