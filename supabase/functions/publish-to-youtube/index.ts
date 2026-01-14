@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
     let title: string | undefined = requestData.title;
     let description: string | undefined = requestData.description;
     let userId: string | undefined = requestData.userId;
-    const privacyStatus = requestData.privacyStatus || 'unlisted';
+    const privacyStatus = requestData.privacyStatus || 'public';
     const tags = requestData.tags || [];
     const categoryId = requestData.categoryId || '22';
 
