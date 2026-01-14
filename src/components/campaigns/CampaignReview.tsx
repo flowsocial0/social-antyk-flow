@@ -27,8 +27,8 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
   const [localPosts, setLocalPosts] = useState(posts);
   const navigate = useNavigate();
 
-  const contentPosts = localPosts.filter(p => p.type === 'content').length;
-  const salesPosts = localPosts.filter(p => p.type === 'sales').length;
+  const contentPosts = localPosts.filter((p) => p.type === "content").length;
+  const salesPosts = localPosts.filter((p) => p.type === "sales").length;
 
   const handleEdit = (index: number) => {
     setEditingIndex(index);
@@ -52,39 +52,40 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
     setIsScheduling(true);
     setSchedulingProgress(0);
     setScheduledCount(0);
-    
+
     const totalSteps = localPosts.length + 1; // +1 for campaign creation
     let completedSteps = 0;
-    
+
     try {
       // Use config.name or generate default
-      const campaignName = config.name || `Kampania ${format(parseISO(config.startDate), 'dd.MM.yyyy', { locale: pl })}`;
+      const campaignName =
+        config.name || `Kampania ${format(parseISO(config.startDate), "dd.MM.yyyy", { locale: pl })}`;
       const { data: campaignData, error: campaignError } = await (supabase as any)
-        .from('campaigns')
+        .from("campaigns")
         .insert({
           name: campaignName,
           description: `Kampania ${config.durationDays} dni, ${config.postsPerDay} postów dziennie`,
-          status: 'scheduled',
+          status: "scheduled",
           duration_days: config.durationDays,
           posts_per_day: config.postsPerDay,
           content_posts_count: contentPosts,
           sales_posts_count: salesPosts,
           start_date: config.startDate,
           posting_times: config.postingTimes,
-          target_platforms: config.targetPlatforms || ['x']
+          target_platforms: config.targetPlatforms || ["x"],
         } as any)
         .select()
         .single();
 
       if (campaignError) throw campaignError;
-      
+
       completedSteps++;
       setSchedulingProgress(Math.round((completedSteps / totalSteps) * 100));
 
       // Create entries in campaign_posts table
       for (let i = 0; i < localPosts.length; i++) {
         const post = localPosts[i];
-        const { error: postError } = await (supabase as any).from('campaign_posts').insert({
+        const { error: postError } = await (supabase as any).from("campaign_posts").insert({
           campaign_id: campaignData.id,
           day: post.day,
           time: post.time,
@@ -93,54 +94,55 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
           text: post.text,
           scheduled_at: post.scheduledAt,
           book_id: (post as any).bookId || null,
-          status: 'scheduled',
-          platforms: config.targetPlatforms || ['x']
+          status: "scheduled",
+          platforms: config.targetPlatforms || ["x"],
         } as any);
 
         if (postError) throw postError;
 
         // If this is a sales post with a book reference, update the book's campaign counter
-        if (post.type === 'sales' && (post as any).bookId) {
+        if (post.type === "sales" && (post as any).bookId) {
           const { data: bookData } = await supabase
-            .from('books')
-            .select('campaign_post_count')
-            .eq('id', (post as any).bookId)
+            .from("books")
+            .select("campaign_post_count")
+            .eq("id", (post as any).bookId)
             .single();
 
           await supabase
-            .from('books')
+            .from("books")
             .update({
               campaign_post_count: ((bookData as any)?.campaign_post_count || 0) + 1,
-              last_campaign_date: new Date().toISOString()
+              last_campaign_date: new Date().toISOString(),
             } as any)
-            .eq('id', (post as any).bookId);
+            .eq("id", (post as any).bookId);
         }
-        
+
         // Save post text to cache for future campaigns
         if ((post as any).bookId && post.text) {
-          const platforms = config.targetPlatforms || ['x'];
-          
+          const platforms = config.targetPlatforms || ["x"];
+
           for (const platform of platforms) {
             try {
-              await (supabase as any)
-                .from('book_campaign_texts')
-                .upsert({
+              await (supabase as any).from("book_campaign_texts").upsert(
+                {
                   book_id: (post as any).bookId,
                   platform: platform,
                   post_type: post.type,
                   text: post.text,
                   source_campaign_id: campaignData.id,
-                  updated_at: new Date().toISOString()
-                }, {
-                  onConflict: 'book_id,platform,post_type'
-                });
+                  updated_at: new Date().toISOString(),
+                },
+                {
+                  onConflict: "book_id,platform,post_type",
+                },
+              );
             } catch (cacheError) {
-              console.error('Error caching post text:', cacheError);
+              console.error("Error caching post text:", cacheError);
               // Don't fail the whole operation if caching fails
             }
           }
         }
-        
+
         // Update progress
         completedSteps++;
         setScheduledCount(i + 1);
@@ -148,17 +150,17 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
       }
 
       toast.success(`Zaplanowano kampanię z ${localPosts.length} postami!`, {
-        description: "Kampania zostanie automatycznie publikowana zgodnie z harmonogramem"
+        description: "Kampania zostanie automatycznie publikowana zgodnie z harmonogramem",
       });
-      
+
       // Navigate to campaign details page
       setTimeout(() => {
         navigate(`/campaigns/${campaignData.id}`);
       }, 1500);
     } catch (error: any) {
-      console.error('Error scheduling campaign:', error);
-      toast.error('Błąd planowania kampanii', {
-        description: error.message
+      console.error("Error scheduling campaign:", error);
+      toast.error("Błąd planowania kampanii", {
+        description: error.message,
       });
     } finally {
       setIsScheduling(false);
@@ -168,17 +170,24 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
   };
 
   // Group posts by day
-  const postsByDay = localPosts.reduce((acc, post) => {
-    if (!acc[post.day]) {
-      acc[post.day] = [];
-    }
-    acc[post.day].push(post);
-    return acc;
-  }, {} as Record<number, CampaignPost[]>);
+  const postsByDay = localPosts.reduce(
+    (acc, post) => {
+      if (!acc[post.day]) {
+        acc[post.day] = [];
+      }
+      acc[post.day].push(post);
+      return acc;
+    },
+    {} as Record<number, CampaignPost[]>,
+  );
 
   // Calculate date range
-  const firstPostDate = localPosts[0]?.scheduledAt ? format(parseISO(localPosts[0].scheduledAt), 'dd MMM yyyy', { locale: pl }) : '';
-  const lastPostDate = localPosts[localPosts.length - 1]?.scheduledAt ? format(parseISO(localPosts[localPosts.length - 1].scheduledAt), 'dd MMM yyyy', { locale: pl }) : '';
+  const firstPostDate = localPosts[0]?.scheduledAt
+    ? format(parseISO(localPosts[0].scheduledAt), "dd MMM yyyy", { locale: pl })
+    : "";
+  const lastPostDate = localPosts[localPosts.length - 1]?.scheduledAt
+    ? format(parseISO(localPosts[localPosts.length - 1].scheduledAt), "dd MMM yyyy", { locale: pl })
+    : "";
 
   return (
     <div className="space-y-6">
@@ -206,7 +215,7 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
               {((contentPosts / localPosts.length) * 100).toFixed(0)}% kampanii
             </div>
           </Card>
-          
+
           <Card className="p-4 bg-background/50">
             <div className="flex items-center gap-3 mb-2">
               <TrendingUp className="w-6 h-6 text-green-500" />
@@ -217,16 +226,14 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
               {((salesPosts / localPosts.length) * 100).toFixed(0)}% kampanii
             </div>
           </Card>
-          
+
           <Card className="p-4 bg-background/50">
             <div className="flex items-center gap-3 mb-2">
               <Calendar className="w-6 h-6 text-purple-500" />
               <span className="text-sm text-muted-foreground">Czas trwania</span>
             </div>
             <div className="text-3xl font-bold text-foreground">{config.durationDays}</div>
-            <div className="text-xs text-muted-foreground mt-1">
-              dni kampanii
-            </div>
+            <div className="text-xs text-muted-foreground mt-1">dni kampanii</div>
           </Card>
 
           <Card className="p-4 bg-background/50">
@@ -235,9 +242,7 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
               <span className="text-sm text-muted-foreground">Częstotliwość</span>
             </div>
             <div className="text-3xl font-bold text-foreground">{config.postsPerDay}</div>
-            <div className="text-xs text-muted-foreground mt-1">
-              postów dziennie
-            </div>
+            <div className="text-xs text-muted-foreground mt-1">postów dziennie</div>
           </Card>
         </div>
 
@@ -258,14 +263,16 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
           <h3 className="text-xl font-bold text-foreground">Szczegółowy harmonogram</h3>
           <Badge variant="secondary">{Object.keys(postsByDay).length} dni</Badge>
         </div>
-        
+
         {Object.entries(postsByDay)
           .sort(([a], [b]) => Number(a) - Number(b))
           .map(([day, dayPosts]) => {
-            const dayDate = dayPosts[0]?.scheduledAt ? format(parseISO(dayPosts[0].scheduledAt), 'EEEE, dd MMMM yyyy', { locale: pl }) : '';
-            const dayContentPosts = dayPosts.filter(p => p.type === 'content').length;
-            const daySalesPosts = dayPosts.filter(p => p.type === 'sales').length;
-            
+            const dayDate = dayPosts[0]?.scheduledAt
+              ? format(parseISO(dayPosts[0].scheduledAt), "EEEE, dd MMMM yyyy", { locale: pl })
+              : "";
+            const dayContentPosts = dayPosts.filter((p) => p.type === "content").length;
+            const daySalesPosts = dayPosts.filter((p) => p.type === "sales").length;
+
             return (
               <Card key={day} className="p-5 border-primary/20">
                 <div className="flex items-start justify-between mb-4 pb-4 border-b">
@@ -287,22 +294,24 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
                     </Badge>
                   </div>
                 </div>
-            
+
                 <div className="space-y-3">
                   {dayPosts.map((post, postIndex) => {
-                    const globalIndex = localPosts.findIndex(p => p === post);
+                    const globalIndex = localPosts.findIndex((p) => p === post);
                     const isEditing = editingIndex === globalIndex;
-                    const postTime = post.scheduledAt ? format(parseISO(post.scheduledAt), 'HH:mm', { locale: pl }) : post.time;
-                    
+                    const postTime = post.scheduledAt
+                      ? format(parseISO(post.scheduledAt), "HH:mm", { locale: pl })
+                      : post.time;
+
                     return (
-                      <div key={postIndex} className="p-4 bg-background rounded-lg border border-border/50 hover:border-primary/50 transition-colors">
+                      <div
+                        key={postIndex}
+                        className="p-4 bg-background rounded-lg border border-border/50 hover:border-primary/50 transition-colors"
+                      >
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <Badge 
-                              variant={post.type === 'content' ? 'secondary' : 'default'}
-                              className="font-medium"
-                            >
-                              {post.type === 'content' ? '📚 Content' : '💰 Sprzedaż'}
+                            <Badge variant={post.type === "content" ? "secondary" : "default"} className="font-medium">
+                              {post.type === "content" ? "📚 Content" : "💰 Sprzedaż"}
                             </Badge>
                             <Badge variant="outline" className="text-xs">
                               {post.category}
@@ -311,7 +320,10 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
                               <Clock className="w-3 h-3" />
                               <span>{postTime}</span>
                             </div>
-                            <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/20">
+                            <Badge
+                              variant="outline"
+                              className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/20"
+                            >
                               ⏳ Zaplanowany
                             </Badge>
                           </div>
@@ -326,7 +338,7 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
                             </Button>
                           )}
                         </div>
-                        
+
                         {isEditing ? (
                           <div className="space-y-2">
                             <Textarea
@@ -335,26 +347,17 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
                               className="min-h-[100px]"
                             />
                             <div className="flex gap-2 justify-end">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleCancelEdit}
-                              >
+                              <Button variant="outline" size="sm" onClick={handleCancelEdit}>
                                 Anuluj
                               </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => handleSaveEdit(globalIndex)}
-                              >
+                              <Button size="sm" onClick={() => handleSaveEdit(globalIndex)}>
                                 Zapisz
                               </Button>
                             </div>
                           </div>
                         ) : (
                           <div>
-                            <p className="text-sm whitespace-pre-wrap text-foreground leading-relaxed">
-                              {post.text}
-                            </p>
+                            <p className="text-sm whitespace-pre-wrap text-foreground leading-relaxed">{post.text}</p>
                             {(post as any).bookId && (
                               <div className="mt-2 pt-2 border-t border-border/50">
                                 <span className="text-xs text-muted-foreground">
@@ -384,19 +387,17 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
                   </div>
                   <div>
                     <span className="text-base font-semibold text-foreground">
-                      Planowanie kampanii...
+                      Planowanie kampanii - pozostań tu aż się skończy
                     </span>
                     <p className="text-sm text-muted-foreground">
-                      {scheduledCount === 0 
-                        ? "Tworzenie kampanii w bazie danych..." 
+                      {scheduledCount === 0
+                        ? "Tworzenie kampanii w bazie danych..."
                         : `Zapisywanie postów do harmonogramu...`}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-2xl font-bold text-primary">
-                    {schedulingProgress}%
-                  </span>
+                  <span className="text-2xl font-bold text-primary">{schedulingProgress}%</span>
                   <p className="text-xs text-muted-foreground">
                     {scheduledCount} / {localPosts.length} postów
                   </p>
@@ -407,10 +408,10 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>Początek</span>
                   <span className="font-medium text-primary">
-                    {scheduledCount === 0 
-                      ? "Tworzenie kampanii" 
-                      : scheduledCount < localPosts.length 
-                        ? `Post ${scheduledCount + 1}: ${localPosts[scheduledCount]?.type === 'content' ? 'Content' : 'Sprzedaż'}`
+                    {scheduledCount === 0
+                      ? "Tworzenie kampanii"
+                      : scheduledCount < localPosts.length
+                        ? `Post ${scheduledCount + 1}: ${localPosts[scheduledCount]?.type === "content" ? "Content" : "Sprzedaż"}`
                         : "Finalizacja..."}
                   </span>
                   <span>Koniec</span>
@@ -422,23 +423,14 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
             </div>
           </Card>
         )}
-        
+
         <div className="flex gap-3 justify-between">
-          <Button
-            variant="outline"
-            onClick={onBack}
-            disabled={isScheduling}
-          >
+          <Button variant="outline" onClick={onBack} disabled={isScheduling}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Wstecz
           </Button>
-          
-          <Button
-            onClick={handleScheduleAll}
-            disabled={isScheduling}
-            size="lg"
-            className="min-w-[200px]"
-          >
+
+          <Button onClick={handleScheduleAll} disabled={isScheduling} size="lg" className="min-w-[200px]">
             {isScheduling ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
