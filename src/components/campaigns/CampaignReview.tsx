@@ -373,21 +373,51 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
           })}
       </div>
 
-      <div className="flex flex-col gap-4 pt-6 border-t">
+      <div className="flex flex-col gap-4 pt-6 border-t sticky bottom-0 bg-background pb-4">
         {isScheduling && (
-          <Card className="p-4 bg-primary/5 border-primary/20">
-            <div className="space-y-3">
+          <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/30 shadow-lg animate-in fade-in duration-300">
+            <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Planowanie postów...</span>
-                <span className="text-sm text-muted-foreground">
-                  {scheduledCount} / {localPosts.length} ({schedulingProgress}%)
-                </span>
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                  </div>
+                  <div>
+                    <span className="text-base font-semibold text-foreground">
+                      Planowanie kampanii...
+                    </span>
+                    <p className="text-sm text-muted-foreground">
+                      {scheduledCount === 0 
+                        ? "Tworzenie kampanii w bazie danych..." 
+                        : `Zapisywanie postów do harmonogramu...`}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-2xl font-bold text-primary">
+                    {schedulingProgress}%
+                  </span>
+                  <p className="text-xs text-muted-foreground">
+                    {scheduledCount} / {localPosts.length} postów
+                  </p>
+                </div>
               </div>
-              <Progress value={schedulingProgress} className="h-2" />
-              <p className="text-xs text-muted-foreground">
-                {scheduledCount === 0 
-                  ? "Tworzenie kampanii..." 
-                  : `Zaplanowano ${scheduledCount} z ${localPosts.length} postów`}
+              <div className="space-y-2">
+                <Progress value={schedulingProgress} className="h-3 transition-all duration-300" />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Początek</span>
+                  <span className="font-medium text-primary">
+                    {scheduledCount === 0 
+                      ? "Tworzenie kampanii" 
+                      : scheduledCount < localPosts.length 
+                        ? `Post ${scheduledCount + 1}: ${localPosts[scheduledCount]?.type === 'content' ? 'Content' : 'Sprzedaż'}`
+                        : "Finalizacja..."}
+                  </span>
+                  <span>Koniec</span>
+                </div>
+              </div>
+              <p className="text-xs text-center text-muted-foreground bg-background/50 rounded-lg py-2">
+                ⏳ Proszę nie zamykać tej strony - planowanie jest w toku...
               </p>
             </div>
           </Card>
