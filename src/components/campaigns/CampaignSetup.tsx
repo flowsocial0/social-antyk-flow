@@ -237,32 +237,54 @@ export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
         
         <div className="space-y-6">
           {/* Duration */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <Label className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               Czas trwania kampanii (dni)
             </Label>
-            <Input
-              type="number"
-              min={1}
-              max={90}
-              value={durationDays}
-              onChange={(e) => setDurationDays(parseInt(e.target.value) || 1)}
-              className="max-w-xs"
-            />
+            <div className="flex items-center gap-4">
+              <Slider
+                value={[durationDays]}
+                onValueChange={(value) => setDurationDays(value[0])}
+                min={1}
+                max={90}
+                step={1}
+                className="flex-1 max-w-md"
+              />
+              <Input
+                type="number"
+                min={1}
+                max={90}
+                value={durationDays}
+                onChange={(e) => setDurationDays(Math.min(90, Math.max(1, parseInt(e.target.value) || 1)))}
+                className="w-20"
+              />
+              <span className="text-sm text-muted-foreground">dni</span>
+            </div>
           </div>
 
           {/* Posts per day */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <Label>Liczba postów dziennie</Label>
-            <Input
-              type="number"
-              min={1}
-              max={20}
-              value={postsPerDay}
-              onChange={(e) => handlePostsPerDayChange(parseInt(e.target.value) || 1)}
-              className="max-w-xs"
-            />
+            <div className="flex items-center gap-4">
+              <Slider
+                value={[postsPerDay]}
+                onValueChange={(value) => handlePostsPerDayChange(value[0])}
+                min={1}
+                max={20}
+                step={1}
+                className="flex-1 max-w-md"
+              />
+              <Input
+                type="number"
+                min={1}
+                max={20}
+                value={postsPerDay}
+                onChange={(e) => handlePostsPerDayChange(Math.min(20, Math.max(1, parseInt(e.target.value) || 1)))}
+                className="w-20"
+              />
+              <span className="text-sm text-muted-foreground">postów</span>
+            </div>
             <p className="text-xs text-muted-foreground">Maksymalnie 20 postów dziennie</p>
           </div>
 
