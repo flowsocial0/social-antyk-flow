@@ -371,13 +371,14 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('[YouTube] Error publishing:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    // Return 200 with success: false so Supabase client can parse the error message
     return new Response(
       JSON.stringify({ 
         success: false, 
         error: errorMessage 
       }),
       {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );

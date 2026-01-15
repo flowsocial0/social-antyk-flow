@@ -254,13 +254,18 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
         },
       });
       
-      if (error) throw error;
+      // Handle Supabase client error (network issues, etc.)
+      if (error) {
+        throw new Error(error.message || 'Błąd połączenia z serwerem');
+      }
       
-      // CRITICAL: Check top-level success field
+      // CRITICAL: Check top-level success field - this is the primary error handling
       if (data && data.success === false) {
-        // Extract first error from results if available
-        const firstError = data.results?.find((r: any) => !r.success)?.error;
-        throw new Error(firstError || data.error || 'Publikacja nie powiodła się');
+        // Extract error message from response
+        const errorMsg = data.error || 
+                        data.results?.find((r: any) => !r.success)?.error || 
+                        'Publikacja nie powiodła się';
+        throw new Error(errorMsg);
       }
 
       // Additional validation for results array

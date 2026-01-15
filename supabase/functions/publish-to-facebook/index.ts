@@ -522,6 +522,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Facebook publish error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    // Return 200 with success: false so Supabase client can parse the error message
     return new Response(
       JSON.stringify({ 
         success: false,
@@ -530,7 +531,7 @@ Deno.serve(async (req) => {
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+        status: 200,
       }
     );
   }

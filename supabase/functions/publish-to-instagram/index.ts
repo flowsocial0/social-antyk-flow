@@ -350,6 +350,7 @@ serve(async (req) => {
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Nieznany błąd';
     console.error('Error in publish-to-instagram:', error);
+    // Return 200 with success: false so Supabase client can parse the error message
     return new Response(
       JSON.stringify({
         success: false,
@@ -357,7 +358,7 @@ serve(async (req) => {
         results: [{ success: false, platform: 'instagram', error: errorMessage }]
       }),
       {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
