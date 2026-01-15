@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
       error: errorParam || 'none'
     });
 
-    const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'https://socialautoflow.pl';
+    const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'https://social-auto-flow.netlify.app';
 
     // Check if user cancelled or Facebook returned an error FIRST
     if (errorParam) {
@@ -223,7 +223,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Facebook OAuth callback error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const FRONTEND_URL_FALLBACK = Deno.env.get('FRONTEND_URL') || 'https://socialautoflow.pl';
+    const FRONTEND_URL_FALLBACK = Deno.env.get('FRONTEND_URL') || 'https://social-auto-flow.netlify.app';
     
     // Redirect back to app with error
     const redirectUrl = new URL(`${FRONTEND_URL_FALLBACK}/platforms/facebook`);
