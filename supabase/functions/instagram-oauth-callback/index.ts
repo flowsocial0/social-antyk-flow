@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'https://socialautoflow.pl';
+const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'https://social-auto-flow.netlify.app';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
