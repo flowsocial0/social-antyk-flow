@@ -6,7 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const FRONTEND_URL = Deno.env.get('FRONTEND_URL') || 'https://social-auto-flow.netlify.app';
+// Remove trailing slash to avoid double slashes in URLs
+const FRONTEND_URL = (Deno.env.get('FRONTEND_URL') || 'https://social-auto-flow.netlify.app').replace(/\/$/, '');
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
