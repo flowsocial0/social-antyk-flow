@@ -581,7 +581,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
               const book = content.book;
               const isPublishing = publishingIds.has(content.id);
               
-              // For video-only platforms, only require video; for others require AI text from books table
+              // For video-only platforms, only require video; for text platforms allow AI text OR basic content
               const isVideoOnlyPlatform = platformRequiresVideo(platform as PlatformId);
               const hasVideo = !!(book.video_url || book.video_storage_path);
               // Check platform-specific AI text from books table
@@ -590,7 +590,9 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                                      platform === 'youtube' ? book.ai_text_youtube :
                                      null;
               const hasAiText = !!platformAiText;
-              const canPublish = isVideoOnlyPlatform ? hasVideo : hasAiText;
+              // For text-based platforms: description or title is sufficient (edge functions have fallback)
+              const hasBasicContent = !!(book.description || book.title);
+              const canPublish = isVideoOnlyPlatform ? hasVideo : (hasAiText || hasBasicContent);
 
               return (
                 <TableRow key={content.id}>
