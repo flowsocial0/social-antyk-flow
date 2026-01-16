@@ -183,7 +183,7 @@ const LandingPage = () => {
           </div>
           <div className="mt-4 text-center md:text-left">
             <p className="text-sm text-muted-foreground">
-              Kontakt: <a href="mailto:kontakt@socialautoflow.pl" className="hover:text-foreground">kontakt@socialautoflow.pl</a>
+              Kontakt: <a href="mailto:flowsocial0@gmail.com" className="hover:text-foreground">flowsocial0@gmail.com</a>
             </p>
           </div>
         </div>

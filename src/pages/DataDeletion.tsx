@@ -125,8 +125,8 @@ const DataDeletion = () => {
                   </p>
                   <div className="flex items-center gap-2 mt-2">
                     <Mail className="h-4 w-4" />
-                    <a href="mailto:kontakt@socialautoflow.pl" className="text-primary hover:underline">
-                      kontakt@socialautoflow.pl
+                    <a href="mailto:flowsocial0@gmail.com" className="text-primary hover:underline">
+                      flowsocial0@gmail.com
                     </a>
                   </div>
                 </div>
