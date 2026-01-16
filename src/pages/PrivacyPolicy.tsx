@@ -26,8 +26,8 @@ const PrivacyPolicy = () => {
               <p className="text-center text-sm text-muted-foreground mt-4">
                 Niniejszy dokument stanowi Politykę Prywatności (Privacy Policy) aplikacji{" "}
                 <strong>Social Auto Flow</strong> dostępnej pod adresem{" "}
-                <a href="https://socialautoflow.pl" className="text-primary hover:underline">
-                  socialautoflow.pl
+                <a href="https://social-auto-flow.netlify.app" className="text-primary hover:underline">
+                  social-auto-flow.netlify.app
                 </a>
               </p>
               <p className="text-center text-muted-foreground mt-4">
@@ -41,7 +41,7 @@ const PrivacyPolicy = () => {
                 <p className="text-muted-foreground">
                   Niniejsza Polityka Prywatności (Privacy Policy) określa zasady przetwarzania i ochrony danych osobowych przekazanych
                   przez Użytkowników w związku z korzystaniem z aplikacji <strong>Social Auto Flow</strong> (dalej: "Aplikacja" lub "Serwis"), 
-                  dostępnej pod adresem https://socialautoflow.pl.
+                  dostępnej pod adresem https://social-auto-flow.netlify.app.
                 </p>
               </section>
 
