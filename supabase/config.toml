@@ -12,6 +12,9 @@ verify_jwt = false
 [functions.migrate-images-to-storage]
 verify_jwt = false
 
+[functions.cleanup-unused-images]
+verify_jwt = false
+
 [functions.publish-to-x]
 verify_jwt = false
 
