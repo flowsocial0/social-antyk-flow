@@ -73,6 +73,14 @@ export const ResumeCampaignDialog = ({
   const handleResume = async () => {
     setIsResuming(true);
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Musisz być zalogowany");
+        setIsResuming(false);
+        return;
+      }
+
       // Create new campaign
       const { data: newCampaign, error: campaignError } = await (supabase as any)
         .from('campaigns')
@@ -87,6 +95,7 @@ export const ResumeCampaignDialog = ({
           start_date: startDate,
           posting_times: campaign.posting_times,
           target_platforms: campaign.target_platforms,
+          user_id: user.id,
         })
         .select()
         .single();

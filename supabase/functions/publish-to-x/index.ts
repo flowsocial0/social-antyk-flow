@@ -845,7 +845,8 @@ Deno.serve(async (req) => {
               published: true,
               published_at: new Date().toISOString(),
               post_id: tweetResponse.data?.id,
-              ai_generated_text: book.ai_generated_text
+              ai_generated_text: book.ai_generated_text,
+              user_id: book.user_id
             });
 
           if (insertError) throw insertError;

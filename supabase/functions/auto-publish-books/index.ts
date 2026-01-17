@@ -396,7 +396,8 @@ Deno.serve(async (req) => {
                   platform: platform,
                   category: post.category || 'unknown',
                   topic_summary: post.text.substring(0, 150),
-                  full_text: post.text
+                  full_text: post.text,
+                  user_id: post.campaign?.user_id
                 });
 
               if (historyError) {

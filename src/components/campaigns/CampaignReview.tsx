@@ -57,6 +57,14 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
     let completedSteps = 0;
 
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Musisz być zalogowany");
+        setIsScheduling(false);
+        return;
+      }
+
       // Use config.name or generate default
       const campaignName =
         config.name || `Kampania ${format(parseISO(config.startDate), "dd.MM.yyyy", { locale: pl })}`;
@@ -73,6 +81,7 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
           start_date: config.startDate,
           posting_times: config.postingTimes,
           target_platforms: config.targetPlatforms || ["x"],
+          user_id: user.id,
         } as any)
         .select()
         .single();
@@ -131,6 +140,7 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
                   text: post.text,
                   source_campaign_id: campaignData.id,
                   updated_at: new Date().toISOString(),
+                  user_id: user.id,
                 },
                 {
                   onConflict: "book_id,platform,post_type",
