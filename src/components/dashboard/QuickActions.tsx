@@ -185,13 +185,6 @@ export const QuickActions = () => {
 
   const actions = [
     {
-      icon: Zap,
-      label: "Kampania Express",
-      description: "Miesiąc na wszystkich platformach",
-      variant: "default" as const,
-      onClick: launchExpressCampaign,
-    },
-    {
       icon: Share2,
       label: "Platformy społecznościowe",
       description: "Zarządzaj wszystkimi platformami",
