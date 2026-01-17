@@ -135,9 +135,16 @@ export const AddBookDialog = ({ open, onOpenChange, onSuccess }: AddBookDialogPr
   const onSubmit = async (data: BookFormData) => {
     setIsSubmitting(true);
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("Musisz być zalogowany");
+      }
+
       const bookData: any = {
         code: data.code,
         title: data.title,
+        user_id: user.id,
       };
 
       if (data.image_url) bookData.image_url = data.image_url;

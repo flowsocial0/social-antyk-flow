@@ -70,6 +70,13 @@ export const QuickActions = () => {
 
   const launchExpressCampaign = async () => {
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Musisz być zalogowany");
+        return;
+      }
+
       // Check connected platforms
       const { data: xData } = await supabase.from('twitter_oauth_tokens').select('id').limit(1).maybeSingle();
       const { data: fbData } = await supabase.from('facebook_oauth_tokens').select('id').limit(1).maybeSingle();
@@ -107,7 +114,8 @@ export const QuickActions = () => {
           posting_times: xPostingTimes,
           start_date: startDate.toISOString(),
           target_platforms: ["x"],
-          status: "draft"
+          status: "draft",
+          user_id: user.id
         };
 
         const { data: xCampaign, error: xError } = await supabase
@@ -138,7 +146,8 @@ export const QuickActions = () => {
           posting_times: fbPostingTimes,
           start_date: startDate.toISOString(),
           target_platforms: ["facebook"],
-          status: "draft"
+          status: "draft",
+          user_id: user.id
         };
 
         const { data: fbCampaign, error: fbError } = await supabase

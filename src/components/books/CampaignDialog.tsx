@@ -81,6 +81,13 @@ export const CampaignDialog = ({ open, onOpenChange, bookId, bookData }: Campaig
 
     setIsScheduling(true);
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Musisz być zalogowany");
+        return;
+      }
+
       const [hours, minutes] = startTime.split(':').map(Number);
       let scheduledDate = new Date(startDate);
       scheduledDate.setHours(hours, minutes, 0, 0);
@@ -113,7 +120,8 @@ export const CampaignDialog = ({ open, onOpenChange, bookId, bookData }: Campaig
               scheduled_publish_at: scheduledDate.toISOString(),
               auto_publish_enabled: true,
               product_url: 'https://sklep.antyk.org.pl',
-              template_type: 'text' // Text-only post
+              template_type: 'text', // Text-only post
+              user_id: user.id
             });
 
           if (error) throw error;

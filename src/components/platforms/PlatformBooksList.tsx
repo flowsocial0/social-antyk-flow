@@ -309,12 +309,19 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
       return existingContentId;
     }
 
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("Musisz być zalogowany");
+    }
+
     // Create new content record
     const { data, error } = await (supabase as any)
       .from("book_platform_content")
       .insert({
         book_id: bookId,
         platform: platform,
+        user_id: user.id,
       })
       .select()
       .single();
