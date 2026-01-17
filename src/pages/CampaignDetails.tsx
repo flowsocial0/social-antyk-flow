@@ -874,6 +874,7 @@ const CampaignDetails = () => {
             start_date: campaign.start_date,
             posting_times: campaign.posting_times || [],
             target_platforms: campaign.target_platforms || ["x"],
+            selected_accounts: campaign.selected_accounts as Record<string, string[]> || {},
           }}
           posts={posts.map((p: any) => ({
             id: p.id,
@@ -884,6 +885,7 @@ const CampaignDetails = () => {
             text: p.text,
             book_id: p.book_id,
             platforms: p.platforms || campaign.target_platforms || ["x"],
+            target_accounts: p.target_accounts as Record<string, string[]> || {},
           }))}
         />
       )}
