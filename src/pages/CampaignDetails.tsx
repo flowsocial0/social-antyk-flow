@@ -19,6 +19,7 @@ import {
   Pencil,
   Pause,
   Copy,
+  Users,
 } from "lucide-react";
 import { CampaignPostCard } from "@/components/campaigns/CampaignPostCard";
 import { ResumeCampaignDialog } from "@/components/campaigns/ResumeCampaignDialog";
@@ -51,6 +52,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getPlatformConfig, PlatformId } from "@/config/platforms";
+
+interface AccountInfo {
+  id: string;
+  display_name: string;
+  platform: string;
+}
 
 const CampaignDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -62,6 +70,7 @@ const CampaignDetails = () => {
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const [isEditNameDialogOpen, setIsEditNameDialogOpen] = useState(false);
   const [editedName, setEditedName] = useState("");
+  const [accountsMap, setAccountsMap] = useState<Record<string, AccountInfo>>({});
   const [newPost, setNewPost] = useState({
     day: 1,
     time: "09:00",
@@ -90,6 +99,99 @@ const CampaignDetails = () => {
     },
     enabled: !!id,
   });
+
+  // Load account info for displaying selected accounts
+  useEffect(() => {
+    const loadAccountsInfo = async () => {
+      if (!campaign?.selected_accounts) return;
+
+      const selectedAccounts = campaign.selected_accounts as Record<string, string[]>;
+      const allAccountIds = Object.values(selectedAccounts).flat();
+      
+      if (allAccountIds.length === 0) return;
+
+      const newAccountsMap: Record<string, AccountInfo> = {};
+
+      // Load X accounts
+      if (selectedAccounts.x?.length) {
+        const { data } = await supabase
+          .from('twitter_oauth1_tokens')
+          .select('id, screen_name, account_name')
+          .in('id', selectedAccounts.x);
+        data?.forEach((a: any) => {
+          newAccountsMap[a.id] = {
+            id: a.id,
+            display_name: a.screen_name ? `@${a.screen_name}` : (a.account_name || 'Konto X'),
+            platform: 'x'
+          };
+        });
+      }
+
+      // Load Facebook accounts
+      if (selectedAccounts.facebook?.length) {
+        const { data } = await (supabase as any)
+          .from('facebook_oauth_tokens')
+          .select('id, page_name, account_name')
+          .in('id', selectedAccounts.facebook);
+        data?.forEach((a: any) => {
+          newAccountsMap[a.id] = {
+            id: a.id,
+            display_name: a.page_name || a.account_name || 'Strona Facebook',
+            platform: 'facebook'
+          };
+        });
+      }
+
+      // Load Instagram accounts
+      if (selectedAccounts.instagram?.length) {
+        const { data } = await (supabase as any)
+          .from('instagram_oauth_tokens')
+          .select('id, instagram_username, account_name')
+          .in('id', selectedAccounts.instagram);
+        data?.forEach((a: any) => {
+          newAccountsMap[a.id] = {
+            id: a.id,
+            display_name: a.instagram_username ? `@${a.instagram_username}` : (a.account_name || 'Konto Instagram'),
+            platform: 'instagram'
+          };
+        });
+      }
+
+      // Load TikTok accounts
+      if (selectedAccounts.tiktok?.length) {
+        const { data } = await (supabase as any)
+          .from('tiktok_oauth_tokens')
+          .select('id, account_name, open_id')
+          .in('id', selectedAccounts.tiktok);
+        data?.forEach((a: any) => {
+          newAccountsMap[a.id] = {
+            id: a.id,
+            display_name: a.account_name || a.open_id?.substring(0, 8) || 'Konto TikTok',
+            platform: 'tiktok'
+          };
+        });
+      }
+
+      // Load YouTube accounts
+      if (selectedAccounts.youtube?.length) {
+        const { data } = await (supabase as any)
+          .from('youtube_oauth_tokens')
+          .select('id, channel_title, account_name')
+          .in('id', selectedAccounts.youtube);
+        data?.forEach((a: any) => {
+          newAccountsMap[a.id] = {
+            id: a.id,
+            display_name: a.channel_title || a.account_name || 'Kanał YouTube',
+            platform: 'youtube'
+          };
+        });
+      }
+
+      setAccountsMap(newAccountsMap);
+    };
+
+    loadAccountsInfo();
+  }, [campaign?.selected_accounts]);
 
   const { data: posts, isLoading: postsLoading } = useQuery({
     queryKey: ["campaign-posts", id],
@@ -580,6 +682,31 @@ const CampaignDetails = () => {
               )}
             </div>
           </div>
+
+          {/* Selected Accounts Section */}
+          {campaign.selected_accounts && Object.keys(campaign.selected_accounts).length > 0 && (
+            <div className="mt-6 pt-6 border-t border-border">
+              <div className="flex items-center gap-2 mb-4">
+                <Users className="h-5 w-5 text-primary" />
+                <h3 className="font-semibold">Konta do publikacji</h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(campaign.selected_accounts as Record<string, string[]>).map(([platform, accountIds]) => {
+                  const platformConfig = getPlatformConfig(platform as PlatformId);
+                  const Icon = platformConfig?.icon;
+                  return (accountIds as string[]).map((accountId) => {
+                    const accountInfo = accountsMap[accountId];
+                    return (
+                      <Badge key={accountId} variant="secondary" className="gap-2 py-1.5 px-3">
+                        {Icon && <Icon className="h-3.5 w-3.5" />}
+                        <span>{accountInfo?.display_name || 'Ładowanie...'}</span>
+                      </Badge>
+                    );
+                  });
+                })}
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* Posts Schedule */}
