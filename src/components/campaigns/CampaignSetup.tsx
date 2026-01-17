@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { CampaignConfig } from "./CampaignBuilder";
 import { PlatformSelector } from "./PlatformSelector";
 import { BookSelector } from "./BookSelector";
+import { AccountSelector } from "./AccountSelector";
 import { useSearchParams } from "react-router-dom";
 import { PlatformId, getAllPlatforms } from "@/config/platforms";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -42,6 +43,9 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
   const [useAI, setUseAI] = useState(initialConfig?.useAI ?? true);
   const [regenerateTexts, setRegenerateTexts] = useState(initialConfig?.regenerateTexts ?? false);
   const [contentRatio, setContentRatio] = useState(initialConfig?.contentRatio ?? 20);
+  const [selectedAccounts, setSelectedAccounts] = useState<Record<PlatformId, string>>(
+    initialConfig?.selectedAccounts || ({} as Record<PlatformId, string>)
+  );
   const [connectedPlatforms, setConnectedPlatforms] = useState<Record<PlatformId, boolean>>(
     {} as Record<PlatformId, boolean>
   );
@@ -173,7 +177,8 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
       selectedBooks,
       useAI,
       regenerateTexts,
-      contentRatio
+      contentRatio,
+      selectedAccounts,
     });
   };
 
@@ -399,6 +404,13 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
         selected={targetPlatforms}
         onChange={setTargetPlatforms}
         connectedPlatforms={connectedPlatforms}
+      />
+
+      {/* Account Selection (only shows if multiple accounts per platform) */}
+      <AccountSelector
+        selectedPlatforms={targetPlatforms}
+        selectedAccounts={selectedAccounts}
+        onChange={setSelectedAccounts}
       />
 
       {/* Book Selection */}

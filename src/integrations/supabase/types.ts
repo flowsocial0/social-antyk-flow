@@ -399,9 +399,11 @@ export type Database = {
       facebook_oauth_tokens: {
         Row: {
           access_token: string
+          account_name: string | null
           created_at: string | null
           expires_at: string | null
           id: string
+          is_default: boolean | null
           page_id: string | null
           page_name: string | null
           scope: string | null
@@ -411,9 +413,11 @@ export type Database = {
         }
         Insert: {
           access_token: string
+          account_name?: string | null
           created_at?: string | null
           expires_at?: string | null
           id?: string
+          is_default?: boolean | null
           page_id?: string | null
           page_name?: string | null
           scope?: string | null
@@ -423,9 +427,11 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          account_name?: string | null
           created_at?: string | null
           expires_at?: string | null
           id?: string
+          is_default?: boolean | null
           page_id?: string | null
           page_name?: string | null
           scope?: string | null
@@ -462,12 +468,14 @@ export type Database = {
       instagram_oauth_tokens: {
         Row: {
           access_token: string
+          account_name: string | null
           created_at: string | null
           expires_at: string | null
           facebook_page_id: string | null
           id: string
           instagram_account_id: string
           instagram_username: string | null
+          is_default: boolean | null
           scope: string | null
           token_type: string | null
           updated_at: string | null
@@ -475,12 +483,14 @@ export type Database = {
         }
         Insert: {
           access_token: string
+          account_name?: string | null
           created_at?: string | null
           expires_at?: string | null
           facebook_page_id?: string | null
           id?: string
           instagram_account_id: string
           instagram_username?: string | null
+          is_default?: boolean | null
           scope?: string | null
           token_type?: string | null
           updated_at?: string | null
@@ -488,12 +498,14 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          account_name?: string | null
           created_at?: string | null
           expires_at?: string | null
           facebook_page_id?: string | null
           id?: string
           instagram_account_id?: string
           instagram_username?: string | null
+          is_default?: boolean | null
           scope?: string | null
           token_type?: string | null
           updated_at?: string | null
@@ -504,9 +516,11 @@ export type Database = {
       tiktok_oauth_tokens: {
         Row: {
           access_token: string
+          account_name: string | null
           created_at: string | null
           expires_at: string | null
           id: string
+          is_default: boolean | null
           open_id: string
           refresh_token: string | null
           scope: string | null
@@ -515,9 +529,11 @@ export type Database = {
         }
         Insert: {
           access_token: string
+          account_name?: string | null
           created_at?: string | null
           expires_at?: string | null
           id?: string
+          is_default?: boolean | null
           open_id: string
           refresh_token?: string | null
           scope?: string | null
@@ -526,9 +542,11 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          account_name?: string | null
           created_at?: string | null
           expires_at?: string | null
           id?: string
+          is_default?: boolean | null
           open_id?: string
           refresh_token?: string | null
           scope?: string | null
@@ -605,8 +623,10 @@ export type Database = {
       }
       twitter_oauth1_tokens: {
         Row: {
+          account_name: string | null
           created_at: string | null
           id: string
+          is_default: boolean | null
           oauth_token: string
           oauth_token_secret: string
           screen_name: string | null
@@ -615,8 +635,10 @@ export type Database = {
           x_user_id: string | null
         }
         Insert: {
+          account_name?: string | null
           created_at?: string | null
           id?: string
+          is_default?: boolean | null
           oauth_token: string
           oauth_token_secret: string
           screen_name?: string | null
@@ -625,8 +647,10 @@ export type Database = {
           x_user_id?: string | null
         }
         Update: {
+          account_name?: string | null
           created_at?: string | null
           id?: string
+          is_default?: boolean | null
           oauth_token?: string
           oauth_token_secret?: string
           screen_name?: string | null
@@ -663,11 +687,13 @@ export type Database = {
       youtube_oauth_tokens: {
         Row: {
           access_token: string
+          account_name: string | null
           channel_id: string | null
           channel_title: string | null
           created_at: string | null
           expires_at: string | null
           id: string
+          is_default: boolean | null
           refresh_token: string | null
           scope: string | null
           token_type: string | null
@@ -676,11 +702,13 @@ export type Database = {
         }
         Insert: {
           access_token: string
+          account_name?: string | null
           channel_id?: string | null
           channel_title?: string | null
           created_at?: string | null
           expires_at?: string | null
           id?: string
+          is_default?: boolean | null
           refresh_token?: string | null
           scope?: string | null
           token_type?: string | null
@@ -689,11 +717,13 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          account_name?: string | null
           channel_id?: string | null
           channel_title?: string | null
           created_at?: string | null
           expires_at?: string | null
           id?: string
+          is_default?: boolean | null
           refresh_token?: string | null
           scope?: string | null
           token_type?: string | null
