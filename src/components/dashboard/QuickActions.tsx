@@ -198,21 +198,6 @@ export const QuickActions = () => {
       variant: "default" as const,
       onClick: () => navigate("/campaigns"),
     },
-    {
-      icon: Calendar,
-      label: "Harmonogram zbiorczy",
-      description: "Zobacz wszystkie zaplanowane posty",
-      variant: "secondary" as const,
-      onClick: () => navigate("/schedule-overview"),
-    },
-    {
-      icon: RefreshCw,
-      label: "Synchronizuj dane",
-      description: "Pobierz dane z XML",
-      variant: "secondary" as const,
-      onClick: () => syncBooksMutation.mutate(),
-      loading: syncBooksMutation.isPending,
-    },
   ];
 
   return (
@@ -254,24 +239,25 @@ export const QuickActions = () => {
                 <FileDown className="mr-2 h-4 w-4" />
                 Pobierz szablon XML
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => syncBooksMutation.mutate()} disabled={syncBooksMutation.isPending}>
+                <RefreshCw className={`mr-2 h-4 w-4 ${syncBooksMutation.isPending ? "animate-spin" : ""}`} />
+                Synchronizuj z XML
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
           {/* Other actions */}
           {actions.map((action, index) => {
             const Icon = action.icon;
-            const hasOnClick = "onClick" in action;
-            const isLoading = "loading" in action && action.loading;
             
             return (
               <Button
                 key={index}
                 variant={action.variant}
                 className="h-auto flex-col items-start p-6 space-y-2 hover:shadow-glow transition-all duration-300"
-                onClick={hasOnClick ? action.onClick : undefined}
-                disabled={isLoading}
+                onClick={action.onClick}
               >
-                <Icon className={`h-8 w-8 mb-2 ${isLoading ? "animate-spin" : ""}`} />
+                <Icon className="h-8 w-8 mb-2" />
                 <span className="font-semibold text-base">{action.label}</span>
                 <span className="text-xs opacity-70 font-normal">{action.description}</span>
               </Button>
