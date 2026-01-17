@@ -160,7 +160,7 @@ Deno.serve(async (req) => {
     );
     console.log("Access token received for @" + screen_name);
 
-    // Store access token in database (upsert)
+    // Store access token in database (upsert by x_user_id to allow multiple X accounts per user)
     console.log("Storing access token in database...");
     const { error: upsertError } = await supabase
       .from('twitter_oauth1_tokens')
@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
         x_user_id: user_id,
         updated_at: new Date().toISOString(),
       }, {
-        onConflict: 'user_id'
+        onConflict: 'x_user_id'
       });
 
     if (upsertError) {
