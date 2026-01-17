@@ -17,24 +17,31 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface CampaignSetupProps {
   onComplete: (config: CampaignConfig) => void;
+  initialConfig?: Partial<CampaignConfig>;
 }
 
-export const CampaignSetup = ({ onComplete }: CampaignSetupProps) => {
+export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps) => {
   const [searchParams] = useSearchParams();
   const preSelectedPlatform = searchParams.get('platform') as PlatformId | null;
   
-  const [campaignName, setCampaignName] = useState("");
-  const [durationDays, setDurationDays] = useState(7);
-  const [postsPerDay, setPostsPerDay] = useState(2);
-  const [startDate, setStartDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
-  const [postingTimes, setPostingTimes] = useState(["10:00", "18:00"]);
-  const [targetPlatforms, setTargetPlatforms] = useState<PlatformId[]>(
-    preSelectedPlatform ? [preSelectedPlatform] : ['x']
+  const [campaignName, setCampaignName] = useState(initialConfig?.name || "");
+  const [durationDays, setDurationDays] = useState(initialConfig?.durationDays || 7);
+  const [postsPerDay, setPostsPerDay] = useState(initialConfig?.postsPerDay || 2);
+  const [startDate, setStartDate] = useState(
+    initialConfig?.startDate || format(addDays(new Date(), 1), "yyyy-MM-dd")
   );
-  const [selectedBooks, setSelectedBooks] = useState<string[]>([]);
-  const [useAI, setUseAI] = useState(true);
-  const [regenerateTexts, setRegenerateTexts] = useState(false);
-  const [contentRatio, setContentRatio] = useState(20); // Default 20% content, 80% sales
+  const [postingTimes, setPostingTimes] = useState(
+    initialConfig?.postingTimes || ["10:00", "18:00"]
+  );
+  const [targetPlatforms, setTargetPlatforms] = useState<PlatformId[]>(
+    initialConfig?.targetPlatforms || (preSelectedPlatform ? [preSelectedPlatform] : ['x'])
+  );
+  const [selectedBooks, setSelectedBooks] = useState<string[]>(
+    initialConfig?.selectedBooks || []
+  );
+  const [useAI, setUseAI] = useState(initialConfig?.useAI ?? true);
+  const [regenerateTexts, setRegenerateTexts] = useState(initialConfig?.regenerateTexts ?? false);
+  const [contentRatio, setContentRatio] = useState(initialConfig?.contentRatio ?? 20);
   const [connectedPlatforms, setConnectedPlatforms] = useState<Record<PlatformId, boolean>>(
     {} as Record<PlatformId, boolean>
   );
