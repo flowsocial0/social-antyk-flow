@@ -684,14 +684,15 @@ const CampaignDetails = () => {
           </div>
 
           {/* Selected Accounts Section */}
-          {campaign.selected_accounts && Object.keys(campaign.selected_accounts).length > 0 && (
-            <div className="mt-6 pt-6 border-t border-border">
-              <div className="flex items-center gap-2 mb-4">
-                <Users className="h-5 w-5 text-primary" />
-                <h3 className="font-semibold">Konta do publikacji</h3>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(campaign.selected_accounts as Record<string, string[]>).map(([platform, accountIds]) => {
+          <div className="mt-6 pt-6 border-t border-border">
+            <div className="flex items-center gap-2 mb-4">
+              <Users className="h-5 w-5 text-primary" />
+              <h3 className="font-semibold">Konta do publikacji</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {campaign.selected_accounts && Object.keys(campaign.selected_accounts).length > 0 ? (
+                // Show selected accounts from new campaigns
+                Object.entries(campaign.selected_accounts as Record<string, string[]>).map(([platform, accountIds]) => {
                   const platformConfig = getPlatformConfig(platform as PlatformId);
                   const Icon = platformConfig?.icon;
                   return (accountIds as string[]).map((accountId) => {
@@ -703,10 +704,22 @@ const CampaignDetails = () => {
                       </Badge>
                     );
                   });
-                })}
-              </div>
+                })
+              ) : (
+                // Fallback for older campaigns - show target platforms
+                (campaign.target_platforms as string[] || ['x']).map((platform: string) => {
+                  const platformConfig = getPlatformConfig(platform as PlatformId);
+                  const Icon = platformConfig?.icon;
+                  return (
+                    <Badge key={platform} variant="secondary" className="gap-2 py-1.5 px-3">
+                      {Icon && <Icon className="h-3.5 w-3.5" />}
+                      <span>{platformConfig?.name || platform} (domyślne konto)</span>
+                    </Badge>
+                  );
+                })
+              )}
             </div>
-          )}
+          </div>
         </Card>
 
         {/* Posts Schedule */}
