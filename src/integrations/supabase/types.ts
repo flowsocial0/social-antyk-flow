@@ -24,7 +24,7 @@ export type Database = {
           source_campaign_id: string | null
           text: string
           updated_at: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           book_id: string
@@ -35,7 +35,7 @@ export type Database = {
           source_campaign_id?: string | null
           text: string
           updated_at?: string | null
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           book_id?: string
@@ -46,7 +46,7 @@ export type Database = {
           source_campaign_id?: string | null
           text?: string
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
@@ -82,7 +82,7 @@ export type Database = {
           published_at: string | null
           scheduled_publish_at: string | null
           updated_at: string
-          user_id: string | null
+          user_id: string
           youtube_video_id: string | null
         }
         Insert: {
@@ -101,7 +101,7 @@ export type Database = {
           published_at?: string | null
           scheduled_publish_at?: string | null
           updated_at?: string
-          user_id?: string | null
+          user_id: string
           youtube_video_id?: string | null
         }
         Update: {
@@ -120,7 +120,7 @@ export type Database = {
           published_at?: string | null
           scheduled_publish_at?: string | null
           updated_at?: string
-          user_id?: string | null
+          user_id?: string
           youtube_video_id?: string | null
         }
         Relationships: [
@@ -160,7 +160,7 @@ export type Database = {
           template_type: string | null
           title: string
           updated_at: string
-          user_id: string | null
+          user_id: string
           video_storage_path: string | null
           video_url: string | null
           warehouse_quantity: number | null
@@ -191,7 +191,7 @@ export type Database = {
           template_type?: string | null
           title: string
           updated_at?: string
-          user_id?: string | null
+          user_id: string
           video_storage_path?: string | null
           video_url?: string | null
           warehouse_quantity?: number | null
@@ -222,7 +222,7 @@ export type Database = {
           template_type?: string | null
           title?: string
           updated_at?: string
-          user_id?: string | null
+          user_id?: string
           video_storage_path?: string | null
           video_url?: string | null
           warehouse_quantity?: number | null
@@ -238,7 +238,7 @@ export type Database = {
           id: string
           platform: string
           topic_summary: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           campaign_post_id: string
@@ -248,7 +248,7 @@ export type Database = {
           id?: string
           platform: string
           topic_summary: string
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           campaign_post_id?: string
@@ -258,7 +258,7 @@ export type Database = {
           id?: string
           platform?: string
           topic_summary?: string
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
@@ -360,7 +360,7 @@ export type Database = {
           status: string
           target_platforms: Json | null
           updated_at: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           content_posts_count: number
@@ -376,7 +376,7 @@ export type Database = {
           status?: string
           target_platforms?: Json | null
           updated_at?: string
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           content_posts_count?: number
@@ -392,7 +392,7 @@ export type Database = {
           status?: string
           target_platforms?: Json | null
           updated_at?: string
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -666,21 +666,21 @@ export type Database = {
           id: string
           product_url: string
           title: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
           product_url: string
           title: string
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           created_at?: string
           id?: string
           product_url?: string
           title?: string
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: []
       }
