@@ -2,183 +2,157 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Twitter, Facebook, Instagram, Youtube, CheckCircle2, XCircle, Loader2, Video, ArrowLeft } from "lucide-react";
+import { Twitter, Facebook, Instagram, Youtube, CheckCircle2, Loader2, Video, ArrowLeft, Plus, Star, Trash2 } from "lucide-react";
 import { Footer } from "@/components/layout/Footer";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+interface SocialAccount {
+  id: string;
+  account_name: string | null;
+  is_default: boolean;
+  display_name: string;
+}
+
+interface PlatformAccounts {
+  x: SocialAccount[];
+  facebook: SocialAccount[];
+  instagram: SocialAccount[];
+  tiktok: SocialAccount[];
+  youtube: SocialAccount[];
+}
 
 export default function SocialAccounts() {
   const navigate = useNavigate();
-  const [isLoadingX, setIsLoadingX] = useState(false);
-  const [isLoadingFB, setIsLoadingFB] = useState(false);
-  const [isLoadingTikTok, setIsLoadingTikTok] = useState(false);
-  const [isLoadingIG, setIsLoadingIG] = useState(false);
-  const [isLoadingYT, setIsLoadingYT] = useState(false);
-  const [xConnected, setXConnected] = useState(false);
-  const [fbConnected, setFbConnected] = useState(false);
-  const [tiktokConnected, setTiktokConnected] = useState(false);
-  const [igConnected, setIgConnected] = useState(false);
-  const [ytConnected, setYtConnected] = useState(false);
-  const [xUsername, setXUsername] = useState<string | null>(null);
-  const [fbPageName, setFbPageName] = useState<string | null>(null);
-  const [tiktokOpenId, setTiktokOpenId] = useState<string | null>(null);
-  const [igUsername, setIgUsername] = useState<string | null>(null);
-  const [ytChannelName, setYtChannelName] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<Record<string, boolean>>({});
+  const [accounts, setAccounts] = useState<PlatformAccounts>({
+    x: [],
+    facebook: [],
+    instagram: [],
+    tiktok: [],
+    youtube: [],
+  });
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; platform: string; accountId: string; accountName: string }>({
+    open: false,
+    platform: '',
+    accountId: '',
+    accountName: '',
+  });
 
   useEffect(() => {
-    checkConnections();
+    loadAllAccounts();
     
     // Auto-refresh after OAuth callback
     const params = new URLSearchParams(window.location.search);
     if (params.get('connected') === 'true' || params.get('success') || params.get('instagram') === 'connected' || params.get('youtube') === 'connected') {
-      checkConnections();
+      loadAllAccounts();
       window.history.replaceState({}, '', '/settings/social-accounts');
     }
-    // Handle YouTube callback errors
-    if (params.get('youtube') === 'error') {
-      toast.error('Błąd połączenia YouTube', {
-        description: 'Spróbuj ponownie'
-      });
-      window.history.replaceState({}, '', '/settings/social-accounts');
-    }
-    // Handle Instagram callback errors
-    if (params.get('instagram') === 'error') {
+    // Handle errors
+    if (params.get('youtube') === 'error' || params.get('instagram') === 'error') {
       const message = params.get('message');
-      const errorMessages: Record<string, string> = {
-        'no_pages_permission': 'Nie udzielono zgody na dostęp do stron Facebook. Spróbuj ponownie i zaznacz wszystkie zgody.',
-        'no_instagram_permission': 'Nie udzielono zgody na dostęp do Instagram. Spróbuj ponownie i zaznacz wszystkie zgody.',
-        'no_pages_found': 'Nie znaleziono żadnych stron Facebook, których jesteś administratorem. Utwórz stronę lub zostań adminem istniejącej.',
-        'no_instagram_account': 'Żadna z Twoich stron Facebook nie ma podłączonego konta Instagram Professional. Podłącz konto IG do strony w Meta Business Suite.',
-        'pages_fetch_failed': 'Nie udało się pobrać listy stron. Spróbuj ponownie.',
-        'token_exchange_failed': 'Błąd autoryzacji. Spróbuj ponownie.',
-        'save_failed': 'Nie udało się zapisać połączenia. Spróbuj ponownie.',
-      };
-      toast.error('Błąd połączenia Instagram', {
-        description: errorMessages[message || ''] || message || 'Spróbuj ponownie'
-      });
+      toast.error('Błąd połączenia', { description: message || 'Spróbuj ponownie' });
       window.history.replaceState({}, '', '/settings/social-accounts');
     }
   }, []);
 
-  const checkConnections = async () => {
-    // Get current user session
+  const loadAllAccounts = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    // Check X connection - use twitter_oauth1_tokens (OAuth 1.0a)
-    const { data: xData } = await supabase
-      .from('twitter_oauth1_tokens')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .maybeSingle();
+    // Load all accounts for each platform
+    const [xResult, fbResult, igResult, tiktokResult, ytResult] = await Promise.all([
+      supabase.from('twitter_oauth1_tokens').select('*').eq('user_id', session.user.id),
+      (supabase as any).from('facebook_oauth_tokens').select('*').eq('user_id', session.user.id),
+      (supabase as any).from('instagram_oauth_tokens').select('*').eq('user_id', session.user.id),
+      (supabase as any).from('tiktok_oauth_tokens').select('*').eq('user_id', session.user.id),
+      (supabase as any).from('youtube_oauth_tokens').select('*').eq('user_id', session.user.id),
+    ]);
 
-    if (xData) {
-      setXConnected(true);
-      setXUsername((xData as any).screen_name || null);
-    }
+    setAccounts({
+      x: (xResult.data || []).map((a: any) => ({
+        id: a.id,
+        account_name: a.account_name,
+        is_default: a.is_default ?? false,
+        display_name: a.screen_name ? `@${a.screen_name}` : 'Konto X',
+      })),
+      facebook: (fbResult.data || []).map((a: any) => ({
+        id: a.id,
+        account_name: a.account_name,
+        is_default: a.is_default ?? false,
+        display_name: a.page_name || 'Strona Facebook',
+      })),
+      instagram: (igResult.data || []).map((a: any) => ({
+        id: a.id,
+        account_name: a.account_name,
+        is_default: a.is_default ?? false,
+        display_name: a.instagram_username ? `@${a.instagram_username}` : 'Konto Instagram',
+      })),
+      tiktok: (tiktokResult.data || []).map((a: any) => ({
+        id: a.id,
+        account_name: a.account_name,
+        is_default: a.is_default ?? false,
+        display_name: a.account_name || a.open_id?.substring(0, 8) || 'Konto TikTok',
+      })),
+      youtube: (ytResult.data || []).map((a: any) => ({
+        id: a.id,
+        account_name: a.account_name,
+        is_default: a.is_default ?? false,
+        display_name: a.channel_title || 'Kanał YouTube',
+      })),
+    });
+  };
 
-    // Check Facebook connection
-    const { data: fbData } = await (supabase as any)
-      .from('facebook_oauth_tokens')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .maybeSingle();
-
-    if (fbData) {
-      setFbConnected(true);
-      setFbPageName((fbData as any).page_name ?? null);
-    }
-
-    // Check TikTok connection
-    const { data: tiktokData } = await (supabase as any)
-      .from('tiktok_oauth_tokens')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .maybeSingle();
-
-    if (tiktokData) {
-      setTiktokConnected(true);
-      setTiktokOpenId((tiktokData as any).open_id ?? null);
-    }
-
-    // Check Instagram connection
-    const { data: igData } = await (supabase as any)
-      .from('instagram_oauth_tokens')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .maybeSingle();
-
-    if (igData) {
-      setIgConnected(true);
-      setIgUsername((igData as any).instagram_username ?? null);
-    }
-
-    // Check YouTube connection
-    const { data: ytData } = await (supabase as any)
-      .from('youtube_oauth_tokens')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .maybeSingle();
-
-    if (ytData) {
-      setYtConnected(true);
-      setYtChannelName((ytData as any).channel_title ?? null);
-    }
+  const setLoading = (key: string, value: boolean) => {
+    setIsLoading(prev => ({ ...prev, [key]: value }));
   };
 
   const connectX = async () => {
-    setIsLoadingX(true);
+    setLoading('x', true);
     try {
-      // Get current user session
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        toast.error('Musisz być zalogowany', {
-          description: 'Zaloguj się, aby połączyć konto X'
-        });
-        setIsLoadingX(false);
+        toast.error('Musisz być zalogowany');
         return;
       }
 
       const redirectUri = `${window.location.origin}/twitter-callback`;
       const { data, error } = await supabase.functions.invoke('twitter-oauth-start', {
         body: { redirectUri },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
+        headers: { Authorization: `Bearer ${session.access_token}` }
       });
       
       if (error) throw error;
       
       if (data?.authUrl) {
-        // Store code verifier for callback
-        if (data.codeVerifier) {
-          sessionStorage.setItem('twitter_oauth_verifier', data.codeVerifier);
-        }
-        if (data.state) {
-          sessionStorage.setItem('twitter_oauth_state', data.state);
-        }
+        if (data.codeVerifier) sessionStorage.setItem('twitter_oauth_verifier', data.codeVerifier);
+        if (data.state) sessionStorage.setItem('twitter_oauth_state', data.state);
         window.location.href = data.authUrl;
       }
     } catch (error: any) {
-      console.error('Error connecting X:', error);
-      toast.error('Nie udało się połączyć z X', {
-        description: error.message
-      });
+      toast.error('Nie udało się połączyć z X', { description: error.message });
     } finally {
-      setIsLoadingX(false);
+      setLoading('x', false);
     }
   };
 
   const connectFacebook = async () => {
-    setIsLoadingFB(true);
+    setLoading('facebook', true);
     try {
-      // Get current user session
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        toast.error('Musisz być zalogowany', {
-          description: 'Zaloguj się, aby połączyć konto Facebook'
-        });
-        setIsLoadingFB(false);
+        toast.error('Musisz być zalogowany');
         return;
       }
 
@@ -197,72 +171,45 @@ export default function SocialAccounts() {
         window.location.href = data.url;
       }
     } catch (error: any) {
-      console.error('Error connecting Facebook:', error);
-      toast.error('Nie udało się połączyć z Facebook', {
-        description: error.message
-      });
+      toast.error('Nie udało się połączyć z Facebook', { description: error.message });
     } finally {
-      setIsLoadingFB(false);
+      setLoading('facebook', false);
     }
   };
 
-  const disconnectX = async () => {
+  const connectInstagram = async () => {
+    setLoading('instagram', true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         toast.error('Musisz być zalogowany');
         return;
       }
-      
-      const { error } = await supabase
-        .from('twitter_oauth1_tokens')
-        .delete()
-        .eq('user_id', session.user.id);
-      
-      if (error) throw error;
-      
-      setXConnected(false);
-      setXUsername(null);
-      toast.success('Odłączono konto X');
-    } catch (error: any) {
-      console.error('Error disconnecting X:', error);
-      toast.error('Nie udało się odłączyć konta X');
-    }
-  };
 
-  const disconnectFacebook = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('Musisz być zalogowany');
-        return;
-      }
-      
-      const { error } = await (supabase as any)
-        .from('facebook_oauth_tokens')
-        .delete()
-        .eq('user_id', session.user.id);
+      const { data, error } = await supabase.functions.invoke('instagram-oauth-start', {
+        body: { userId: session.user.id }
+      });
       
       if (error) throw error;
       
-      setFbConnected(false);
-      setFbPageName(null);
-      toast.success('Odłączono konto Facebook');
+      if (data?.authUrl) {
+        if (data.state) sessionStorage.setItem('instagram_oauth_state', data.state);
+        sessionStorage.setItem('instagram_user_id', session.user.id);
+        window.location.href = data.authUrl;
+      }
     } catch (error: any) {
-      console.error('Error disconnecting Facebook:', error);
-      toast.error('Nie udało się odłączyć konta Facebook');
+      toast.error('Nie udało się połączyć z Instagram', { description: error.message });
+    } finally {
+      setLoading('instagram', false);
     }
   };
 
   const connectTikTok = async () => {
-    setIsLoadingTikTok(true);
+    setLoading('tiktok', true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        toast.error('Musisz być zalogowany', {
-          description: 'Zaloguj się, aby połączyć konto TikTok'
-        });
-        setIsLoadingTikTok(false);
+        toast.error('Musisz być zalogowany');
         return;
       }
 
@@ -274,133 +221,24 @@ export default function SocialAccounts() {
       if (error) throw error;
       
       if (data?.url) {
-        if (data.state) {
-          sessionStorage.setItem('tiktok_oauth_state', data.state);
-        }
-        if (data.codeVerifier) {
-          sessionStorage.setItem('tiktok_code_verifier', data.codeVerifier);
-        }
+        if (data.state) sessionStorage.setItem('tiktok_oauth_state', data.state);
+        if (data.codeVerifier) sessionStorage.setItem('tiktok_code_verifier', data.codeVerifier);
         sessionStorage.setItem('tiktok_user_id', session.user.id);
         window.location.href = data.url;
       }
     } catch (error: any) {
-      console.error('Error connecting TikTok:', error);
-      toast.error('Nie udało się połączyć z TikTok', {
-        description: error.message
-      });
+      toast.error('Nie udało się połączyć z TikTok', { description: error.message });
     } finally {
-      setIsLoadingTikTok(false);
-    }
-  };
-
-  const disconnectTikTok = async () => {
-    setIsLoadingTikTok(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('Musisz być zalogowany');
-        return;
-      }
-
-      // Call revoke function to properly disconnect from TikTok
-      const { data, error } = await supabase.functions.invoke('tiktok-oauth-revoke', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
-      });
-      
-      if (error) throw error;
-      
-      if (data?.success) {
-        setTiktokConnected(false);
-        setTiktokOpenId(null);
-        toast.success('Odłączono konto TikTok', {
-          description: data.revokeResult
-        });
-      } else {
-        throw new Error(data?.error || 'Nieznany błąd');
-      }
-    } catch (error: any) {
-      console.error('Error disconnecting TikTok:', error);
-      toast.error('Nie udało się odłączyć konta TikTok', {
-        description: error.message
-      });
-    } finally {
-      setIsLoadingTikTok(false);
-    }
-  };
-
-  const connectInstagram = async () => {
-    setIsLoadingIG(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('Musisz być zalogowany', {
-          description: 'Zaloguj się, aby połączyć konto Instagram'
-        });
-        setIsLoadingIG(false);
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke('instagram-oauth-start', {
-        body: { userId: session.user.id }
-      });
-      
-      if (error) throw error;
-      
-      if (data?.authUrl) {
-        if (data.state) {
-          sessionStorage.setItem('instagram_oauth_state', data.state);
-        }
-        sessionStorage.setItem('instagram_user_id', session.user.id);
-        window.location.href = data.authUrl;
-      }
-    } catch (error: any) {
-      console.error('Error connecting Instagram:', error);
-      toast.error('Nie udało się połączyć z Instagram', {
-        description: error.message
-      });
-    } finally {
-      setIsLoadingIG(false);
-    }
-  };
-
-  const disconnectInstagram = async () => {
-    setIsLoadingIG(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('Musisz być zalogowany');
-        return;
-      }
-
-      const { error } = await (supabase as any)
-        .from('instagram_oauth_tokens')
-        .delete()
-        .eq('user_id', session.user.id);
-      
-      if (error) throw error;
-      
-      setIgConnected(false);
-      setIgUsername(null);
-      toast.success('Odłączono konto Instagram');
-    } catch (error: any) {
-      console.error('Error disconnecting Instagram:', error);
-      toast.error('Nie udało się odłączyć konta Instagram');
-    } finally {
-      setIsLoadingIG(false);
+      setLoading('tiktok', false);
     }
   };
 
   const connectYouTube = async () => {
-    setIsLoadingYT(true);
+    setLoading('youtube', true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        toast.error('Musisz być zalogowany', {
-          description: 'Zaloguj się, aby połączyć konto YouTube'
-        });
-        setIsLoadingYT(false);
+        toast.error('Musisz być zalogowany');
         return;
       }
 
@@ -412,47 +250,87 @@ export default function SocialAccounts() {
       if (error) throw error;
       
       if (data?.authUrl) {
-        if (data.state) {
-          sessionStorage.setItem('youtube_oauth_state', data.state);
-        }
+        if (data.state) sessionStorage.setItem('youtube_oauth_state', data.state);
         window.location.href = data.authUrl;
       }
     } catch (error: any) {
-      console.error('Error connecting YouTube:', error);
-      toast.error('Nie udało się połączyć z YouTube', {
-        description: error.message
-      });
+      toast.error('Nie udało się połączyć z YouTube', { description: error.message });
     } finally {
-      setIsLoadingYT(false);
+      setLoading('youtube', false);
     }
   };
 
-  const disconnectYouTube = async () => {
-    setIsLoadingYT(true);
+  const deleteAccount = async (platform: string, accountId: string) => {
+    setLoading(`delete-${accountId}`, true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('Musisz być zalogowany');
-        return;
-      }
+      if (!session) return;
+
+      const tableMap: Record<string, string> = {
+        x: 'twitter_oauth1_tokens',
+        facebook: 'facebook_oauth_tokens',
+        instagram: 'instagram_oauth_tokens',
+        tiktok: 'tiktok_oauth_tokens',
+        youtube: 'youtube_oauth_tokens',
+      };
 
       const { error } = await (supabase as any)
-        .from('youtube_oauth_tokens')
+        .from(tableMap[platform])
         .delete()
+        .eq('id', accountId)
         .eq('user_id', session.user.id);
-      
+
       if (error) throw error;
-      
-      setYtConnected(false);
-      setYtChannelName(null);
-      toast.success('Odłączono konto YouTube');
+
+      toast.success('Konto zostało usunięte');
+      loadAllAccounts();
     } catch (error: any) {
-      console.error('Error disconnecting YouTube:', error);
-      toast.error('Nie udało się odłączyć konta YouTube');
+      toast.error('Nie udało się usunąć konta', { description: error.message });
     } finally {
-      setIsLoadingYT(false);
+      setLoading(`delete-${accountId}`, false);
+      setDeleteDialog({ open: false, platform: '', accountId: '', accountName: '' });
     }
   };
+
+  const setAsDefault = async (platform: string, accountId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const tableMap: Record<string, string> = {
+        x: 'twitter_oauth1_tokens',
+        facebook: 'facebook_oauth_tokens',
+        instagram: 'instagram_oauth_tokens',
+        tiktok: 'tiktok_oauth_tokens',
+        youtube: 'youtube_oauth_tokens',
+      };
+
+      // First, unset all defaults for this platform
+      await (supabase as any)
+        .from(tableMap[platform])
+        .update({ is_default: false })
+        .eq('user_id', session.user.id);
+
+      // Then set this one as default
+      await (supabase as any)
+        .from(tableMap[platform])
+        .update({ is_default: true })
+        .eq('id', accountId);
+
+      toast.success('Ustawiono jako domyślne');
+      loadAllAccounts();
+    } catch (error: any) {
+      toast.error('Nie udało się ustawić jako domyślne');
+    }
+  };
+
+  const platformConfig = [
+    { id: 'x', name: 'X (Twitter)', icon: Twitter, color: 'text-blue-500', bgColor: 'bg-blue-500/10', connect: connectX },
+    { id: 'facebook', name: 'Facebook', icon: Facebook, color: 'text-blue-600', bgColor: 'bg-blue-600/10', connect: connectFacebook },
+    { id: 'instagram', name: 'Instagram', icon: Instagram, color: 'text-pink-500', bgColor: 'bg-pink-500/10', connect: connectInstagram },
+    { id: 'tiktok', name: 'TikTok', icon: Video, color: 'text-black dark:text-white', bgColor: 'bg-black/10 dark:bg-white/10', connect: connectTikTok },
+    { id: 'youtube', name: 'YouTube', icon: Youtube, color: 'text-red-500', bgColor: 'bg-red-500/10', connect: connectYouTube },
+  ];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -468,301 +346,144 @@ export default function SocialAccounts() {
           </Button>
           <h1 className="text-3xl font-bold mb-2">Konta społecznościowe</h1>
           <p className="text-muted-foreground">
-            Zarządzaj połączonymi kontami mediów społecznościowych
+            Zarządzaj połączonymi kontami mediów społecznościowych. Możesz podłączyć wiele kont do każdej platformy.
           </p>
         </div>
 
-        <div className="space-y-4">
-          {/* X / Twitter */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-blue-500/10">
-                  <Twitter className="h-6 w-6 text-blue-500" />
-                </div>
-                <div>
-                  <h3 className="font-semibold flex items-center gap-2">
-                    X (Twitter)
-                    {xConnected && (
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    )}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {xConnected 
-                      ? `Połączono ${xUsername ? `jako @${xUsername}` : ''}`
-                      : 'Nie połączono'
-                    }
-                  </p>
-                </div>
-              </div>
-              
-              <div>
-                {xConnected ? (
+        <div className="space-y-6">
+          {platformConfig.map((platform) => {
+            const Icon = platform.icon;
+            const platformAccounts = accounts[platform.id as keyof PlatformAccounts];
+            
+            return (
+              <Card key={platform.id} className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-lg ${platform.bgColor}`}>
+                      <Icon className={`h-6 w-6 ${platform.color}`} />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold flex items-center gap-2">
+                        {platform.name}
+                        {platformAccounts.length > 0 && (
+                          <Badge variant="secondary" className="text-xs">
+                            {platformAccounts.length} {platformAccounts.length === 1 ? 'konto' : 'kont'}
+                          </Badge>
+                        )}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {platformAccounts.length === 0 
+                          ? 'Brak połączonych kont'
+                          : 'Kliknij "Dodaj kolejne" aby połączyć więcej kont'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  
                   <Button
-                    variant="outline"
-                    onClick={disconnectX}
+                    onClick={platform.connect}
+                    disabled={isLoading[platform.id]}
+                    variant={platformAccounts.length === 0 ? "default" : "outline"}
                     className="gap-2"
                   >
-                    <XCircle className="h-4 w-4" />
-                    Odłącz
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={connectX}
-                    disabled={isLoadingX}
-                    className="gap-2"
-                  >
-                    {isLoadingX ? (
+                    {isLoading[platform.id] ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Twitter className="h-4 w-4" />
+                      <Plus className="h-4 w-4" />
                     )}
-                    Połącz
+                    {platformAccounts.length === 0 ? 'Połącz' : 'Dodaj kolejne'}
                   </Button>
-                )}
-              </div>
-            </div>
-          </Card>
+                </div>
 
-          {/* Facebook */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-blue-600/10">
-                  <Facebook className="h-6 w-6 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold flex items-center gap-2">
-                    Facebook
-                    {fbConnected && (
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    )}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {fbConnected 
-                      ? `Połączono${fbPageName ? ` - ${fbPageName}` : ''}`
-                      : 'Nie połączono'
-                    }
-                  </p>
-                </div>
-              </div>
-              
-              <div>
-                {fbConnected ? (
-                  <Button
-                    variant="outline"
-                    onClick={disconnectFacebook}
-                    className="gap-2"
-                  >
-                    <XCircle className="h-4 w-4" />
-                    Odłącz
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={connectFacebook}
-                    disabled={isLoadingFB}
-                    className="gap-2"
-                  >
-                    {isLoadingFB ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Facebook className="h-4 w-4" />
-                    )}
-                    Połącz
-                  </Button>
+                {platformAccounts.length > 0 && (
+                  <div className="space-y-2 border-t pt-4">
+                    {platformAccounts.map((account) => (
+                      <div 
+                        key={account.id} 
+                        className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <span className="font-medium">{account.display_name}</span>
+                          {account.is_default && (
+                            <Badge variant="default" className="text-xs gap-1">
+                              <Star className="h-3 w-3" />
+                              Domyślne
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          {!account.is_default && platformAccounts.length > 1 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setAsDefault(platform.id, account.id)}
+                              className="text-xs"
+                            >
+                              Ustaw domyślne
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeleteDialog({
+                              open: true,
+                              platform: platform.id,
+                              accountId: account.id,
+                              accountName: account.display_name,
+                            })}
+                            disabled={isLoading[`delete-${account.id}`]}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            {isLoading[`delete-${account.id}`] ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
-              </div>
-            </div>
-          </Card>
-
-          {/* TikTok */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-gradient-to-br from-slate-900/20 to-pink-500/20">
-                  <Video className="h-6 w-6 text-slate-900" />
-                </div>
-                <div>
-                  <h3 className="font-semibold flex items-center gap-2">
-                    TikTok
-                    {tiktokConnected && (
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    )}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {tiktokConnected 
-                      ? `Połączono${tiktokOpenId ? ` (${tiktokOpenId.substring(0, 8)}...)` : ''}`
-                      : 'Nie połączono'
-                    }
-                  </p>
-                </div>
-              </div>
-              
-              <div>
-                {tiktokConnected ? (
-                  <Button
-                    variant="outline"
-                    onClick={disconnectTikTok}
-                    disabled={isLoadingTikTok}
-                    className="gap-2"
-                  >
-                    {isLoadingTikTok ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <XCircle className="h-4 w-4" />
-                    )}
-                    Odłącz
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={connectTikTok}
-                    disabled={isLoadingTikTok}
-                    className="gap-2"
-                  >
-                    {isLoadingTikTok ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Video className="h-4 w-4" />
-                    )}
-                    Połącz
-                  </Button>
-                )}
-              </div>
-            </div>
-          </Card>
-
-          {/* Instagram */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-gradient-to-br from-pink-500/20 to-purple-500/20">
-                  <Instagram className="h-6 w-6 text-pink-500" />
-                </div>
-                <div>
-                  <h3 className="font-semibold flex items-center gap-2">
-                    Instagram
-                    {igConnected && (
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    )}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {igConnected 
-                      ? `Połączono${igUsername ? ` jako @${igUsername}` : ''}`
-                      : 'Nie połączono'
-                    }
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Wymaga konta Business/Creator połączonego ze stroną Facebook
-                  </p>
-                </div>
-              </div>
-              
-              <div>
-                {igConnected ? (
-                  <Button
-                    variant="outline"
-                    onClick={disconnectInstagram}
-                    disabled={isLoadingIG}
-                    className="gap-2"
-                  >
-                    {isLoadingIG ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <XCircle className="h-4 w-4" />
-                    )}
-                    Odłącz
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={connectInstagram}
-                    disabled={isLoadingIG}
-                    className="gap-2"
-                  >
-                    {isLoadingIG ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Instagram className="h-4 w-4" />
-                    )}
-                    Połącz
-                  </Button>
-                )}
-              </div>
-            </div>
-          </Card>
-
-          {/* YouTube */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-red-500/10">
-                  <Youtube className="h-6 w-6 text-red-500" />
-                </div>
-                <div>
-                  <h3 className="font-semibold flex items-center gap-2">
-                    YouTube
-                    {ytConnected && (
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    )}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {ytConnected 
-                      ? `Połączono${ytChannelName ? ` - ${ytChannelName}` : ''}`
-                      : 'Nie połączono'
-                    }
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Wymaga kanału YouTube z możliwością uploadowania
-                  </p>
-                </div>
-              </div>
-              
-              <div>
-                {ytConnected ? (
-                  <Button
-                    variant="outline"
-                    onClick={disconnectYouTube}
-                    disabled={isLoadingYT}
-                    className="gap-2"
-                  >
-                    {isLoadingYT ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <XCircle className="h-4 w-4" />
-                    )}
-                    Odłącz
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={connectYouTube}
-                    disabled={isLoadingYT}
-                    className="gap-2"
-                  >
-                    {isLoadingYT ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Youtube className="h-4 w-4" />
-                    )}
-                    Połącz
-                  </Button>
-                )}
-              </div>
-            </div>
-          </Card>
+              </Card>
+            );
+          })}
         </div>
 
-        <Card className="p-6 mt-6 bg-muted/30">
-          <h3 className="font-semibold mb-2">Informacje</h3>
+        <div className="mt-8 p-4 bg-muted/50 rounded-lg">
+          <h4 className="font-medium mb-2">Wskazówki</h4>
           <ul className="text-sm text-muted-foreground space-y-1">
-            <li>• Aby publikować posty, musisz najpierw połączyć odpowiednie konta</li>
-            <li>• Tokeny dostępu są bezpiecznie przechowywane w bazie danych</li>
-            <li>• Możesz odłączyć konto w dowolnym momencie</li>
-            <li>• Facebook wymaga uprawnienia do zarządzania postami na stronie</li>
-            <li>• Instagram wymaga konta Business/Creator połączonego ze stroną Facebook</li>
+            <li>• Możesz podłączyć wiele kont do każdej platformy</li>
+            <li>• Konto domyślne będzie używane automatycznie w kampaniach</li>
+            <li>• W ustawieniach kampanii możesz wybrać konkretne konta do publikacji</li>
           </ul>
-        </Card>
+        </div>
       </div>
-      
+
       <Footer />
+
+      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog(prev => ({ ...prev, open }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Usuń konto</AlertDialogTitle>
+            <AlertDialogDescription>
+              Czy na pewno chcesz odłączyć konto <strong>{deleteDialog.accountName}</strong>? 
+              Ta akcja jest nieodwracalna.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Anuluj</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteAccount(deleteDialog.platform, deleteDialog.accountId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Usuń
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
