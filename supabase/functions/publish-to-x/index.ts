@@ -568,12 +568,19 @@ Deno.serve(async (req) => {
         if (postError) throw postError;
         if (!campaignPost) throw new Error(`Campaign post not found: ${campaignPostId}`);
 
-        if (campaignPost.status === 'published') {
-          console.log(`Campaign post ${campaignPostId} already published, skipping`);
+        // For multi-account publishing, we skip the status check if accountId is provided
+        // because one post can be published to multiple accounts
+        if (campaignPost.status === 'published' && !accountId) {
+          console.log(`Campaign post ${campaignPostId} already published and no specific account requested, skipping`);
           return new Response(
             JSON.stringify({ success: false, error: "Already published" }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
+        }
+        
+        // Log if we're republishing to a different account
+        if (campaignPost.status === 'published' && accountId) {
+          console.log(`Campaign post ${campaignPostId} already published, but publishing to additional account ${accountId}`);
         }
 
         let tweetText = fixUrlsInText(campaignPost.text) + '\n\n(ai)';
@@ -640,15 +647,22 @@ Deno.serve(async (req) => {
         const tweetResponse = await sendTweetWithRetry(tweetText, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, mediaIds);
         console.log("Tweet sent successfully:", tweetResponse);
 
-        const { error: updateError } = await supabaseClient
-          .from('campaign_posts')
-          .update({ 
-            status: 'published',
-            published_at: new Date().toISOString()
-          })
-          .eq('id', campaignPostId);
+        // Only update status to published if no specific accountId was provided
+        // When accountId is provided, auto-publish-books will handle the final status update
+        // after all accounts have been processed
+        if (!accountId) {
+          const { error: updateError } = await supabaseClient
+            .from('campaign_posts')
+            .update({ 
+              status: 'published',
+              published_at: new Date().toISOString()
+            })
+            .eq('id', campaignPostId);
 
-        if (updateError) throw updateError;
+          if (updateError) throw updateError;
+        } else {
+          console.log(`Skipping status update for campaign post ${campaignPostId} - auto-publish-books will handle it`);
+        }
 
         return new Response(
           JSON.stringify({ 
