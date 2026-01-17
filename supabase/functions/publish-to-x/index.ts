@@ -109,7 +109,39 @@ function fixUrlsInText(text: string): string {
 const BASE_URL = "https://api.x.com/2";
 const UPLOAD_URL = "https://upload.twitter.com/1.1/media/upload.json";
 
-async function getLatestOAuth1Token(supabaseClient: any, userId: string): Promise<{ oauth_token: string; oauth_token_secret: string; screen_name?: string } | null> {
+async function getOAuth1Token(supabaseClient: any, userId: string, accountId?: string): Promise<{ oauth_token: string; oauth_token_secret: string; screen_name?: string } | null> {
+  // If accountId is provided, fetch that specific account
+  if (accountId) {
+    const { data, error } = await supabaseClient
+      .from('twitter_oauth1_tokens')
+      .select('oauth_token, oauth_token_secret, screen_name')
+      .eq('id', accountId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Failed to fetch OAuth1 token by accountId:', error);
+      return null;
+    }
+    if (data) {
+      console.log(`Using specific account: @${data.screen_name} (id: ${accountId})`);
+      return data;
+    }
+  }
+  
+  // Fallback: try to get default account for user
+  const { data: defaultData, error: defaultError } = await supabaseClient
+    .from('twitter_oauth1_tokens')
+    .select('oauth_token, oauth_token_secret, screen_name')
+    .eq('user_id', userId)
+    .eq('is_default', true)
+    .maybeSingle();
+
+  if (!defaultError && defaultData) {
+    console.log(`Using default account: @${defaultData.screen_name}`);
+    return defaultData;
+  }
+
+  // Final fallback: get any account for user
   const { data, error } = await supabaseClient
     .from('twitter_oauth1_tokens')
     .select('oauth_token, oauth_token_secret, screen_name')
@@ -370,7 +402,8 @@ Deno.serve(async (req) => {
         storageBucket: string | undefined,
         storagePath: string | undefined,
         customText: string | undefined,
-        userIdFromBody: string | undefined;
+        userIdFromBody: string | undefined,
+        accountId: string | undefined;
     
     try {
       const body = await req.json();
@@ -382,6 +415,7 @@ Deno.serve(async (req) => {
       storagePath = body.storagePath;
       customText = body.customText;
       userIdFromBody = body.userId;
+      accountId = body.accountId;
       console.log('Request body:', { 
         bookId, 
         bookIds: bookIds ? `${bookIds.length} items` : undefined, 
@@ -389,7 +423,8 @@ Deno.serve(async (req) => {
         testConnection: shouldTestConnection, 
         storageBucket, 
         storagePath,
-        userId: userIdFromBody ? 'present' : undefined
+        userId: userIdFromBody ? 'present' : undefined,
+        accountId: accountId ? 'present' : undefined
       });
     } catch (_) {
       console.log('No valid JSON body');
@@ -450,8 +485,8 @@ Deno.serve(async (req) => {
     
     const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Fetch user's OAuth 1.0a tokens
-    const oauth1Token = await getLatestOAuth1Token(supabaseClient, userId);
+    // Fetch user's OAuth 1.0a tokens (using specific accountId if provided)
+    const oauth1Token = await getOAuth1Token(supabaseClient, userId, accountId);
     console.log('OAuth1 token for user:', oauth1Token ? `found (@${oauth1Token.screen_name})` : 'not found');
     
     if (!oauth1Token) {
