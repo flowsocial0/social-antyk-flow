@@ -40,11 +40,18 @@ const Index = () => {
   }, [navigate]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (error) {
+      // Even if server-side logout fails (e.g., session already expired),
+      // we still want to clear local state and redirect
+      console.log('Logout completed (session may have already expired)');
+    }
     toast({
       title: "Wylogowano",
       description: "Do zobaczenia!",
     });
+    navigate("/login");
   };
 
   if (loading) {
