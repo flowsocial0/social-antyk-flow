@@ -128,7 +128,8 @@ export default function SocialAccounts() {
       }
 
       const redirectUri = `${window.location.origin}/twitter-callback`;
-      const { data, error } = await supabase.functions.invoke('twitter-oauth-start', {
+      // Use OAuth 1.0a for X (required for public pictures)
+      const { data, error } = await supabase.functions.invoke('twitter-oauth1-start', {
         body: { redirectUri },
         headers: { Authorization: `Bearer ${session.access_token}` }
       });
@@ -136,8 +137,7 @@ export default function SocialAccounts() {
       if (error) throw error;
       
       if (data?.authUrl) {
-        if (data.codeVerifier) sessionStorage.setItem('twitter_oauth_verifier', data.codeVerifier);
-        if (data.state) sessionStorage.setItem('twitter_oauth_state', data.state);
+        if (data.state) sessionStorage.setItem('twitter_oauth1_state', data.state);
         window.location.href = data.authUrl;
       }
     } catch (error: any) {
