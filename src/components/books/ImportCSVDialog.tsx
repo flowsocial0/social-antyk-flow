@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,7 @@ import { Upload, CheckCircle, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import Papa from "papaparse";
 import { supabase } from "@/integrations/supabase/client";
+import type { User } from "@supabase/supabase-js";
 
 interface ImportCSVDialogProps {
   open: boolean;
@@ -26,6 +27,7 @@ interface CSVRow {
 export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   const [progress, setProgress] = useState<{
     success: number;
     failed: number;
@@ -33,6 +35,12 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
     phase: string;
     errors: string[];
   } | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+  }, []);
 
   const parsePrice = (priceStr: string): number | null => {
     if (!priceStr || priceStr.trim() === "") return null;
@@ -289,6 +297,7 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
               stock_status: stockStatus,
               warehouse_quantity: parseQuantity(row["Ilość w magazynach"]),
               exclude_from_campaigns: isHidden,
+              user_id: user?.id,
               // Only reset storage_path if image URL changed (to trigger re-migration)
               // If not changed, don't include storage_path at all so it keeps its value
               ...(imageUrlChanged ? { storage_path: null } : {}),
