@@ -1,17 +1,24 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, Sparkles, Copy } from "lucide-react";
 import { CampaignBuilder } from "@/components/campaigns/CampaignBuilder";
 import { Footer } from "@/components/layout/Footer";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { User } from "@supabase/supabase-js";
+import type { CampaignConfig } from "@/components/campaigns/CampaignBuilder";
 
 const CampaignsNew = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Get copied config from navigation state
+  const copiedConfig = location.state?.copiedConfig as Partial<CampaignConfig> | undefined;
+  const sourceCampaignName = location.state?.sourceCampaignName as string | undefined;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -63,10 +70,12 @@ const CampaignsNew = () => {
             <div className="flex-1">
               <h1 className="text-3xl font-bold text-primary-foreground flex items-center gap-2">
                 <Sparkles className="h-8 w-8" />
-                Nowa Kampania AI
+                {copiedConfig ? "Kopiowanie kampanii" : "Nowa Kampania AI"}
               </h1>
               <p className="text-sm text-primary-foreground/90 mt-1">
-                Stwórz profesjonalną kampanię z zasadą 80/20 (80% content, 20% sprzedaż)
+                {copiedConfig 
+                  ? `Na podstawie: ${sourceCampaignName}` 
+                  : "Stwórz profesjonalną kampanię z zasadą 80/20 (80% content, 20% sprzedaż)"}
               </p>
             </div>
           </div>
@@ -75,8 +84,16 @@ const CampaignsNew = () => {
 
       {/* Main Content */}
       <main className="flex-1 container mx-auto px-4 py-8">
+        {copiedConfig && (
+          <Alert className="mb-6 bg-primary/5 border-primary/20">
+            <Copy className="h-4 w-4" />
+            <AlertDescription>
+              Kampania została skopiowana. Możesz zmodyfikować wszystkie parametry przed uruchomieniem.
+            </AlertDescription>
+          </Alert>
+        )}
         <Card className="p-8 bg-gradient-card border-border/50 shadow-card">
-          <CampaignBuilder />
+          <CampaignBuilder initialConfig={copiedConfig} />
         </Card>
       </main>
       

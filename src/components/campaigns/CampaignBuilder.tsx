@@ -28,7 +28,11 @@ export type CampaignConfig = {
   contentRatio?: number; // 0-100, percentage of content posts
 };
 
-export const CampaignBuilder = () => {
+interface CampaignBuilderProps {
+  initialConfig?: Partial<CampaignConfig>;
+}
+
+export const CampaignBuilder = ({ initialConfig }: CampaignBuilderProps) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [config, setConfig] = useState<CampaignConfig | null>(null);
   const [plan, setPlan] = useState<{ structure: any[] } | null>(null);
@@ -83,7 +87,7 @@ export const CampaignBuilder = () => {
 
       {/* Step Content */}
       {step === 1 && (
-        <CampaignSetup onComplete={handleConfigComplete} />
+        <CampaignSetup onComplete={handleConfigComplete} initialConfig={initialConfig} />
       )}
 
       {step === 2 && config && (

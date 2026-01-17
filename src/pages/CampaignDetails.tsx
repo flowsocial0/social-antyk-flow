@@ -18,9 +18,11 @@ import {
   RefreshCw,
   Pencil,
   Pause,
+  Copy,
 } from "lucide-react";
 import { CampaignPostCard } from "@/components/campaigns/CampaignPostCard";
 import { ResumeCampaignDialog } from "@/components/campaigns/ResumeCampaignDialog";
+import { CopyCampaignDialog } from "@/components/campaigns/CopyCampaignDialog";
 import { format } from "date-fns";
 import { pl } from "date-fns/locale";
 import { toast } from "sonner";
@@ -57,6 +59,7 @@ const CampaignDetails = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isAddingPost, setIsAddingPost] = useState(false);
   const [isResumeDialogOpen, setIsResumeDialogOpen] = useState(false);
+  const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const [isEditNameDialogOpen, setIsEditNameDialogOpen] = useState(false);
   const [editedName, setEditedName] = useState("");
   const [newPost, setNewPost] = useState({
@@ -473,6 +476,9 @@ const CampaignDetails = () => {
               <Button variant="secondary" className="gap-2" onClick={() => setIsResumeDialogOpen(true)}>
                 <RefreshCw className="h-4 w-4" />
               </Button>
+              <Button variant="secondary" className="gap-2" onClick={() => setIsCopyDialogOpen(true)}>
+                <Copy className="h-4 w-4" />
+              </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" className="gap-2">
@@ -772,6 +778,23 @@ const CampaignDetails = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CopyCampaignDialog
+        open={isCopyDialogOpen}
+        onOpenChange={setIsCopyDialogOpen}
+        campaign={{
+          id: campaign.id,
+          name: campaign.name,
+          duration_days: campaign.duration_days,
+          posts_per_day: campaign.posts_per_day,
+          start_date: campaign.start_date,
+          posting_times: Array.isArray(campaign.posting_times) ? campaign.posting_times : [],
+          target_platforms: Array.isArray(campaign.target_platforms) ? campaign.target_platforms : [],
+          content_posts_count: campaign.content_posts_count,
+          sales_posts_count: campaign.sales_posts_count,
+        }}
+        selectedBooks={Array.from(new Set(posts.filter((p: any) => p.book_id).map((p: any) => String(p.book_id))))}
+      />
     </div>
   );
 };
