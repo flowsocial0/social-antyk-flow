@@ -36,6 +36,7 @@ interface ResumeCampaignDialogProps {
     start_date: string;
     posting_times: string[];
     target_platforms: string[];
+    selected_accounts?: Record<string, string[]>;
   };
   posts: Array<{
     id: string;
@@ -46,6 +47,7 @@ interface ResumeCampaignDialogProps {
     text: string;
     book_id: string | null;
     platforms: string[];
+    target_accounts?: Record<string, string[]>;
   }>;
 }
 
@@ -81,7 +83,7 @@ export const ResumeCampaignDialog = ({
         return;
       }
 
-      // Create new campaign
+      // Create new campaign - include selected_accounts from original campaign
       const { data: newCampaign, error: campaignError } = await (supabase as any)
         .from('campaigns')
         .insert({
@@ -95,6 +97,7 @@ export const ResumeCampaignDialog = ({
           start_date: startDate,
           posting_times: campaign.posting_times,
           target_platforms: campaign.target_platforms,
+          selected_accounts: campaign.selected_accounts || {},
           user_id: user.id,
         })
         .select()
@@ -115,6 +118,9 @@ export const ResumeCampaignDialog = ({
           const [hours, minutes] = originalPost.time.split(':').map(Number);
           scheduledDate.setHours(hours, minutes, 0, 0);
           
+          // Include target_accounts from original post, or fall back to campaign's selected_accounts
+          const postTargetAccounts = originalPost.target_accounts || campaign.selected_accounts || {};
+          
           const { error: postError } = await (supabase as any)
             .from('campaign_posts')
             .insert({
@@ -128,6 +134,7 @@ export const ResumeCampaignDialog = ({
               scheduled_at: scheduledDate.toISOString(),
               status: 'scheduled',
               platforms: originalPost.platforms || campaign.target_platforms,
+              target_accounts: postTargetAccounts,
             });
 
           if (postError) throw postError;
