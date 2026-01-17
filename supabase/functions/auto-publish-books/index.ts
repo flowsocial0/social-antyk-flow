@@ -31,6 +31,7 @@ interface CampaignPost {
   book_id?: string;
   scheduled_at: string;
   platforms?: string[];
+  target_accounts?: Record<string, string[]>; // Platform -> Account IDs array
 }
 
 Deno.serve(async (req) => {
@@ -247,6 +248,7 @@ Deno.serve(async (req) => {
       
       try {
         const platforms = post.platforms || ['x'];
+        const targetAccounts = post.target_accounts || {};
         let platformSuccessCount = 0;
         let platformFailCount = 0;
         
@@ -272,7 +274,7 @@ Deno.serve(async (req) => {
               continue;
           }
 
-          // Determine user ID for this platform
+          // Determine user ID for this platform (fallback when no specific accounts selected)
           let platformUserId: string | null = null;
           if (platform === 'facebook') {
             platformUserId = facebookUserId;
@@ -284,60 +286,111 @@ Deno.serve(async (req) => {
             platformUserId = youtubeUserId;
           }
 
-          if (!platformUserId) {
-            console.error(`No user token found for platform: ${platform}`);
-            
-            // Update post with error
-            await supabase
-              .from('campaign_posts')
-              .update({
-                status: 'failed',
-                error_message: `Brak połączonego konta ${platform === 'facebook' ? 'Facebook' : 'X'}. Połącz konto w ustawieniach platformy.`,
-                error_code: 'NO_PLATFORM_TOKEN'
-              })
-              .eq('id', post.id);
-            
-            platformFailCount++;
-            continue;
-          }
-
-          // Get book image URL for the post
-          const bookImageUrl = post.book?.image_url || null;
+          // Get selected accounts for this platform, or use empty array for fallback behavior
+          const accountsForPlatform = targetAccounts[platform] || [];
           
-          const { data, error: publishError } = await supabase.functions.invoke(publishFunctionName, {
-            body: { 
-              campaignPostId: post.id,
-              platform: platform,
-              userId: platformUserId,
-              imageUrl: bookImageUrl
-            }
-          });
-
-          if (publishError) {
-            console.error(`Failed to publish campaign post ${post.id} to ${platform}:`, publishError);
-            
-            // Check if it's a rate limit error - if so, the publish function already updated the status
-            const isRateLimitError = publishError.message?.includes('429') || 
-              publishError.message?.includes('Too Many Requests') ||
-              data?.error === 'rate_limit';
-            
-            if (!isRateLimitError) {
-              // Save error message to campaign post
-              const errorMsg = data?.error || publishError.message || 'Unknown error';
+          // If no specific accounts selected, use legacy behavior (single account per platform)
+          if (accountsForPlatform.length === 0) {
+            if (!platformUserId) {
+              console.error(`No user token found for platform: ${platform}`);
+              
+              // Update post with error
               await supabase
                 .from('campaign_posts')
                 .update({
-                  error_message: errorMsg,
-                  error_code: 'PUBLISH_FAILED'
+                  status: 'failed',
+                  error_message: `Brak połączonego konta ${platform === 'facebook' ? 'Facebook' : 'X'}. Połącz konto w ustawieniach platformy.`,
+                  error_code: 'NO_PLATFORM_TOKEN'
                 })
                 .eq('id', post.id);
               
               platformFailCount++;
+              continue;
             }
-            // For rate limit errors, don't count as failure - let the retry mechanism handle it
+
+            // Get book image URL for the post
+            const bookImageUrl = post.book?.image_url || null;
+            
+            const { data, error: publishError } = await supabase.functions.invoke(publishFunctionName, {
+              body: { 
+                campaignPostId: post.id,
+                platform: platform,
+                userId: platformUserId,
+                imageUrl: bookImageUrl
+              }
+            });
+
+            if (publishError) {
+              console.error(`Failed to publish campaign post ${post.id} to ${platform}:`, publishError);
+              
+              // Check if it's a rate limit error - if so, the publish function already updated the status
+              const isRateLimitError = publishError.message?.includes('429') || 
+                publishError.message?.includes('Too Many Requests') ||
+                data?.error === 'rate_limit';
+              
+              if (!isRateLimitError) {
+                // Save error message to campaign post
+                const errorMsg = data?.error || publishError.message || 'Unknown error';
+                await supabase
+                  .from('campaign_posts')
+                  .update({
+                    error_message: errorMsg,
+                    error_code: 'PUBLISH_FAILED'
+                  })
+                  .eq('id', post.id);
+                
+                platformFailCount++;
+              }
+            } else {
+              console.log(`Successfully published campaign post ${post.id} to ${platform}`);
+              platformSuccessCount++;
+            }
           } else {
-            console.log(`Successfully published campaign post ${post.id} to ${platform}`);
-            platformSuccessCount++;
+            // Multi-account publishing: iterate over selected accounts
+            console.log(`Publishing to ${accountsForPlatform.length} accounts on ${platform}`);
+            let accountSuccessCount = 0;
+            
+            for (const accountId of accountsForPlatform) {
+              console.log(`Publishing to account ${accountId} on ${platform}`);
+              
+              // Get book image URL for the post
+              const bookImageUrl = post.book?.image_url || null;
+              
+              const { data, error: publishError } = await supabase.functions.invoke(publishFunctionName, {
+                body: { 
+                  campaignPostId: post.id,
+                  platform: platform,
+                  userId: platformUserId, // Still need userId for service role context
+                  accountId: accountId,   // Specific account to publish to
+                  imageUrl: bookImageUrl
+                }
+              });
+
+              if (publishError) {
+                console.error(`Failed to publish campaign post ${post.id} to ${platform} account ${accountId}:`, publishError);
+                
+                // Check if it's a rate limit error
+                const isRateLimitError = publishError.message?.includes('429') || 
+                  publishError.message?.includes('Too Many Requests') ||
+                  data?.error === 'rate_limit';
+                
+                if (!isRateLimitError) {
+                  const errorMsg = data?.error || publishError.message || 'Unknown error';
+                  console.error(`Account ${accountId} publish failed: ${errorMsg}`);
+                }
+                // Continue to next account even if this one failed
+              } else {
+                console.log(`Successfully published campaign post ${post.id} to ${platform} account ${accountId}`);
+                accountSuccessCount++;
+              }
+            }
+            
+            // Consider platform successful if at least one account succeeded
+            if (accountSuccessCount > 0) {
+              platformSuccessCount++;
+            } else {
+              platformFailCount++;
+            }
           }
         }
 

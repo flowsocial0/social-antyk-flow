@@ -286,6 +286,7 @@ export type Database = {
           retry_count: number | null
           scheduled_at: string
           status: string
+          target_accounts: Json | null
           text: string
           time: string
           type: string
@@ -305,6 +306,7 @@ export type Database = {
           retry_count?: number | null
           scheduled_at: string
           status?: string
+          target_accounts?: Json | null
           text: string
           time: string
           type: string
@@ -324,6 +326,7 @@ export type Database = {
           retry_count?: number | null
           scheduled_at?: string
           status?: string
+          target_accounts?: Json | null
           text?: string
           time?: string
           type?: string
@@ -356,6 +359,7 @@ export type Database = {
           posting_times: Json
           posts_per_day: number
           sales_posts_count: number
+          selected_accounts: Json | null
           start_date: string
           status: string
           target_platforms: Json | null
@@ -372,6 +376,7 @@ export type Database = {
           posting_times: Json
           posts_per_day: number
           sales_posts_count: number
+          selected_accounts?: Json | null
           start_date: string
           status?: string
           target_platforms?: Json | null
@@ -388,6 +393,7 @@ export type Database = {
           posting_times?: Json
           posts_per_day?: number
           sales_posts_count?: number
+          selected_accounts?: Json | null
           start_date?: string
           status?: string
           target_platforms?: Json | null

@@ -81,6 +81,7 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
           start_date: config.startDate,
           posting_times: config.postingTimes,
           target_platforms: config.targetPlatforms || ["x"],
+          selected_accounts: config.selectedAccounts || {},
           user_id: user.id,
         } as any)
         .select()
@@ -105,6 +106,7 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
           book_id: (post as any).bookId || null,
           status: "scheduled",
           platforms: config.targetPlatforms || ["x"],
+          target_accounts: config.selectedAccounts || {},
         } as any);
 
         if (postError) throw postError;

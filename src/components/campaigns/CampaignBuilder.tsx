@@ -26,7 +26,7 @@ export type CampaignConfig = {
   useAI?: boolean;
   regenerateTexts?: boolean;
   contentRatio?: number; // 0-100, percentage of content posts
-  selectedAccounts?: Record<PlatformId, string>; // Platform -> Account ID mapping
+  selectedAccounts?: Record<PlatformId, string[]>; // Platform -> Account IDs array (multi-account selection)
 };
 
 interface CampaignBuilderProps {

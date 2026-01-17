@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { PlatformId, getPlatformConfig } from "@/config/platforms";
-import { Users } from "lucide-react";
+import { Users, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface AccountOption {
   id: string;
@@ -15,8 +16,8 @@ interface AccountOption {
 
 interface AccountSelectorProps {
   selectedPlatforms: PlatformId[];
-  selectedAccounts: Record<PlatformId, string>;
-  onChange: (accounts: Record<PlatformId, string>) => void;
+  selectedAccounts: Record<PlatformId, string[]>;
+  onChange: (accounts: Record<PlatformId, string[]>) => void;
 }
 
 export const AccountSelector = ({ selectedPlatforms, selectedAccounts, onChange }: AccountSelectorProps) => {
@@ -26,6 +27,28 @@ export const AccountSelector = ({ selectedPlatforms, selectedAccounts, onChange 
   useEffect(() => {
     loadAccounts();
   }, []);
+
+  // Auto-select default accounts when platforms change
+  useEffect(() => {
+    if (loading) return;
+    
+    const newSelectedAccounts: Record<string, string[]> = { ...selectedAccounts };
+    let changed = false;
+    
+    selectedPlatforms.forEach(platform => {
+      const platformAccounts = accounts[platform] || [];
+      if (platformAccounts.length > 0 && (!newSelectedAccounts[platform] || newSelectedAccounts[platform].length === 0)) {
+        // Auto-select default account or first account
+        const defaultAccount = platformAccounts.find(a => a.is_default);
+        newSelectedAccounts[platform] = [defaultAccount?.id || platformAccounts[0].id];
+        changed = true;
+      }
+    });
+    
+    if (changed) {
+      onChange(newSelectedAccounts as Record<PlatformId, string[]>);
+    }
+  }, [selectedPlatforms, accounts, loading]);
 
   const loadAccounts = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -68,33 +91,45 @@ export const AccountSelector = ({ selectedPlatforms, selectedAccounts, onChange 
     };
 
     setAccounts(newAccounts as Record<PlatformId, AccountOption[]>);
-
-    // Auto-select default accounts for selected platforms
-    const autoSelected: Record<string, string> = { ...selectedAccounts };
-    selectedPlatforms.forEach(platform => {
-      if (!autoSelected[platform] && newAccounts[platform]?.length > 0) {
-        const defaultAccount = newAccounts[platform].find(a => a.is_default);
-        autoSelected[platform] = defaultAccount?.id || newAccounts[platform][0].id;
-      }
-    });
-    onChange(autoSelected as Record<PlatformId, string>);
-
     setLoading(false);
   };
 
-  const handleAccountChange = (platform: PlatformId, accountId: string) => {
+  const handleAccountToggle = (platform: PlatformId, accountId: string, checked: boolean) => {
+    const currentSelection = selectedAccounts[platform] || [];
+    let newSelection: string[];
+    
+    if (checked) {
+      // Add account
+      newSelection = [...currentSelection, accountId];
+    } else {
+      // Remove account (but ensure at least one remains)
+      if (currentSelection.length <= 1) {
+        return; // Don't allow deselecting the last account
+      }
+      newSelection = currentSelection.filter(id => id !== accountId);
+    }
+    
     onChange({
       ...selectedAccounts,
-      [platform]: accountId,
+      [platform]: newSelection,
     });
   };
 
-  // Filter to only show platforms that have multiple accounts
-  const platformsWithMultipleAccounts = selectedPlatforms.filter(
-    platform => (accounts[platform]?.length || 0) > 1
+  // Filter to only show platforms that have accounts
+  const platformsWithAccounts = selectedPlatforms.filter(
+    platform => (accounts[platform]?.length || 0) > 0
   );
 
-  if (loading || platformsWithMultipleAccounts.length === 0) {
+  // Check for platforms with no selected accounts
+  const platformsWithNoSelection = platformsWithAccounts.filter(
+    platform => !selectedAccounts[platform] || selectedAccounts[platform].length === 0
+  );
+
+  if (loading) {
+    return null;
+  }
+
+  if (platformsWithAccounts.length === 0) {
     return null;
   }
 
@@ -105,46 +140,76 @@ export const AccountSelector = ({ selectedPlatforms, selectedAccounts, onChange 
         <h3 className="text-lg font-semibold">Wybór kont do publikacji</h3>
       </div>
       <p className="text-sm text-muted-foreground mb-4">
-        Masz wiele kont połączonych z niektórymi platformami. Wybierz, które konta mają być użyte w tej kampanii.
+        Wybierz konta, na których mają być publikowane posty. Możesz zaznaczyć wiele kont.
       </p>
 
-      <div className="space-y-4">
-        {platformsWithMultipleAccounts.map(platform => {
+      <div className="space-y-6">
+        {platformsWithAccounts.map(platform => {
           const platformConfig = getPlatformConfig(platform);
           const platformAccounts = accounts[platform] || [];
           const Icon = platformConfig?.icon;
+          const currentSelection = selectedAccounts[platform] || [];
 
           return (
-            <div key={platform} className="flex items-center gap-4">
-              <div className="flex items-center gap-2 min-w-[140px]">
-                {Icon && <Icon className="h-4 w-4" />}
+            <div key={platform} className="space-y-3">
+              <div className="flex items-center gap-2">
+                {Icon && (
+                  <div className={`p-1.5 rounded bg-gradient-to-br ${platformConfig?.gradientFrom} ${platformConfig?.gradientTo}`}>
+                    <Icon className={`h-4 w-4 ${platformConfig?.color}`} />
+                  </div>
+                )}
                 <Label className="font-medium">{platformConfig?.name || platform}</Label>
+                <Badge variant="secondary" className="text-xs">
+                  {currentSelection.length} z {platformAccounts.length}
+                </Badge>
               </div>
               
-              <Select
-                value={selectedAccounts[platform] || ''}
-                onValueChange={(value) => handleAccountChange(platform, value)}
-              >
-                <SelectTrigger className="w-[280px]">
-                  <SelectValue placeholder="Wybierz konto" />
-                </SelectTrigger>
-                <SelectContent>
-                  {platformAccounts.map(account => (
-                    <SelectItem key={account.id} value={account.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{account.display_name}</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pl-8">
+                {platformAccounts.map(account => {
+                  const isChecked = currentSelection.includes(account.id);
+                  const isLastSelected = currentSelection.length === 1 && isChecked;
+                  
+                  return (
+                    <div 
+                      key={account.id} 
+                      className={`flex items-center space-x-3 p-3 rounded-lg border transition-colors ${
+                        isChecked ? 'bg-primary/5 border-primary/30' : 'bg-background border-border hover:border-primary/20'
+                      }`}
+                    >
+                      <Checkbox
+                        id={`account-${platform}-${account.id}`}
+                        checked={isChecked}
+                        onCheckedChange={(checked) => handleAccountToggle(platform, account.id, checked === true)}
+                        disabled={isLastSelected}
+                      />
+                      <Label
+                        htmlFor={`account-${platform}-${account.id}`}
+                        className={`flex items-center gap-2 cursor-pointer flex-1 ${isLastSelected ? 'opacity-60' : ''}`}
+                      >
+                        <span className="text-sm">{account.display_name}</span>
                         {account.is_default && (
-                          <Badge variant="secondary" className="text-xs">Domyślne</Badge>
+                          <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/20">
+                            Domyślne
+                          </Badge>
                         )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                      </Label>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           );
         })}
       </div>
+
+      {platformsWithNoSelection.length > 0 && (
+        <Alert className="mt-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Wybierz co najmniej jedno konto dla każdej platformy: {platformsWithNoSelection.map(p => getPlatformConfig(p)?.name || p).join(', ')}
+          </AlertDescription>
+        </Alert>
+      )}
     </Card>
   );
 };
