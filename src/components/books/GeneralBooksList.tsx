@@ -5,11 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Loader2, ExternalLink, Eye, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Snowflake } from "lucide-react";
+import { Loader2, ExternalLink, Eye, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Snowflake, Pencil } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Tables } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
+import { EditBookDialog } from "./EditBookDialog";
 
 type SortColumn = "code" | "title" | "sale_price";
 type SortDirection = "asc" | "desc";
@@ -25,6 +26,7 @@ export const GeneralBooksList = () => {
   const [pageInput, setPageInput] = useState<string>("1");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>("");
+  const [editingBook, setEditingBook] = useState<Tables<"books"> | null>(null);
 
   useEffect(() => {
     setPageInput(String(currentPage));
@@ -311,6 +313,14 @@ export const GeneralBooksList = () => {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingBook(book)}
+                          title="Edytuj książkę"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                         {book.product_url && (
                           <Button
                             variant="ghost"
@@ -383,6 +393,17 @@ export const GeneralBooksList = () => {
           </div>
         )}
       </CardContent>
+
+      {/* Edit Book Dialog */}
+      <EditBookDialog
+        book={editingBook}
+        open={!!editingBook}
+        onOpenChange={(open) => !open && setEditingBook(null)}
+        onSuccess={() => {
+          setEditingBook(null);
+          refetch();
+        }}
+      />
     </Card>
   );
 };
