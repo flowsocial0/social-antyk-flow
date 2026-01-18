@@ -196,9 +196,18 @@ export const AddBookDialog = ({ open, onOpenChange, onSuccess }: AddBookDialogPr
       onSuccess?.();
     } catch (error: any) {
       console.error("Error adding book:", error);
+      
+      // Handle specific error messages in Polish
+      let errorMessage = "Nie udało się dodać książki";
+      if (error?.message?.includes('books_user_id_code_key') || error?.code === '23505') {
+        errorMessage = "Książka z takim kodem już istnieje. Użyj innego kodu produktu.";
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Błąd",
-        description: error?.message || "Nie udało się dodać książki",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
