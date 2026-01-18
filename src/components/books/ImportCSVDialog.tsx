@@ -305,7 +305,7 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
           });
 
           const { error } = await supabase.from("books").upsert(bookData, {
-            onConflict: "code",
+            onConflict: "user_id,code",
             ignoreDuplicates: false,
           });
 

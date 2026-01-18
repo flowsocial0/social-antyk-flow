@@ -3,6 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import LandingPage from "./pages/LandingPage";
@@ -17,6 +19,8 @@ import TikTokCallback from "./pages/TikTokCallback";
 import YouTubeCallback from "./pages/YouTubeCallback";
 import BookPreview from "./pages/BookPreview";
 import BookRedirect from "./pages/BookRedirect";
+import Settings from "./pages/Settings";
+import Admin from "./pages/Admin";
 import PlatformX from "./pages/platforms/PlatformX";
 import PlatformFacebook from "./pages/platforms/PlatformFacebook";
 import FacebookSelectPage from "./pages/platforms/FacebookSelectPage";
@@ -47,9 +51,27 @@ import DataDeletion from "./pages/DataDeletion";
 
 const queryClient = new QueryClient();
 
+// Component to handle auth state changes and clear cache
+const AuthStateHandler = () => {
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Clear React Query cache when user changes (login, logout, token refresh)
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+        console.log('Auth state changed, clearing query cache:', event);
+        queryClient.clear();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
+      <AuthStateHandler />
       <Toaster />
       <Sonner />
       <BrowserRouter>
@@ -62,6 +84,8 @@ const App = () => (
           <Route path="/campaigns/new" element={<CampaignsNew />} />
           <Route path="/express-campaign-launch" element={<ExpressCampaignLaunch />} />
           <Route path="/campaigns/:id" element={<CampaignDetails />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/admin" element={<Admin />} />
           <Route path="/settings/social-accounts" element={<SocialAccounts />} />
           <Route path="/twitter-callback" element={<TwitterCallback />} />
           <Route path="/oauth/facebook/callback" element={<FacebookCallback />} />

@@ -97,26 +97,32 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
   };
 
   const handlePostsPerDayChange = (value: number) => {
-    setPostsPerDay(value);
-    // Adjust posting times array
-    const currentTimes = [...postingTimes];
-    if (value > currentTimes.length) {
-      // Add more times - generate evenly spaced times throughout the day
-      const defaultTimes = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00", "22:00"];
-      for (let i = currentTimes.length; i < value; i++) {
-        if (i < defaultTimes.length) {
-          currentTimes.push(defaultTimes[i]);
-        } else {
-          // Generate additional times if needed
-          const hour = 8 + (i * 2) % 16; // Distribute between 8:00 and 23:00
-          currentTimes.push(`${hour.toString().padStart(2, '0')}:00`);
-        }
+    // Limit to max 13 posts per day
+    const limitedValue = Math.min(value, 13);
+    setPostsPerDay(limitedValue);
+    
+    // Generate unique odd hours for posting times
+    const oddHours = [7, 9, 11, 13, 15, 17, 19, 21, 23, 5, 3, 1, 6];
+    const newTimes: string[] = [];
+    
+    for (let i = 0; i < limitedValue; i++) {
+      if (i < oddHours.length) {
+        newTimes.push(`${oddHours[i].toString().padStart(2, '0')}:00`);
+      } else {
+        // Fallback for edge cases
+        const hour = (8 + i * 2) % 24;
+        newTimes.push(`${hour.toString().padStart(2, '0')}:00`);
       }
-    } else {
-      // Remove excess times
-      currentTimes.splice(value);
     }
-    setPostingTimes(currentTimes);
+    
+    // Sort times chronologically
+    newTimes.sort((a, b) => {
+      const [aH, aM] = a.split(':').map(Number);
+      const [bH, bM] = b.split(':').map(Number);
+      return (aH * 60 + aM) - (bH * 60 + bM);
+    });
+    
+    setPostingTimes(newTimes);
   };
 
   const handleTimeChange = (index: number, value: string) => {
@@ -283,21 +289,21 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
                 value={[postsPerDay]}
                 onValueChange={(value) => handlePostsPerDayChange(value[0])}
                 min={1}
-                max={20}
+                max={13}
                 step={1}
                 className="flex-1 max-w-md"
               />
               <Input
                 type="number"
                 min={1}
-                max={20}
+                max={13}
                 value={postsPerDay}
-                onChange={(e) => handlePostsPerDayChange(Math.min(20, Math.max(1, parseInt(e.target.value) || 1)))}
+                onChange={(e) => handlePostsPerDayChange(Math.min(13, Math.max(1, parseInt(e.target.value) || 1)))}
                 className="w-20"
               />
               <span className="text-sm text-muted-foreground">postów</span>
             </div>
-            <p className="text-xs text-muted-foreground">Maksymalnie 20 postów dziennie</p>
+            <p className="text-xs text-muted-foreground">Maksymalnie 13 postów dziennie</p>
           </div>
 
           {/* Start date */}
