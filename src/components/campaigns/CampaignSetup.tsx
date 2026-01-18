@@ -171,10 +171,10 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
       const [bHours, bMinutes] = b.split(':').map(Number);
       return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
     });
-    
+
     // Generate default name if empty
     const finalName = campaignName.trim() || `Kampania ${format(new Date(startDate), 'dd.MM.yyyy')}`;
-    
+
     onComplete({
       name: finalName,
       durationDays,
@@ -186,7 +186,7 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
       selectedBooks,
       useAI,
       regenerateTexts,
-      contentRatio,
+      contentRatio: useRandomContent ? 100 : contentRatio,
       selectedAccounts,
       useRandomContent,
       randomContentTopic: useRandomContent ? randomContentTopic : undefined,
@@ -269,9 +269,13 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
               onCheckedChange={(checked) => {
                 const isEnabled = checked === true;
                 setUseRandomContent(isEnabled);
-                // Auto-enable AI when random content is enabled
+                // Auto-enable AI + force 100% ciekawostki when random content is enabled
                 if (isEnabled) {
                   setUseAI(true);
+                  setContentRatio(100);
+                } else {
+                  // Back to default mix when leaving random mode
+                  setContentRatio(20);
                 }
               }}
             />
@@ -365,31 +369,40 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
           </div>
 
           {/* Content/Sales Ratio Slider */}
-          <div className="space-y-4">
-            <Label className="flex items-center gap-2">
-              <Percent className="h-4 w-4" />
-              Proporcja postów ciekawostek vs sprzedażowych
-            </Label>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground w-24">Ciekawostki: {contentRatio}%</span>
-              <Slider
-                value={[contentRatio]}
-                onValueChange={(value) => setContentRatio(value[0])}
-                min={0}
-                max={100}
-                step={5}
-                className="flex-1 max-w-md"
-              />
-              <span className="text-sm text-muted-foreground w-28">Sprzedaż: {100 - contentRatio}%</span>
+          {!useRandomContent ? (
+            <div className="space-y-4">
+              <Label className="flex items-center gap-2">
+                <Percent className="h-4 w-4" />
+                Proporcja postów ciekawostek vs sprzedażowych
+              </Label>
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-muted-foreground w-24">Ciekawostki: {contentRatio}%</span>
+                <Slider
+                  value={[contentRatio]}
+                  onValueChange={(value) => setContentRatio(value[0])}
+                  min={0}
+                  max={100}
+                  step={5}
+                  className="flex-1 max-w-md"
+                />
+                <span className="text-sm text-muted-foreground w-28">Sprzedaż: {100 - contentRatio}%</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {contentRatio === 0 && "Tylko posty sprzedażowe - bezpośrednia promocja książek"}
+                {contentRatio > 0 && contentRatio < 30 && "Większość postów sprzedażowych z odrobiną ciekawostek"}
+                {contentRatio >= 30 && contentRatio <= 50 && "Zrównoważona mieszanka ciekawostek i sprzedaży"}
+                {contentRatio > 50 && contentRatio < 100 && "Większość postów ciekawostek, mniej promocji"}
+                {contentRatio === 100 && "Tylko posty ciekawostki - zagadki, wydarzenia historyczne"}
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {contentRatio === 0 && "Tylko posty sprzedażowe - bezpośrednia promocja książek"}
-              {contentRatio > 0 && contentRatio < 30 && "Większość postów sprzedażowych z odrobiną ciekawostek"}
-              {contentRatio >= 30 && contentRatio <= 50 && "Zrównoważona mieszanka ciekawostek i sprzedaży"}
-              {contentRatio > 50 && contentRatio < 100 && "Większość postów ciekawostek, mniej promocji"}
-              {contentRatio === 100 && "Tylko posty ciekawostki - zagadki, wydarzenia historyczne"}
-            </p>
-          </div>
+          ) : (
+            <Card className="p-4 bg-purple-500/5 border-purple-500/20">
+              <p className="text-sm text-muted-foreground">
+                <Shuffle className="h-4 w-4 inline mr-2 text-purple-500" />
+                Tryb losowego tematu: wszystkie posty będą <span className="font-medium">ciekawostkami (100%)</span>.
+              </p>
+            </Card>
+          )}
 
           {/* Posting times */}
           <div className="space-y-2">
@@ -447,12 +460,16 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
                       const hours = time.split(':')[0];
                       handleTimeChange(index, `${hours}:${e.target.value}`);
                     }}
-                    className="bg-transparent border-none focus:outline-none text-sm font-medium w-10"
+                    className="bg-transparent border-none focus:outline-none text-sm font-medium w-12"
                   >
-                    <option value="00">00</option>
-                    <option value="15">15</option>
-                    <option value="30">30</option>
-                    <option value="45">45</option>
+                    {Array.from({ length: 60 }, (_, m) => {
+                      const mm = m.toString().padStart(2, '0');
+                      return (
+                        <option key={mm} value={mm}>
+                          {mm}
+                        </option>
+                      );
+                    })}
                   </select>
                   {postingTimes.length > 1 && (
                     <Button

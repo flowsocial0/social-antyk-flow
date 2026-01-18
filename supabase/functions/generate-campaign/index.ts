@@ -148,7 +148,21 @@ serve(async (req) => {
 });
 
 async function generateCampaignStructure(body: any, apiKey: string) {
-  let { totalPosts, contentPosts, salesPosts, durationDays, postsPerDay } = body;
+  let { totalPosts, contentPosts, salesPosts, durationDays, postsPerDay, useRandomContent, randomContentTopic } = body;
+
+  // If random content is enabled: all posts are trivia/content (no sales, no books)
+  if (useRandomContent) {
+    console.log("Random content mode - generating structure locally", { totalPosts, durationDays, postsPerDay, randomContentTopic });
+    const structure = Array.from({ length: totalPosts }, (_, idx) => ({
+      position: idx + 1,
+      type: "content",
+      category: "trivia",
+    }));
+
+    return new Response(JSON.stringify({ success: true, structure }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   // WAŻNE: Jeśli jest tylko 1 post, musi być sprzedażowy
   if (totalPosts === 1) {
@@ -340,7 +354,7 @@ function generateLocalStructure(totalPosts: number, contentPosts: number, salesP
 }
 
 async function generatePostsContent(body: any, apiKey: string) {
-  const { structure, targetPlatforms, selectedBooks, cachedTexts, regenerateTexts, useRandomContent, randomContentTopic, userId } = body;
+  let { structure, targetPlatforms, selectedBooks, cachedTexts, regenerateTexts, useRandomContent, randomContentTopic, userId } = body;
 
   console.log("=== generatePostsContent START ===");
   console.log("Generating content for posts:", structure.length);
@@ -349,6 +363,17 @@ async function generatePostsContent(body: any, apiKey: string) {
   console.log("regenerateTexts flag:", regenerateTexts);
   console.log("useRandomContent:", useRandomContent);
   console.log("randomContentTopic:", randomContentTopic || "(not set)");
+
+  // Safety: random content mode must NEVER produce sales posts (no books required)
+  if (useRandomContent) {
+    structure = (structure || []).map((item: any, idx: number) => ({
+      position: item?.position ?? idx + 1,
+      type: "content",
+      category: "trivia",
+    }));
+    console.log("Random content mode - normalized structure to trivia-only", { count: structure.length });
+  }
+
   console.log("cachedTexts received:", cachedTexts ? `object with ${Object.keys(cachedTexts).length} book IDs` : "null/undefined");
   if (cachedTexts && Object.keys(cachedTexts).length > 0) {
     console.log("First few cached book IDs:", Object.keys(cachedTexts).slice(0, 5).join(", "));
