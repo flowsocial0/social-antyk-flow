@@ -7,6 +7,7 @@ import { PlatformBooksList } from "@/components/platforms/PlatformBooksList";
 import { PlatformConnectionStatus } from "@/components/platforms/PlatformConnectionStatus";
 import { PlatformStats } from "@/components/platforms/PlatformStats";
 import { PlatformAnalytics } from "@/components/platforms/PlatformAnalytics";
+import { XRateLimitStatus } from "@/components/platforms/XRateLimitStatus";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -141,10 +142,11 @@ export default function PlatformX() {
           </Button>
         </div>
 
-        {/* Connection Status & Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Connection Status, Stats & Rate Limits */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <PlatformConnectionStatus platform="x" />
           <PlatformStats platform="x" />
+          <XRateLimitStatus />
         </div>
 
         {/* Analytics */}

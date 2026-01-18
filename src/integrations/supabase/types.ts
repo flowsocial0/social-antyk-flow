@@ -726,6 +726,44 @@ export type Database = {
         }
         Relationships: []
       }
+      x_rate_limits: {
+        Row: {
+          account_id: string
+          endpoint: string
+          id: string
+          limit_max: number | null
+          remaining: number | null
+          reset_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          endpoint: string
+          id?: string
+          limit_max?: number | null
+          remaining?: number | null
+          reset_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          endpoint?: string
+          id?: string
+          limit_max?: number | null
+          remaining?: number | null
+          reset_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "x_rate_limits_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "twitter_oauth1_tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       xml_books: {
         Row: {
           created_at: string
