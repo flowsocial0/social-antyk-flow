@@ -367,6 +367,12 @@ async function sendTweet(
   });
 
   if (!response.ok) {
+    // Check for 403 Forbidden - permissions issue
+    if (response.status === 403) {
+      const error = new Error(`Błąd 403 Forbidden: Brak uprawnień do publikowania. Sprawdź w Developer Portal X, czy aplikacja ma uprawnienia "Read and Write" (nie tylko "Read"), a następnie odłącz i połącz konto X ponownie w ustawieniach.`);
+      (error as any).statusCode = 403;
+      throw error;
+    }
     throw new Error(`Failed to send tweet: ${response.status}, body: ${responseText}`);
   }
 
@@ -738,22 +744,32 @@ Deno.serve(async (req) => {
             }
           );
         } else {
+          // Check for 403 Forbidden - permissions issue
+          const isForbiddenError = error.statusCode === 403 || 
+            error.message?.includes('403') || 
+            error.message?.includes('Forbidden');
+          
+          let userFriendlyError = error.message;
+          if (isForbiddenError) {
+            userFriendlyError = 'Błąd 403: Brak uprawnień do publikowania. Sprawdź w Developer Portal X, czy aplikacja ma uprawnienia "Read and Write", a następnie połącz konto ponownie.';
+          }
+          
           await supabaseClient
             .from('campaign_posts')
             .update({ 
               status: 'failed',
-              error_code: 'unknown',
-              error_message: error.message
+              error_code: isForbiddenError ? '403' : 'unknown',
+              error_message: userFriendlyError
             })
             .eq('id', campaignPostId);
           
           return new Response(
             JSON.stringify({ 
               success: false, 
-              error: error.message 
+              error: userFriendlyError 
             }),
             { 
-              status: 500,
+              status: isForbiddenError ? 403 : 500,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             }
           );

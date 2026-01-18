@@ -320,22 +320,44 @@ Deno.serve(async (req) => {
               }
             });
 
-            if (publishError) {
-              console.error(`Failed to publish campaign post ${post.id} to ${platform}:`, publishError);
+            // Check for errors from both invoke error and response data
+            const hasInvokeError = !!publishError;
+            const hasResponseError = data && data.success === false;
+            const actualError = hasInvokeError || hasResponseError;
+            
+            if (actualError) {
+              const errorMsg = data?.error || publishError?.message || 'Unknown error';
+              console.error(`Failed to publish campaign post ${post.id} to ${platform}:`, errorMsg);
               
               // Check if it's a rate limit error - if so, the publish function already updated the status
-              const isRateLimitError = publishError.message?.includes('429') || 
-                publishError.message?.includes('Too Many Requests') ||
+              const isRateLimitError = errorMsg?.includes('429') || 
+                errorMsg?.includes('Too Many Requests') ||
+                errorMsg?.includes('rate limit') ||
                 data?.error === 'rate_limit';
               
+              // Check if it's a 403 Forbidden error (permissions issue)
+              const isForbiddenError = errorMsg?.includes('403') || 
+                errorMsg?.includes('Forbidden') ||
+                errorMsg?.includes('permission');
+              
               if (!isRateLimitError) {
+                // Provide clearer error message for common issues
+                let userFriendlyError = errorMsg;
+                if (isForbiddenError) {
+                  if (platform === 'x') {
+                    userFriendlyError = 'Błąd 403: Brak uprawnień do publikowania. Sprawdź w Developer Portal X, czy aplikacja ma uprawnienia "Read and Write", a następnie połącz konto ponownie.';
+                  } else if (platform === 'facebook') {
+                    userFriendlyError = 'Błąd 403: Brak uprawnień do publikowania na stronie Facebook. Odłącz i połącz ponownie konto Facebook, nadając wszystkie wymagane uprawnienia.';
+                  }
+                }
+                
                 // Save error message to campaign post
-                const errorMsg = data?.error || publishError.message || 'Unknown error';
                 await supabase
                   .from('campaign_posts')
                   .update({
-                    error_message: errorMsg,
-                    error_code: 'PUBLISH_FAILED'
+                    status: 'failed',
+                    error_message: userFriendlyError,
+                    error_code: isForbiddenError ? 'FORBIDDEN' : 'PUBLISH_FAILED'
                   })
                   .eq('id', post.id);
                 
@@ -366,16 +388,22 @@ Deno.serve(async (req) => {
                 }
               });
 
-              if (publishError) {
-                console.error(`Failed to publish campaign post ${post.id} to ${platform} account ${accountId}:`, publishError);
+              // Check for errors from both invoke error and response data
+              const hasInvokeError = !!publishError;
+              const hasResponseError = data && data.success === false;
+              const actualError = hasInvokeError || hasResponseError;
+
+              if (actualError) {
+                const errorMsg = data?.error || publishError?.message || 'Unknown error';
+                console.error(`Failed to publish campaign post ${post.id} to ${platform} account ${accountId}:`, errorMsg);
                 
                 // Check if it's a rate limit error
-                const isRateLimitError = publishError.message?.includes('429') || 
-                  publishError.message?.includes('Too Many Requests') ||
+                const isRateLimitError = errorMsg?.includes('429') || 
+                  errorMsg?.includes('Too Many Requests') ||
+                  errorMsg?.includes('rate limit') ||
                   data?.error === 'rate_limit';
                 
                 if (!isRateLimitError) {
-                  const errorMsg = data?.error || publishError.message || 'Unknown error';
                   console.error(`Account ${accountId} publish failed: ${errorMsg}`);
                 }
                 // Continue to next account even if this one failed
