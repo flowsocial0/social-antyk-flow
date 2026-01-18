@@ -181,11 +181,25 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
         }
       });
 
-      if (contentResponse.error) throw contentResponse.error;
+      // Check for edge function errors (including WORKER_LIMIT)
+      if (contentResponse.error) {
+        // Parse error code from response
+        const errorCode = contentResponse.error?.code || contentResponse.error?.message || '';
+        if (errorCode.includes('WORKER_LIMIT') || String(contentResponse.error).includes('compute resources')) {
+          throw new Error('WORKER_LIMIT: Serwer wyczerpał zasoby. Zmniejsz liczbę postów.');
+        }
+        throw contentResponse.error;
+      }
       
       // Check for API-level errors (rate limit, auth issues)
       if (contentResponse.data?.success === false) {
-        throw new Error(contentResponse.data.error || 'Błąd API podczas generowania treści');
+        const errorCode = contentResponse.data.errorCode || '';
+        throw new Error(`${errorCode}: ${contentResponse.data.error || 'Błąd API podczas generowania treści'}`);
+      }
+      
+      // Check if response has the expected data
+      if (!contentResponse.data?.posts) {
+        throw new Error('WORKER_LIMIT: Serwer nie zwrócił danych. Zmniejsz liczbę postów lub spróbuj ponownie.');
       }
 
       const generatedPosts = contentResponse.data.posts;
@@ -200,8 +214,32 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
       onComplete({ structure }, scheduledPosts);
     } catch (error: any) {
       console.error('Error generating campaign:', error);
-      toast.error('Błąd generowania kampanii', {
-        description: error.message
+      
+      // Parse error for better messages
+      let errorTitle = 'Błąd generowania kampanii';
+      let errorDescription = error.message || 'Nieznany błąd';
+      
+      // Check for specific error codes
+      if (error.message?.includes('WORKER_LIMIT') || error.message?.includes('compute resources')) {
+        errorTitle = 'Zbyt duża kampania';
+        errorDescription = 'Serwer nie ma wystarczających zasobów do wygenerowania tak dużej kampanii. Zmniejsz liczbę postów (maks. 60) lub spróbuj ponownie.';
+      } else if (error.message?.includes('RATE_LIMIT')) {
+        errorTitle = 'Limit API wyczerpany';
+        errorDescription = 'Przekroczono limit zapytań API Grok. Spróbuj ponownie za kilka minut lub doładuj kredyty w panelu x.ai.';
+      } else if (error.message?.includes('AUTH_ERROR') || error.message?.includes('401') || error.message?.includes('403')) {
+        errorTitle = 'Błąd autoryzacji API';
+        errorDescription = 'Nieprawidłowy lub wygasły klucz API Grok. Sprawdź konfigurację w ustawieniach.';
+      } else if (error.message?.includes('NO_BOOKS')) {
+        errorTitle = 'Brak wybranych książek';
+        errorDescription = 'Nie wybrano żadnych książek do kampanii. Proszę wybrać książki lub włączyć generowanie losowych treści.';
+      } else if (error.message?.includes('timeout') || error.message?.includes('TIMEOUT')) {
+        errorTitle = 'Przekroczono czas oczekiwania';
+        errorDescription = 'Generowanie trwa zbyt długo. Zmniejsz liczbę postów lub spróbuj ponownie.';
+      }
+      
+      toast.error(errorTitle, {
+        description: errorDescription,
+        duration: 8000
       });
     } finally {
       setIsGenerating(false);
