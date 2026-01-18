@@ -185,6 +185,11 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
       setGenerationStage('generating_posts');
       console.log("Generating post content...");
       console.log("Passing cachedTexts to edge function, keys count:", Object.keys(cachedTexts).length);
+      console.log("useRandomContent:", config.useRandomContent);
+      console.log("randomContentTopic:", config.randomContentTopic);
+      
+      // Get current user ID for user_settings lookup
+      const { data: { user } } = await supabase.auth.getUser();
       
       const contentResponse = await supabase.functions.invoke('generate-campaign', {
         body: {
@@ -193,7 +198,10 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
           targetPlatforms: config.targetPlatforms,
           selectedBooks: config.selectedBooks,
           cachedTexts: Object.keys(cachedTexts).length > 0 ? cachedTexts : null,
-          regenerateTexts: config.regenerateTexts || false
+          regenerateTexts: config.regenerateTexts || false,
+          useRandomContent: config.useRandomContent || false,
+          randomContentTopic: config.randomContentTopic || '',
+          userId: user?.id
         }
       });
 

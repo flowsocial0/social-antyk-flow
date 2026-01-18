@@ -349,9 +349,21 @@ Deno.serve(async (req) => {
       postText = fixUrlsInText(postText);
     }
 
-    // Add AI disclaimer for Facebook
-    if (postText) {
-      postText += '\n\nTekst wygenerowany przez sztuczny algorytm';
+    // Fetch AI suffix from user_settings
+    let aiSuffix = '';
+    const { data: userSettings } = await supabase
+      .from('user_settings')
+      .select('ai_suffix_facebook')
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    if (userSettings?.ai_suffix_facebook) {
+      aiSuffix = userSettings.ai_suffix_facebook;
+    }
+
+    // Add AI disclaimer for Facebook if suffix is set
+    if (postText && aiSuffix) {
+      postText += `\n\n${aiSuffix}`;
     }
 
     console.log('=== Final Publishing Data ===');

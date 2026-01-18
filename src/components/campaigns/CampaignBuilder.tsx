@@ -27,6 +27,8 @@ export type CampaignConfig = {
   regenerateTexts?: boolean;
   contentRatio?: number; // 0-100, percentage of content posts
   selectedAccounts?: Record<PlatformId, string[]>; // Platform -> Account IDs array (multi-account selection)
+  useRandomContent?: boolean; // Generate random content on a specific topic
+  randomContentTopic?: string; // Topic for random content generation
 };
 
 interface CampaignBuilderProps {

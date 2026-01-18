@@ -239,10 +239,24 @@ serve(async (req) => {
       throw new Error('Instagram wymaga obrazu. Posty tylko tekstowe nie są obsługiwane. Dodaj obraz do książki.');
     }
 
-    // Add AI disclaimer
+    // Fetch AI suffix from user_settings
+    let aiSuffix = '';
+    const { data: userSettings } = await supabase
+      .from('user_settings')
+      .select('ai_suffix_instagram')
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    if (userSettings?.ai_suffix_instagram) {
+      aiSuffix = userSettings.ai_suffix_instagram;
+    }
+
+    // Add hashtags and AI disclaimer if suffix is set
     if (postCaption) {
       postCaption += '\n\n#książki #antykwariat';
-      postCaption += '\n\nTekst wygenerowany przez AI';
+      if (aiSuffix) {
+        postCaption += `\n\n${aiSuffix}`;
+      }
     }
 
     console.log('=== Final Publishing Data ===');

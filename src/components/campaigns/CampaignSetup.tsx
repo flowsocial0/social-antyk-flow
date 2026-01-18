@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
-import { Calendar, Clock, ArrowRight, Plus, X, ArrowUpDown, AlertCircle, Sparkles, RefreshCw, Percent } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Calendar, Clock, ArrowRight, Plus, X, ArrowUpDown, AlertCircle, Sparkles, RefreshCw, Percent, Shuffle } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import type { CampaignConfig } from "./CampaignBuilder";
@@ -49,6 +50,8 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
   const [connectedPlatforms, setConnectedPlatforms] = useState<Record<PlatformId, boolean>>(
     {} as Record<PlatformId, boolean>
   );
+  const [useRandomContent, setUseRandomContent] = useState(initialConfig?.useRandomContent ?? false);
+  const [randomContentTopic, setRandomContentTopic] = useState(initialConfig?.randomContentTopic || "");
 
   useEffect(() => {
     checkConnectedPlatforms();
@@ -185,6 +188,8 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
       regenerateTexts,
       contentRatio,
       selectedAccounts,
+      useRandomContent,
+      randomContentTopic: useRandomContent ? randomContentTopic : undefined,
     });
   };
 
@@ -234,7 +239,7 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
         </div>
         
         {/* Regenerate Texts Checkbox */}
-        <div className="flex items-center space-x-3 mb-6 p-4 bg-amber-500/5 rounded-lg border border-amber-500/20">
+        <div className="flex items-center space-x-3 mb-4 p-4 bg-amber-500/5 rounded-lg border border-amber-500/20">
           <Checkbox
             id="regenerateTexts"
             checked={regenerateTexts}
@@ -251,6 +256,39 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
                 : "Użyj tekstów z poprzednich kampanii (jeśli istnieją)"}
             </p>
           </div>
+        </div>
+        
+        {/* Random Content Generation */}
+        <div className="space-y-3 mb-6 p-4 bg-purple-500/5 rounded-lg border border-purple-500/20">
+          <div className="flex items-center space-x-3">
+            <Checkbox
+              id="useRandomContent"
+              checked={useRandomContent}
+              onCheckedChange={(checked) => setUseRandomContent(checked === true)}
+            />
+            <div className="flex-1">
+              <Label htmlFor="useRandomContent" className="flex items-center gap-2 cursor-pointer">
+                <Shuffle className="h-4 w-4 text-purple-500" />
+                <span className="font-medium">Generuj losowe treści na określony temat</span>
+              </Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Posty contentowe będą generowane na podany temat zamiast na podstawie książek
+              </p>
+            </div>
+          </div>
+          
+          {useRandomContent && (
+            <div className="mt-3">
+              <Label htmlFor="randomContentTopic" className="text-sm">Temat do generowania</Label>
+              <Textarea
+                id="randomContentTopic"
+                value={randomContentTopic}
+                onChange={(e) => setRandomContentTopic(e.target.value)}
+                placeholder="np. Historia Polski XX wieku, Literatura romantyzmu, Powstanie Warszawskie..."
+                className="mt-1 min-h-[80px]"
+              />
+            </div>
+          )}
         </div>
         
         <div className="space-y-6">
