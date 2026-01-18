@@ -18,7 +18,7 @@ const bookSchema = z.object({
   sale_price: z.string().optional(),
   promotional_price: z.string().optional(),
   description: z.string().optional(),
-  product_url: z.string().url("Nieprawidłowy URL").optional().or(z.literal("")),
+  product_url: z.string().optional(), // URL validation removed per user request
   stock_status: z.string().optional(),
 });
 
@@ -194,11 +194,11 @@ export const AddBookDialog = ({ open, onOpenChange, onSuccess }: AddBookDialogPr
       handleRemoveImageFile();
       onOpenChange(false);
       onSuccess?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding book:", error);
       toast({
         title: "Błąd",
-        description: "Nie udało się dodać książki",
+        description: error?.message || "Nie udało się dodać książki",
         variant: "destructive",
       });
     } finally {

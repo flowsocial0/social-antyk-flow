@@ -19,7 +19,7 @@ const bookSchema = z.object({
   sale_price: z.string().optional(),
   promotional_price: z.string().optional(),
   description: z.string().optional(),
-  product_url: z.string().url("Nieprawidłowy URL").optional().or(z.literal("")),
+  product_url: z.string().optional(), // URL validation removed per user request
   stock_status: z.string().optional(),
   ai_text_x: z.string().optional(),
   ai_text_facebook: z.string().optional(),
@@ -325,11 +325,11 @@ export const EditBookDialog = ({ open, onOpenChange, book, onSuccess }: EditBook
 
       onOpenChange(false);
       onSuccess?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating book:", error);
       toast({
         title: "Błąd",
-        description: "Nie udało się zaktualizować książki",
+        description: error?.message || "Nie udało się zaktualizować książki",
         variant: "destructive",
       });
     } finally {
