@@ -72,7 +72,7 @@ export function XRateLimitStatus() {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Limity API X
+            Limity X
           </CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-center py-4">
@@ -88,7 +88,7 @@ export function XRateLimitStatus() {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Limity API X
+            Limity X
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -104,7 +104,7 @@ export function XRateLimitStatus() {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Limity API X
+            Limity X
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -122,7 +122,7 @@ export function XRateLimitStatus() {
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Limity API X
+            Limity X
           </CardTitle>
           <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isFetching} className="h-8 w-8 p-0">
             <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
