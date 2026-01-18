@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
 
     // Store access token in database (upsert by x_user_id to allow multiple X accounts per user)
     console.log("Storing access token in database...");
-    const { error: upsertError } = await supabase
+    const { data: upsertData, error: upsertError } = await supabase
       .from('twitter_oauth1_tokens')
       .upsert({
         user_id: user.id,
@@ -173,13 +173,41 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'x_user_id'
-      });
+      })
+      .select('id')
+      .single();
 
     if (upsertError) {
       console.error('Failed to store access token:', upsertError);
       throw new Error('Failed to save OAuth credentials: ' + upsertError.message);
     }
-    console.log("Access token stored successfully");
+    console.log("Access token stored successfully with ID:", upsertData?.id);
+
+    // Initialize default rate limits for the new account
+    if (upsertData?.id) {
+      console.log("Initializing default rate limits for account:", upsertData.id);
+      const resetAt = new Date();
+      resetAt.setHours(resetAt.getHours() + 24);
+      
+      const { error: rateLimitError } = await supabase
+        .from('x_rate_limits')
+        .upsert({
+          account_id: upsertData.id,
+          endpoint: 'tweets',
+          limit_max: 50,
+          remaining: 50,
+          reset_at: resetAt.toISOString(),
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'account_id,endpoint'
+        });
+
+      if (rateLimitError) {
+        console.warn('Failed to initialize rate limits (non-critical):', rateLimitError);
+      } else {
+        console.log("Default rate limits initialized successfully");
+      }
+    }
 
     // Delete request token
     console.log("Deleting request token...");

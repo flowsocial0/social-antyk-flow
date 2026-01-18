@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Clock, CheckCircle2, RefreshCw, Loader2 } from "lucide-react";
+import { AlertTriangle, Clock, CheckCircle2, RefreshCw, Loader2, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,22 +38,32 @@ export function XRateLimitStatus() {
   const { data, isLoading, error, refetch, isFetching } = useQuery<RateLimitsResponse>({
     queryKey: ["x-rate-limits"],
     queryFn: async () => {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session.session) {
-        throw new Error("Not authenticated");
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+      try {
+        const { data: session } = await supabase.auth.getSession();
+        if (!session.session) {
+          throw new Error("Not authenticated");
+        }
+
+        const { data, error } = await supabase.functions.invoke("get-x-rate-limits", {
+          headers: {
+            Authorization: `Bearer ${session.session.access_token}`,
+          },
+        });
+
+        if (error) throw error;
+        return data;
+      } finally {
+        clearTimeout(timeoutId);
       }
-
-      const { data, error } = await supabase.functions.invoke("get-x-rate-limits", {
-        headers: {
-          Authorization: `Bearer ${session.session.access_token}`,
-        },
-      });
-
-      if (error) throw error;
-      return data;
     },
     refetchInterval: 60000, // Refresh every minute
     staleTime: 30000, // Consider data stale after 30s
+    retry: 1,
+    retryDelay: 1000,
+    gcTime: 60000,
   });
 
   if (isLoading) {
@@ -164,7 +174,7 @@ export function XRateLimitStatus() {
                   )}
                 </div>
 
-                {hasData && (
+                {hasData ? (
                   <>
                     <Progress
                       value={percentage}
@@ -185,6 +195,11 @@ export function XRateLimitStatus() {
                       )}
                     </div>
                   </>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Info className="h-3 w-3" />
+                    <span>Limity zaktualizują się po pierwszej publikacji</span>
+                  </div>
                 )}
               </div>
             );
