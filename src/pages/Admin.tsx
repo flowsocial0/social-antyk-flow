@@ -8,7 +8,6 @@ import { ArrowLeft, Loader2, Shield, Users, BookOpen, Calendar, Link2 } from "lu
 import { Footer } from "@/components/layout/Footer";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
 import type { User } from "@supabase/supabase-js";
 
 interface AdminStats {
@@ -24,13 +23,25 @@ interface AdminStats {
   };
 }
 
+interface AuthUser {
+  id: string;
+  email: string;
+  created_at: string;
+}
+
 interface UserData {
   id: string;
   email: string;
   created_at: string;
   books_count: number;
   campaigns_count: number;
-  connected_platforms: string[];
+  connected_platforms: {
+    x: number;
+    facebook: number;
+    instagram: number;
+    youtube: number;
+    tiktok: number;
+  };
 }
 
 const Admin = () => {
@@ -78,15 +89,21 @@ const Admin = () => {
       
       setDataLoading(true);
       try {
+        // Fetch all users from edge function
+        const { data: authUsersResponse, error: authError } = await supabase.functions.invoke('admin-list-users');
+        
+        if (authError) {
+          console.error('Error fetching users from edge function:', authError);
+          throw authError;
+        }
+
+        const authUsers: AuthUser[] = authUsersResponse?.users || [];
+        console.log(`Fetched ${authUsers.length} users from auth`);
+
         // Fetch aggregate stats and all data in parallel
         const [
           booksRes, 
           campaignsRes, 
-          xRes, 
-          fbRes, 
-          igRes, 
-          ytRes, 
-          ttRes,
           allBooks,
           allCampaigns,
           xTokens,
@@ -97,11 +114,6 @@ const Admin = () => {
         ] = await Promise.all([
           supabase.from('books').select('id', { count: 'exact', head: true }),
           supabase.from('campaigns').select('id', { count: 'exact', head: true }),
-          supabase.from('twitter_oauth1_tokens').select('id', { count: 'exact', head: true }),
-          supabase.from('facebook_oauth_tokens').select('id', { count: 'exact', head: true }),
-          supabase.from('instagram_oauth_tokens').select('id', { count: 'exact', head: true }),
-          supabase.from('youtube_oauth_tokens').select('id', { count: 'exact', head: true }),
-          supabase.from('tiktok_oauth_tokens').select('id', { count: 'exact', head: true }),
           supabase.from('books').select('user_id'),
           supabase.from('campaigns').select('user_id'),
           supabase.from('twitter_oauth1_tokens').select('user_id'),
@@ -111,40 +123,39 @@ const Admin = () => {
           supabase.from('tiktok_oauth_tokens').select('user_id'),
         ]);
 
-        // Collect ALL unique user IDs from all tables
-        const uniqueUserIds = new Set<string>();
-        allBooks.data?.forEach(b => uniqueUserIds.add(b.user_id));
-        allCampaigns.data?.forEach(c => uniqueUserIds.add(c.user_id));
-        xTokens.data?.forEach(t => uniqueUserIds.add(t.user_id));
-        fbTokens.data?.forEach(t => t.user_id && uniqueUserIds.add(t.user_id));
-        igTokens.data?.forEach(t => uniqueUserIds.add(t.user_id));
-        ytTokens.data?.forEach(t => uniqueUserIds.add(t.user_id));
-        ttTokens.data?.forEach(t => uniqueUserIds.add(t.user_id));
+        // Calculate total connected accounts
+        const totalConnected = {
+          x: xTokens.data?.length || 0,
+          facebook: fbTokens.data?.length || 0,
+          instagram: igTokens.data?.length || 0,
+          youtube: ytTokens.data?.length || 0,
+          tiktok: ttTokens.data?.length || 0,
+        };
 
         setStats({
-          totalUsers: uniqueUserIds.size,
+          totalUsers: authUsers.length,
           totalBooks: booksRes.count || 0,
           totalCampaigns: campaignsRes.count || 0,
-          connectedAccounts: {
-            x: xRes.count || 0,
-            facebook: fbRes.count || 0,
-            instagram: igRes.count || 0,
-            youtube: ytRes.count || 0,
-            tiktok: ttRes.count || 0,
-          },
+          connectedAccounts: totalConnected,
         });
 
-        // Build user data map
+        // Build user data map from auth users
         const userDataMap = new Map<string, UserData>();
         
-        for (const userId of uniqueUserIds) {
-          userDataMap.set(userId, {
-            id: userId,
-            email: userId.substring(0, 8) + '...',
-            created_at: '',
+        for (const authUser of authUsers) {
+          userDataMap.set(authUser.id, {
+            id: authUser.id,
+            email: authUser.email,
+            created_at: authUser.created_at,
             books_count: 0,
             campaigns_count: 0,
-            connected_platforms: [],
+            connected_platforms: {
+              x: 0,
+              facebook: 0,
+              instagram: 0,
+              youtube: 0,
+              tiktok: 0,
+            },
           });
         }
 
@@ -164,39 +175,41 @@ const Admin = () => {
           }
         });
 
-        // Add connected platforms
+        // Count connected platforms per user
         xTokens.data?.forEach(t => {
           const userData = userDataMap.get(t.user_id);
-          if (userData && !userData.connected_platforms.includes('X')) {
-            userData.connected_platforms.push('X');
+          if (userData) {
+            userData.connected_platforms.x++;
           }
         });
 
         fbTokens.data?.forEach(t => {
-          const userData = userDataMap.get(t.user_id!);
-          if (userData && !userData.connected_platforms.includes('Facebook')) {
-            userData.connected_platforms.push('Facebook');
+          if (t.user_id) {
+            const userData = userDataMap.get(t.user_id);
+            if (userData) {
+              userData.connected_platforms.facebook++;
+            }
           }
         });
 
         igTokens.data?.forEach(t => {
           const userData = userDataMap.get(t.user_id);
-          if (userData && !userData.connected_platforms.includes('Instagram')) {
-            userData.connected_platforms.push('Instagram');
+          if (userData) {
+            userData.connected_platforms.instagram++;
           }
         });
 
         ytTokens.data?.forEach(t => {
           const userData = userDataMap.get(t.user_id);
-          if (userData && !userData.connected_platforms.includes('YouTube')) {
-            userData.connected_platforms.push('YouTube');
+          if (userData) {
+            userData.connected_platforms.youtube++;
           }
         });
 
         ttTokens.data?.forEach(t => {
           const userData = userDataMap.get(t.user_id);
-          if (userData && !userData.connected_platforms.includes('TikTok')) {
-            userData.connected_platforms.push('TikTok');
+          if (userData) {
+            userData.connected_platforms.tiktok++;
           }
         });
 
@@ -212,6 +225,20 @@ const Admin = () => {
       fetchAdminData();
     }
   }, [isAdmin]);
+
+  const getTotalPlatformCount = (platforms: UserData['connected_platforms']) => {
+    return platforms.x + platforms.facebook + platforms.instagram + platforms.youtube + platforms.tiktok;
+  };
+
+  const formatPlatformBadges = (platforms: UserData['connected_platforms']) => {
+    const badges: { label: string; count: number }[] = [];
+    if (platforms.x > 0) badges.push({ label: 'X', count: platforms.x });
+    if (platforms.facebook > 0) badges.push({ label: 'FB', count: platforms.facebook });
+    if (platforms.instagram > 0) badges.push({ label: 'IG', count: platforms.instagram });
+    if (platforms.youtube > 0) badges.push({ label: 'YT', count: platforms.youtube });
+    if (platforms.tiktok > 0) badges.push({ label: 'TT', count: platforms.tiktok });
+    return badges;
+  };
 
   if (authLoading || roleLoading) {
     return (
@@ -306,7 +333,9 @@ const Admin = () => {
                   <p className="text-xs text-muted-foreground mt-1">
                     X: {stats?.connectedAccounts.x || 0} | 
                     FB: {stats?.connectedAccounts.facebook || 0} | 
-                    IG: {stats?.connectedAccounts.instagram || 0}
+                    IG: {stats?.connectedAccounts.instagram || 0} | 
+                    YT: {stats?.connectedAccounts.youtube || 0} | 
+                    TT: {stats?.connectedAccounts.tiktok || 0}
                   </p>
                 </CardContent>
               </Card>
@@ -322,28 +351,35 @@ const Admin = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>ID użytkownika</TableHead>
+                      <TableHead>Email</TableHead>
                       <TableHead>Książki</TableHead>
                       <TableHead>Kampanie</TableHead>
-                      <TableHead>Połączone platformy</TableHead>
+                      <TableHead>Połączone konta</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {users.map((userData) => (
                       <TableRow key={userData.id}>
-                        <TableCell className="font-mono text-xs">
-                          {userData.id.substring(0, 16)}...
+                        <TableCell>
+                          <div>
+                            <span className="font-medium">{userData.email}</span>
+                            <p className="text-xs text-muted-foreground font-mono">
+                              {userData.id.substring(0, 8)}...
+                            </p>
+                          </div>
                         </TableCell>
                         <TableCell>{userData.books_count}</TableCell>
                         <TableCell>{userData.campaigns_count}</TableCell>
                         <TableCell>
-                          <div className="flex gap-1 flex-wrap">
-                            {userData.connected_platforms.length > 0 ? (
-                              userData.connected_platforms.map((platform) => (
-                                <Badge key={platform} variant="secondary" className="text-xs">
-                                  {platform}
-                                </Badge>
-                              ))
+                          <div className="flex gap-1 flex-wrap items-center">
+                            {getTotalPlatformCount(userData.connected_platforms) > 0 ? (
+                              <>
+                                {formatPlatformBadges(userData.connected_platforms).map((badge) => (
+                                  <Badge key={badge.label} variant="secondary" className="text-xs">
+                                    {badge.label}: {badge.count}
+                                  </Badge>
+                                ))}
+                              </>
                             ) : (
                               <span className="text-muted-foreground text-xs">Brak</span>
                             )}
