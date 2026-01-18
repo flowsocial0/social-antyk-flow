@@ -3,19 +3,23 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, Upload, Calendar, RefreshCw, Download, Sparkles, Share2, ChevronDown, FileDown, Zap } from "lucide-react";
+import { Plus, Upload, Calendar, RefreshCw, Download, Sparkles, Share2, ChevronDown, FileDown, Shield, Settings, FileCode } from "lucide-react";
 import { ImportCSVDialog } from "@/components/books/ImportCSVDialog";
+import { ImportXMLDialog } from "@/components/books/ImportXMLDialog";
 import { AddBookDialog } from "@/components/books/AddBookDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { generateCSVTemplate, generateXMLTemplate, downloadTemplate } from "@/lib/templates";
+import { useUserRole } from "@/hooks/useUserRole";
 
 export const QuickActions = () => {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importXMLDialogOpen, setImportXMLDialogOpen] = useState(false);
   const [addBookDialogOpen, setAddBookDialogOpen] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isAdmin, loading: roleLoading } = useUserRole();
 
   const syncBooksMutation = useMutation({
     mutationFn: async () => {
@@ -68,121 +72,6 @@ export const QuickActions = () => {
     toast.success("Szablon XML został pobrany");
   };
 
-  const launchExpressCampaign = async () => {
-    try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error("Musisz być zalogowany");
-        return;
-      }
-
-      // Check connected platforms
-      const { data: xData } = await supabase.from('twitter_oauth_tokens').select('id').limit(1).maybeSingle();
-      const { data: fbData } = await supabase.from('facebook_oauth_tokens').select('id').limit(1).maybeSingle();
-      
-      if (!xData && !fbData) {
-        toast.error("Brak połączonych platform", {
-          description: "Połącz najpierw X lub Facebook aby uruchomić kampanię"
-        });
-        return;
-      }
-
-      toast.loading("Tworzenie kampanii Express...", { id: "express-campaign" });
-
-      // Calculate dates
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() + 1); // Start tomorrow
-      startDate.setHours(8, 0, 0, 0);
-
-      const campaigns = [];
-
-      // Create X campaign if connected
-      if (xData) {
-        const xPostingTimes = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00", "22:00", "00:00"];
-        const xTotalPosts = 9 * 30; // 9 posts/day * 30 days
-        const xContentPosts = Math.floor(xTotalPosts * 0.8);
-        const xSalesPosts = xTotalPosts - xContentPosts;
-
-        const xCampaignData = {
-          name: `Kampania Express X - ${new Date().toLocaleDateString('pl-PL')}`,
-          description: "Automatycznie wygenerowana kampania miesięczna dla platformy X",
-          duration_days: 30,
-          posts_per_day: 9,
-          content_posts_count: xContentPosts,
-          sales_posts_count: xSalesPosts,
-          posting_times: xPostingTimes,
-          start_date: startDate.toISOString(),
-          target_platforms: ["x"],
-          status: "draft",
-          user_id: user.id
-        };
-
-        const { data: xCampaign, error: xError } = await supabase
-          .from('campaigns')
-          .insert(xCampaignData)
-          .select()
-          .single();
-
-        if (!xError && xCampaign) {
-          campaigns.push({ id: xCampaign.id, platform: 'x', postsPerDay: 9 });
-        }
-      }
-
-      // Create Facebook campaign if connected
-      if (fbData) {
-        const fbPostingTimes = Array.from({length: 24}, (_, i) => `${i.toString().padStart(2, '0')}:00`);
-        const fbTotalPosts = 24 * 30; // 24 posts/day * 30 days
-        const fbContentPosts = Math.floor(fbTotalPosts * 0.8);
-        const fbSalesPosts = fbTotalPosts - fbContentPosts;
-
-        const fbCampaignData = {
-          name: `Kampania Express Facebook - ${new Date().toLocaleDateString('pl-PL')}`,
-          description: "Automatycznie wygenerowana kampania miesięczna dla Facebooka",
-          duration_days: 30,
-          posts_per_day: 24,
-          content_posts_count: fbContentPosts,
-          sales_posts_count: fbSalesPosts,
-          posting_times: fbPostingTimes,
-          start_date: startDate.toISOString(),
-          target_platforms: ["facebook"],
-          status: "draft",
-          user_id: user.id
-        };
-
-        const { data: fbCampaign, error: fbError } = await supabase
-          .from('campaigns')
-          .insert(fbCampaignData)
-          .select()
-          .single();
-
-        if (!fbError && fbCampaign) {
-          campaigns.push({ id: fbCampaign.id, platform: 'facebook', postsPerDay: 24 });
-        }
-      }
-
-      if (campaigns.length === 0) {
-        toast.error("Nie udało się utworzyć kampanii", { id: "express-campaign" });
-        return;
-      }
-
-      toast.success(`Utworzono ${campaigns.length} kampanię/kampanie Express`, {
-        id: "express-campaign",
-        description: "Przekierowywanie do automatycznego uruchomienia..."
-      });
-
-      // Redirect to launch page with campaign IDs
-      const campaignIdsParam = campaigns.map(c => c.id).join(',');
-      navigate(`/express-campaign-launch?campaigns=${campaignIdsParam}`);
-    } catch (error) {
-      console.error("Error creating express campaign:", error);
-      toast.error("Błąd podczas tworzenia kampanii", {
-        id: "express-campaign",
-        description: error instanceof Error ? error.message : "Nieznany błąd"
-      });
-    }
-  };
-
   const actions = [
     {
       icon: Share2,
@@ -198,7 +87,23 @@ export const QuickActions = () => {
       variant: "default" as const,
       onClick: () => navigate("/campaigns"),
     },
+    {
+      icon: Settings,
+      label: "Ustawienia",
+      description: "Dopiski AI, domyślny link",
+      variant: "outline" as const,
+      onClick: () => navigate("/settings"),
+    },
   ];
+
+  // Add admin tile if user is admin
+  const adminAction = isAdmin ? {
+    icon: Shield,
+    label: "Administracja",
+    description: "Panel administratora",
+    variant: "destructive" as const,
+    onClick: () => navigate("/admin"),
+  } : null;
 
   return (
     <>
@@ -227,9 +132,13 @@ export const QuickActions = () => {
                 <Upload className="mr-2 h-4 w-4" />
                 Importuj CSV
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setImportXMLDialogOpen(true)}>
+                <FileCode className="mr-2 h-4 w-4" />
+                Importuj XML
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => loadXmlBooksMutation.mutate()}>
                 <Download className="mr-2 h-4 w-4" />
-                Załaduj z XML
+                Załaduj z XML (online)
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleDownloadCSVTemplate}>
                 <FileDown className="mr-2 h-4 w-4" />
@@ -263,10 +172,24 @@ export const QuickActions = () => {
               </Button>
             );
           })}
+
+          {/* Admin tile (only for admins) */}
+          {!roleLoading && adminAction && (
+            <Button
+              variant={adminAction.variant}
+              className="h-auto flex-col items-start p-6 space-y-2 hover:shadow-glow transition-all duration-300"
+              onClick={adminAction.onClick}
+            >
+              <adminAction.icon className="h-8 w-8 mb-2" />
+              <span className="font-semibold text-base">{adminAction.label}</span>
+              <span className="text-xs opacity-70 font-normal">{adminAction.description}</span>
+            </Button>
+          )}
         </div>
       </Card>
 
       <ImportCSVDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
+      <ImportXMLDialog open={importXMLDialogOpen} onOpenChange={setImportXMLDialogOpen} />
       <AddBookDialog 
         open={addBookDialogOpen} 
         onOpenChange={setAddBookDialogOpen}

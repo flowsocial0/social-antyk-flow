@@ -583,7 +583,21 @@ Deno.serve(async (req) => {
           console.log(`Campaign post ${campaignPostId} already published, but publishing to additional account ${accountId}`);
         }
 
-        let tweetText = fixUrlsInText(campaignPost.text) + '\n\n(ai)';
+        // Fetch user's AI suffix from user_settings
+        let aiSuffix = '(ai)'; // Default
+        const { data: userSettings } = await supabaseClient
+          .from('user_settings')
+          .select('ai_suffix_x')
+          .eq('user_id', userId)
+          .maybeSingle();
+        
+        if (userSettings?.ai_suffix_x !== null && userSettings?.ai_suffix_x !== undefined) {
+          aiSuffix = userSettings.ai_suffix_x;
+        }
+        console.log(`Using AI suffix for X: "${aiSuffix}"`);
+
+        const suffixPart = aiSuffix ? `\n\n${aiSuffix}` : '';
+        let tweetText = fixUrlsInText(campaignPost.text) + suffixPart;
 
         let mediaIds: string[] = [];
         if (campaignPost.book?.image_url || campaignPost.book?.storage_path) {
