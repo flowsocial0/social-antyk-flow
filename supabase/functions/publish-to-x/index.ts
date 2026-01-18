@@ -109,12 +109,116 @@ function fixUrlsInText(text: string): string {
 const BASE_URL = "https://api.x.com/2";
 const UPLOAD_URL = "https://upload.twitter.com/1.1/media/upload.json";
 
-async function getOAuth1Token(supabaseClient: any, userId: string, accountId?: string): Promise<{ oauth_token: string; oauth_token_secret: string; screen_name?: string } | null> {
+// Helper function to save rate limit info from X API response headers
+async function saveRateLimitInfo(
+  supabaseClient: any,
+  accountId: string,
+  endpoint: string,
+  response: Response
+): Promise<void> {
+  try {
+    const limitMax = response.headers.get('x-rate-limit-limit');
+    const remaining = response.headers.get('x-rate-limit-remaining');
+    const resetTimestamp = response.headers.get('x-rate-limit-reset');
+
+    if (remaining !== null || resetTimestamp !== null) {
+      const resetAt = resetTimestamp ? new Date(parseInt(resetTimestamp) * 1000).toISOString() : null;
+      
+      console.log(`📊 Rate limit for ${endpoint}: ${remaining}/${limitMax}, reset: ${resetAt}`);
+
+      const { error } = await supabaseClient
+        .from('x_rate_limits')
+        .upsert({
+          account_id: accountId,
+          endpoint: endpoint,
+          limit_max: limitMax ? parseInt(limitMax) : null,
+          remaining: remaining ? parseInt(remaining) : null,
+          reset_at: resetAt,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'account_id,endpoint'
+        });
+
+      if (error) {
+        console.error('Failed to save rate limit info:', error);
+      } else {
+        console.log(`✅ Rate limit info saved for ${endpoint}`);
+      }
+    }
+  } catch (err) {
+    console.error('Error saving rate limit info:', err);
+  }
+}
+
+// Helper function to check rate limits before publishing
+async function checkRateLimits(
+  supabaseClient: any,
+  accountId: string
+): Promise<{ canPublish: boolean; resetAt: string | null; remaining: number | null }> {
+  try {
+    const { data, error } = await supabaseClient
+      .from('x_rate_limits')
+      .select('*')
+      .eq('account_id', accountId)
+      .eq('endpoint', 'tweets')
+      .maybeSingle();
+
+    if (error || !data) {
+      // No rate limit data - assume we can publish
+      return { canPublish: true, resetAt: null, remaining: null };
+    }
+
+    const now = new Date();
+    const resetAt = data.reset_at ? new Date(data.reset_at) : null;
+
+    // If remaining is 0 and reset time is in the future, we're rate limited
+    if (data.remaining === 0 && resetAt && resetAt > now) {
+      console.log(`⚠️ Rate limit exhausted. Reset at: ${resetAt.toISOString()}`);
+      return { canPublish: false, resetAt: data.reset_at, remaining: 0 };
+    }
+
+    // If reset time has passed, assume limits are refreshed
+    if (resetAt && resetAt <= now) {
+      console.log('Rate limit period has reset');
+      return { canPublish: true, resetAt: null, remaining: null };
+    }
+
+    return { canPublish: true, resetAt: data.reset_at, remaining: data.remaining };
+  } catch (err) {
+    console.error('Error checking rate limits:', err);
+    return { canPublish: true, resetAt: null, remaining: null };
+  }
+}
+
+// Helper to get account ID from token
+async function getAccountIdFromToken(supabaseClient: any, userId: string, accountId?: string): Promise<string | null> {
+  if (accountId) return accountId;
+  
+  const { data } = await supabaseClient
+    .from('twitter_oauth1_tokens')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('is_default', true)
+    .maybeSingle();
+  
+  if (data) return data.id;
+  
+  const { data: anyToken } = await supabaseClient
+    .from('twitter_oauth1_tokens')
+    .select('id')
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle();
+  
+  return anyToken?.id || null;
+}
+
+async function getOAuth1Token(supabaseClient: any, userId: string, accountId?: string): Promise<{ oauth_token: string; oauth_token_secret: string; screen_name?: string; id?: string } | null> {
   // If accountId is provided, fetch that specific account
   if (accountId) {
     const { data, error } = await supabaseClient
       .from('twitter_oauth1_tokens')
-      .select('oauth_token, oauth_token_secret, screen_name')
+      .select('id, oauth_token, oauth_token_secret, screen_name')
       .eq('id', accountId)
       .maybeSingle();
 
@@ -131,7 +235,7 @@ async function getOAuth1Token(supabaseClient: any, userId: string, accountId?: s
   // Fallback: try to get default account for user
   const { data: defaultData, error: defaultError } = await supabaseClient
     .from('twitter_oauth1_tokens')
-    .select('oauth_token, oauth_token_secret, screen_name')
+    .select('id, oauth_token, oauth_token_secret, screen_name')
     .eq('user_id', userId)
     .eq('is_default', true)
     .maybeSingle();
@@ -144,7 +248,7 @@ async function getOAuth1Token(supabaseClient: any, userId: string, accountId?: s
   // Final fallback: get any account for user
   const { data, error } = await supabaseClient
     .from('twitter_oauth1_tokens')
-    .select('oauth_token, oauth_token_secret, screen_name')
+    .select('id, oauth_token, oauth_token_secret, screen_name')
     .eq('user_id', userId)
     .maybeSingle();
 
@@ -336,7 +440,7 @@ async function sendTweet(
   userAccessToken: string,
   userAccessTokenSecret: string,
   mediaIds?: string[]
-): Promise<any> {
+): Promise<{ data: any; response: Response }> {
   const url = `${BASE_URL}/tweets`;
   const method = "POST";
 
@@ -363,7 +467,9 @@ async function sendTweet(
   console.log("✅ X API Response:", {
     status: response.status,
     statusText: response.statusText,
-    body: responseText
+    body: responseText,
+    rateLimitRemaining: response.headers.get('x-rate-limit-remaining'),
+    rateLimitReset: response.headers.get('x-rate-limit-reset')
   });
 
   if (!response.ok) {
@@ -371,9 +477,12 @@ async function sendTweet(
     if (response.status === 403) {
       const error = new Error(`Błąd 403 Forbidden: Brak uprawnień do publikowania. Sprawdź w Developer Portal X, czy aplikacja ma uprawnienia "Read and Write" (nie tylko "Read"), a następnie odłącz i połącz konto X ponownie w ustawieniach.`);
       (error as any).statusCode = 403;
+      (error as any).response = response;
       throw error;
     }
-    throw new Error(`Failed to send tweet: ${response.status}, body: ${responseText}`);
+    const error = new Error(`Failed to send tweet: ${response.status}, body: ${responseText}`);
+    (error as any).response = response;
+    throw error;
   }
 
   const responseData = JSON.parse(responseText);
@@ -382,7 +491,55 @@ async function sendTweet(
     text: responseData.data?.text
   });
 
-  return responseData;
+  return { data: responseData, response };
+}
+
+async function sendTweetWithRateLimitTracking(
+  supabaseClient: any,
+  accountId: string,
+  tweetText: string,
+  userAccessToken: string,
+  userAccessTokenSecret: string,
+  mediaIds?: string[],
+  maxRetries: number = 3
+): Promise<any> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await sendTweet(tweetText, userAccessToken, userAccessTokenSecret, mediaIds);
+      
+      // Save rate limit info from successful response
+      await saveRateLimitInfo(supabaseClient, accountId, 'tweets', result.response);
+      
+      return result.data;
+    } catch (error: any) {
+      lastError = error;
+      
+      // Save rate limit info even from error responses
+      if (error.response) {
+        await saveRateLimitInfo(supabaseClient, accountId, 'tweets', error.response);
+      }
+      
+      if (error.message.includes('429')) {
+        if (attempt < maxRetries) {
+          const waitTime = Math.min(15000 * Math.pow(2, attempt), 60000);
+          console.log(`Rate limited (429). Waiting ${waitTime/1000}s before retry ${attempt + 1}/${maxRetries}...`);
+          await sleep(waitTime);
+          continue;
+        } else {
+          console.error('Max retries reached for rate limit error');
+          const rateLimitError = new Error(`Twitter rate limit exceeded (429). Please wait a few minutes before trying again.`);
+          (rateLimitError as any).statusCode = 429;
+          throw rateLimitError;
+        }
+      }
+      
+      throw error;
+    }
+  }
+  
+  throw lastError || new Error('Failed to send tweet after retries');
 }
 
 Deno.serve(async (req) => {
@@ -562,6 +719,41 @@ Deno.serve(async (req) => {
     // Handle campaign post
     if (campaignPostId) {
       try {
+        // Get account ID for rate limit tracking
+        const xAccountId = oauth1Token.id || await getAccountIdFromToken(supabaseClient, userId, accountId);
+        
+        // Check rate limits before attempting to publish
+        if (xAccountId) {
+          const rateLimitCheck = await checkRateLimits(supabaseClient, xAccountId);
+          if (!rateLimitCheck.canPublish) {
+            console.log(`⚠️ Rate limit check failed - cannot publish. Reset at: ${rateLimitCheck.resetAt}`);
+            
+            // Update campaign post with rate limit info
+            await supabaseClient
+              .from('campaign_posts')
+              .update({ 
+                status: 'rate_limited',
+                error_code: '429',
+                error_message: `Limit API X wyczerpany. Automatyczne ponowienie po resecie.`,
+                next_retry_at: rateLimitCheck.resetAt
+              })
+              .eq('id', campaignPostId);
+            
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: 'rate_limit',
+                reset_at: rateLimitCheck.resetAt,
+                message: 'Limit API X wyczerpany. Publikacja zostanie wznowiona automatycznie po resecie.'
+              }),
+              { 
+                status: 429,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
+          }
+        }
+
         const { data: campaignPost, error: postError } = await supabaseClient
           .from('campaign_posts')
           .select(`
@@ -664,7 +856,11 @@ Deno.serve(async (req) => {
 
         console.log(`🐦 Sending tweet with ${mediaIds.length} media attachments`);
 
-        const tweetResponse = await sendTweetWithRetry(tweetText, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, mediaIds);
+        // Use the new rate limit tracking version
+        const xAccountIdForTracking = oauth1Token.id || xAccountId;
+        const tweetResponse = xAccountIdForTracking 
+          ? await sendTweetWithRateLimitTracking(supabaseClient, xAccountIdForTracking, tweetText, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, mediaIds)
+          : await sendTweetWithRetry(tweetText, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, mediaIds);
         console.log("Tweet sent successfully:", tweetResponse);
 
         // Only update status to published if no specific accountId was provided
@@ -894,7 +1090,11 @@ Deno.serve(async (req) => {
           console.error("Failed to upload media, continuing without image:", error);
         }
 
-        const tweetResponse = await sendTweetWithRetry(tweetText, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, mediaIds);
+        // Use rate limit tracking for book publishing too
+        const bookAccountId = oauth1Token.id || await getAccountIdFromToken(supabaseClient, userId, accountId);
+        const tweetResponse = bookAccountId
+          ? await sendTweetWithRateLimitTracking(supabaseClient, bookAccountId, tweetText, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, mediaIds)
+          : await sendTweetWithRetry(tweetText, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, mediaIds);
         console.log("Tweet sent successfully:", tweetResponse);
 
         const { data: existingContent } = await supabaseClient
