@@ -78,8 +78,23 @@ const Admin = () => {
       
       setDataLoading(true);
       try {
-        // Fetch aggregate stats
-        const [booksRes, campaignsRes, xRes, fbRes, igRes, ytRes, ttRes] = await Promise.all([
+        // Fetch aggregate stats and all data in parallel
+        const [
+          booksRes, 
+          campaignsRes, 
+          xRes, 
+          fbRes, 
+          igRes, 
+          ytRes, 
+          ttRes,
+          allBooks,
+          allCampaigns,
+          xTokens,
+          fbTokens,
+          igTokens,
+          ytTokens,
+          ttTokens
+        ] = await Promise.all([
           supabase.from('books').select('id', { count: 'exact', head: true }),
           supabase.from('campaigns').select('id', { count: 'exact', head: true }),
           supabase.from('twitter_oauth1_tokens').select('id', { count: 'exact', head: true }),
@@ -87,15 +102,24 @@ const Admin = () => {
           supabase.from('instagram_oauth_tokens').select('id', { count: 'exact', head: true }),
           supabase.from('youtube_oauth_tokens').select('id', { count: 'exact', head: true }),
           supabase.from('tiktok_oauth_tokens').select('id', { count: 'exact', head: true }),
+          supabase.from('books').select('user_id'),
+          supabase.from('campaigns').select('user_id'),
+          supabase.from('twitter_oauth1_tokens').select('user_id'),
+          supabase.from('facebook_oauth_tokens').select('user_id'),
+          supabase.from('instagram_oauth_tokens').select('user_id'),
+          supabase.from('youtube_oauth_tokens').select('user_id'),
+          supabase.from('tiktok_oauth_tokens').select('user_id'),
         ]);
 
-        // Get unique user IDs from books and campaigns
-        const { data: bookUsers } = await supabase.from('books').select('user_id');
-        const { data: campaignUsers } = await supabase.from('campaigns').select('user_id');
-        
+        // Collect ALL unique user IDs from all tables
         const uniqueUserIds = new Set<string>();
-        bookUsers?.forEach(b => uniqueUserIds.add(b.user_id));
-        campaignUsers?.forEach(c => uniqueUserIds.add(c.user_id));
+        allBooks.data?.forEach(b => uniqueUserIds.add(b.user_id));
+        allCampaigns.data?.forEach(c => uniqueUserIds.add(c.user_id));
+        xTokens.data?.forEach(t => uniqueUserIds.add(t.user_id));
+        fbTokens.data?.forEach(t => t.user_id && uniqueUserIds.add(t.user_id));
+        igTokens.data?.forEach(t => uniqueUserIds.add(t.user_id));
+        ytTokens.data?.forEach(t => uniqueUserIds.add(t.user_id));
+        ttTokens.data?.forEach(t => uniqueUserIds.add(t.user_id));
 
         setStats({
           totalUsers: uniqueUserIds.size,
@@ -110,10 +134,9 @@ const Admin = () => {
           },
         });
 
-        // Build user data
+        // Build user data map
         const userDataMap = new Map<string, UserData>();
         
-        // Initialize from unique users
         for (const userId of uniqueUserIds) {
           userDataMap.set(userId, {
             id: userId,
@@ -126,11 +149,7 @@ const Admin = () => {
         }
 
         // Count books per user
-        const { data: booksPerUser } = await supabase
-          .from('books')
-          .select('user_id');
-        
-        booksPerUser?.forEach(b => {
+        allBooks.data?.forEach(b => {
           const userData = userDataMap.get(b.user_id);
           if (userData) {
             userData.books_count++;
@@ -138,26 +157,14 @@ const Admin = () => {
         });
 
         // Count campaigns per user
-        const { data: campaignsPerUser } = await supabase
-          .from('campaigns')
-          .select('user_id');
-        
-        campaignsPerUser?.forEach(c => {
+        allCampaigns.data?.forEach(c => {
           const userData = userDataMap.get(c.user_id);
           if (userData) {
             userData.campaigns_count++;
           }
         });
 
-        // Get connected platforms per user
-        const [xTokens, fbTokens, igTokens, ytTokens, ttTokens] = await Promise.all([
-          supabase.from('twitter_oauth1_tokens').select('user_id'),
-          supabase.from('facebook_oauth_tokens').select('user_id'),
-          supabase.from('instagram_oauth_tokens').select('user_id'),
-          supabase.from('youtube_oauth_tokens').select('user_id'),
-          supabase.from('tiktok_oauth_tokens').select('user_id'),
-        ]);
-
+        // Add connected platforms
         xTokens.data?.forEach(t => {
           const userData = userDataMap.get(t.user_id);
           if (userData && !userData.connected_platforms.includes('X')) {
