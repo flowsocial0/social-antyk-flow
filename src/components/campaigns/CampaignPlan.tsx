@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Loader2, Sparkles, ArrowLeft, BookOpen, TrendingUp, FileText, CheckCircle2 } from "lucide-react";
 import type { CampaignConfig, CampaignPost } from "./CampaignBuilder";
 
-type GenerationStage = 'idle' | 'fetching_cache' | 'generating_structure' | 'generating_posts' | 'scheduling';
+type GenerationStage = 'idle' | 'generating' | 'scheduling';
 
 interface CampaignPlanProps {
   config: CampaignConfig;
@@ -43,7 +43,7 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
     };
   }, [isGenerating]);
 
-  // Animated progress within each stage - based on 2.5s per post
+  // Animated progress - based on 2.5s per post from the start
   useEffect(() => {
     if (generationStage === 'idle' || generationStage === 'scheduling') {
       return;
@@ -53,11 +53,8 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
     setStageProgress(0);
     
     const targetProgress = 95;
-    // For generating_posts: 2.5 seconds per post
-    // For other stages: fixed 5 seconds
-    const duration = generationStage === 'generating_posts' 
-      ? totalPosts * 2500 // 2.5s per post in ms
-      : 5000;
+    // 2.5 seconds per post for generating stage
+    const duration = totalPosts * 2500; // 2.5s per post in ms
     
     const updateInterval = 100; // Update every 100ms
     const increment = targetProgress / (duration / updateInterval);
@@ -76,46 +73,24 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
 
   const getStageInfo = () => {
     switch (generationStage) {
-      case 'fetching_cache':
+      case 'generating':
         return { 
-          step: 1, 
-          total: 4, 
-          label: 'Pobieranie zapisanych tekstów...', 
-          percentage: 10,
-          completed: false 
-        };
-      case 'generating_structure':
-        return { 
-          step: 2, 
-          total: 4, 
-          label: 'AI tworzy strukturę kampanii...', 
-          percentage: 25 + (stageProgress * 0.25),
-          completed: false 
-        };
-      case 'generating_posts':
-        return { 
-          step: 3, 
-          total: 4, 
-          label: `AI generuje treści ${totalPosts} postów...`, 
-          percentage: 50 + (stageProgress * 0.45),
-          completed: false 
+          label: `Generowanie ${totalPosts} postów...`, 
+          percentage: stageProgress
         };
       case 'scheduling':
         return { 
-          step: 4, 
-          total: 4, 
-          label: 'Planowanie harmonogramu...', 
-          percentage: 98,
-          completed: false 
+          label: 'Finalizowanie...', 
+          percentage: 98
         };
       default:
-        return { step: 0, total: 4, label: '', percentage: 0, completed: false };
+        return { label: '', percentage: 0 };
     }
   };
 
   const handleGenerateWithAI = async () => {
     setIsGenerating(true);
-    setGenerationStage('fetching_cache');
+    setGenerationStage('generating');
     try {
       // Fetch cached texts if not regenerating
       let cachedTexts: Record<string, Record<string, string>> = {};
@@ -156,8 +131,7 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
         console.log("Skipping cache fetch - regenerateTexts:", config.regenerateTexts);
       }
       
-      // Step 1: Generate campaign structure
-      setGenerationStage('generating_structure');
+      // Generate campaign structure
       console.log("Generating campaign structure...");
       const structureResponse = await supabase.functions.invoke('generate-campaign', {
         body: {
@@ -181,8 +155,7 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
       const structure = structureResponse.data.structure;
       console.log("Structure generated:", structure);
 
-      // Step 2: Generate content for each post
-      setGenerationStage('generating_posts');
+      // Generate content for each post
       console.log("Generating post content...");
       console.log("Passing cachedTexts to edge function, keys count:", Object.keys(cachedTexts).length);
       console.log("useRandomContent:", config.useRandomContent);
@@ -215,7 +188,7 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
       const generatedPosts = contentResponse.data.posts;
       console.log("Posts generated:", generatedPosts.length);
 
-      // Step 3: Schedule posts
+      // Schedule posts
       setGenerationStage('scheduling');
       const scheduledPosts = scheduleGeneratedPosts(generatedPosts);
 
@@ -436,7 +409,7 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
           <Card className="p-4 bg-blue-500/10 border-blue-500/20">
             <div className="flex items-center gap-2 mb-2">
               <BookOpen className="h-5 w-5 text-blue-500" />
-              <h4 className="font-semibold">Content ({contentRatio}%)</h4>
+              <h4 className="font-semibold">Ciekawostki ({contentRatio}%)</h4>
             </div>
             <p className="text-2xl font-bold text-blue-500">{contentPosts} postów</p>
             <p className="text-sm text-muted-foreground mt-1">
@@ -500,33 +473,6 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
         ) : (
           <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/30 shadow-lg animate-in fade-in duration-300">
             <div className="flex flex-col gap-6">
-              {/* Stage indicators */}
-              <div className="flex items-center justify-between gap-2">
-                {['fetching_cache', 'generating_structure', 'generating_posts', 'scheduling'].map((stage, index) => {
-                  const stageNames = ['Cache', 'Struktura', 'Treści', 'Plan'];
-                  const currentStageIndex = ['fetching_cache', 'generating_structure', 'generating_posts', 'scheduling'].indexOf(generationStage);
-                  const isCompleted = index < currentStageIndex;
-                  const isCurrent = stage === generationStage;
-                  
-                  return (
-                    <div key={stage} className="flex items-center gap-2 flex-1">
-                      <div className={`
-                        w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
-                        ${isCompleted ? 'bg-green-500 text-white' : isCurrent ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}
-                      `}>
-                        {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
-                      </div>
-                      <span className={`text-xs font-medium hidden sm:inline ${isCurrent ? 'text-primary' : 'text-muted-foreground'}`}>
-                        {stageNames[index]}
-                      </span>
-                      {index < 3 && (
-                        <div className={`flex-1 h-0.5 ${isCompleted ? 'bg-green-500' : 'bg-muted'}`} />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
               {/* Main progress indicator */}
               <div className="flex items-center gap-4">
                 <Loader2 className="h-10 w-10 animate-spin text-primary flex-shrink-0" />
@@ -539,9 +485,8 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
                 </div>
               </div>
 
-              {/* Time and info */}
-              <div className="flex justify-between items-center text-sm text-muted-foreground">
-                <span>Etap {getStageInfo().step} z {getStageInfo().total}</span>
+              {/* Time */}
+              <div className="flex justify-end text-sm text-muted-foreground">
                 <span>Czas: {Math.floor(elapsedTime / 60)}:{(elapsedTime % 60).toString().padStart(2, '0')}</span>
               </div>
 

@@ -56,7 +56,7 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
   const [parsedBooks, setParsedBooks] = useState<ParsedBook[]>([]);
   const [importing, setImporting] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const [previewStats, setPreviewStats] = useState<{ new: number; updates: number; deletes: number }>({ new: 0, updates: 0, deletes: 0 });
+  const [previewStats, setPreviewStats] = useState<{ new: number; updates: number }>({ new: 0, updates: 0 });
   const [existingCodes, setExistingCodes] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<{
     success: number;
@@ -78,7 +78,7 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
       setFile(null);
       setParsedBooks([]);
       setProgress(null);
-      setPreviewStats({ new: 0, updates: 0, deletes: 0 });
+      setPreviewStats({ new: 0, updates: 0 });
     }
   }, [open]);
 
@@ -217,15 +217,12 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
             const existingCodesSet = new Set(existingBooks?.map(b => b.code) || []);
             setExistingCodes(existingCodesSet);
 
-            const csvCodes = new Set(uniqueItems.map(b => b.code));
             const newCount = uniqueItems.filter(b => !existingCodesSet.has(b.code)).length;
             const updateCount = uniqueItems.filter(b => existingCodesSet.has(b.code)).length;
-            const deleteCount = Array.from(existingCodesSet).filter(code => !csvCodes.has(code)).length;
 
             setPreviewStats({
               new: newCount,
               updates: updateCount,
-              deletes: deleteCount,
             });
           }
 
@@ -309,7 +306,7 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
 
     let success = 0;
     let failed = 0;
-    let deleted = 0;
+    
     const errors: string[] = [];
     const total = parsedBooks.length;
 
@@ -375,31 +372,7 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
       });
     }
 
-    // Delete books not in CSV
-    if (success > 0 && existingBooks && existingBooks.length > 0) {
-      setProgress({ success, failed, total, phase: "Usuwanie nieaktualnych książek...", errors: [...errors] });
-
-      const csvCodes = new Set(parsedBooks.map(b => b.code));
-      const booksToDelete = existingBooks.filter((book) => {
-        const bookCode = book.code?.trim();
-        return bookCode ? !csvCodes.has(bookCode) : false;
-      });
-
-      if (booksToDelete.length > 0) {
-        const deleteIds = booksToDelete.map((b) => b.id);
-        for (let i = 0; i < deleteIds.length; i += 50) {
-          const batchIds = deleteIds.slice(i, i + 50);
-          const { error: deleteError } = await supabase.from("books").delete().in("id", batchIds);
-
-          if (deleteError) {
-            console.error("Błąd usuwania książek:", deleteError);
-            errors.push(`Błąd usuwania książek: ${deleteError.message}`);
-          } else {
-            deleted += batchIds.length;
-          }
-        }
-      }
-    }
+    // Note: Books not in CSV are NOT deleted - import only adds/updates
 
     // Migrate images
     setProgress({ success, failed, total, phase: "Migrowanie okładek do storage...", errors: [...errors] });
@@ -417,13 +390,12 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
     setImporting(false);
 
     const imageStats = migrationResult?.stats;
-    const deletedMsg = deleted > 0 ? ` Usunięto: ${deleted}.` : "";
     const imageMsg = imageStats ? ` Okładki: ${imageStats.succeeded} przesłanych.` : "";
 
     if (failed === 0) {
-      toast.success(`Import zakończony! Zaktualizowano: ${success}.${deletedMsg}${imageMsg}`);
+      toast.success(`Import zakończony! Zaktualizowano: ${success}.${imageMsg}`);
     } else {
-      toast.warning(`Import zakończony. Zaktualizowano: ${success}. Błędów: ${failed}.${deletedMsg}`);
+      toast.warning(`Import zakończony. Zaktualizowano: ${success}. Błędów: ${failed}.`);
     }
 
     setTimeout(() => {
@@ -462,11 +434,6 @@ export const ImportCSVDialog = ({ open, onOpenChange }: ImportCSVDialogProps) =>
         <Badge variant="secondary" className="text-sm">
           <span className="mr-1">Aktualizacji:</span> {previewStats.updates}
         </Badge>
-        {previewStats.deletes > 0 && (
-          <Badge variant="destructive" className="text-sm">
-            <span className="mr-1">Do usunięcia:</span> {previewStats.deletes}
-          </Badge>
-        )}
       </div>
 
       {/* Preview table */}
