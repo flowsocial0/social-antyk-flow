@@ -100,12 +100,12 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
   };
 
   const handlePostsPerDayChange = (value: number) => {
-    // Limit to max 13 posts per day
-    const limitedValue = Math.min(value, 13);
+    // Limit to max 10 posts per day (X/Twitter daily limit for free tier)
+    const limitedValue = Math.min(value, 10);
     setPostsPerDay(limitedValue);
     
     // Generate unique odd hours for posting times
-    const oddHours = [7, 9, 11, 13, 15, 17, 19, 21, 23, 5, 3, 1, 6];
+    const oddHours = [7, 9, 11, 13, 15, 17, 19, 21, 23, 5];
     const newTimes: string[] = [];
     
     for (let i = 0; i < limitedValue; i++) {
@@ -336,21 +336,21 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
                 value={[postsPerDay]}
                 onValueChange={(value) => handlePostsPerDayChange(value[0])}
                 min={1}
-                max={13}
+                max={10}
                 step={1}
                 className="flex-1 max-w-md"
               />
               <Input
                 type="number"
                 min={1}
-                max={13}
+                max={10}
                 value={postsPerDay}
-                onChange={(e) => handlePostsPerDayChange(Math.min(13, Math.max(1, parseInt(e.target.value) || 1)))}
+                onChange={(e) => handlePostsPerDayChange(Math.min(10, Math.max(1, parseInt(e.target.value) || 1)))}
                 className="w-20"
               />
               <span className="text-sm text-muted-foreground">postów</span>
             </div>
-            <p className="text-xs text-muted-foreground">Maksymalnie 13 postów dziennie</p>
+            <p className="text-xs text-muted-foreground">Maksymalnie 10 postów dziennie (limit API X)</p>
           </div>
 
           {/* Start date */}
@@ -421,24 +421,48 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
                 </Button>
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
               {postingTimes.map((time, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <Input
-                    type="time"
-                    value={time}
-                    onChange={(e) => handleTimeChange(index, e.target.value)}
-                    className="max-w-[150px]"
-                  />
+                <div key={index} className="flex items-center gap-1 border rounded-md px-3 py-2 bg-background">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <select
+                    value={time.split(':')[0]}
+                    onChange={(e) => {
+                      const newHour = e.target.value;
+                      const minutes = time.split(':')[1] || '00';
+                      handleTimeChange(index, `${newHour}:${minutes}`);
+                    }}
+                    className="bg-transparent border-none focus:outline-none text-sm font-medium w-12"
+                  >
+                    {Array.from({ length: 24 }, (_, h) => (
+                      <option key={h} value={h.toString().padStart(2, '0')}>
+                        {h.toString().padStart(2, '0')}
+                      </option>
+                    ))}
+                  </select>
+                  <span>:</span>
+                  <select
+                    value={time.split(':')[1] || '00'}
+                    onChange={(e) => {
+                      const hours = time.split(':')[0];
+                      handleTimeChange(index, `${hours}:${e.target.value}`);
+                    }}
+                    className="bg-transparent border-none focus:outline-none text-sm font-medium w-10"
+                  >
+                    <option value="00">00</option>
+                    <option value="15">15</option>
+                    <option value="30">30</option>
+                    <option value="45">45</option>
+                  </select>
                   {postingTimes.length > 1 && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       onClick={() => removePostingTime(index)}
-                      className="text-destructive hover:text-destructive"
+                      className="text-destructive hover:text-destructive h-6 w-6 p-0 ml-1"
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-3 w-3" />
                     </Button>
                   )}
                 </div>

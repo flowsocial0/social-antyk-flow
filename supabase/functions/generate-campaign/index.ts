@@ -387,14 +387,14 @@ async function generatePostsContent(body: any, apiKey: string) {
   
   let availableBooks: any[] = [];
   
-  // CRITICAL: Only use selected books - no fallback to random books
-  if (!selectedBooks || selectedBooks.length === 0) {
-    console.error("No books selected for campaign");
+  // Allow empty books when using random content generation
+  if (!useRandomContent && (!selectedBooks || selectedBooks.length === 0)) {
+    console.error("No books selected for campaign and random content is disabled");
     return new Response(
       JSON.stringify({
         success: false,
         errorCode: "NO_BOOKS",
-        error: "Nie wybrano żadnych książek do kampanii. Proszę wybrać co najmniej jedną książkę.",
+        error: "Nie wybrano żadnych książek do kampanii. Proszę wybrać co najmniej jedną książkę lub włącz generowanie losowych treści.",
       }),
       {
         status: 200,
@@ -403,53 +403,62 @@ async function generatePostsContent(body: any, apiKey: string) {
     );
   }
 
-  console.log(`Fetching ${selectedBooks.length} selected books...`);
-  
-  // Fetch selected books in batches
-  const fetchBatchSize = 100;
-  const allFetchedBooks: any[] = [];
-  
-  for (let i = 0; i < selectedBooks.length; i += fetchBatchSize) {
-    const batch = selectedBooks.slice(i, i + fetchBatchSize);
-    const { data: batchBooks, error: batchError } = await supabase
-      .from("books")
-      .select("id, title, description, sale_price, product_url, campaign_post_count, author")
-      .in("id", batch);
+  // Only fetch books if we have selectedBooks and not in random content mode
+  if (selectedBooks && selectedBooks.length > 0) {
+    console.log(`Fetching ${selectedBooks.length} selected books...`);
     
-    if (batchError) {
-      console.error(`Error fetching books batch ${i / fetchBatchSize}:`, batchError);
-      continue;
-    }
+    // Fetch selected books in batches
+    const fetchBatchSize = 100;
+    const allFetchedBooks: any[] = [];
     
-    if (batchBooks) {
-      allFetchedBooks.push(...batchBooks);
-    }
-  }
-
-  if (allFetchedBooks.length === 0) {
-    console.error("No books found in database for selected IDs");
-    return new Response(
-      JSON.stringify({
-        success: false,
-        errorCode: "BOOKS_NOT_FOUND",
-        error: "Wybrane książki nie zostały znalezione w bazie danych.",
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    for (let i = 0; i < selectedBooks.length; i += fetchBatchSize) {
+      const batch = selectedBooks.slice(i, i + fetchBatchSize);
+      const { data: batchBooks, error: batchError } = await supabase
+        .from("books")
+        .select("id, title, description, sale_price, product_url, campaign_post_count, author")
+        .in("id", batch);
+      
+      if (batchError) {
+        console.error(`Error fetching books batch ${i / fetchBatchSize}:`, batchError);
+        continue;
       }
-    );
+      
+      if (batchBooks) {
+        allFetchedBooks.push(...batchBooks);
+      }
+    }
+
+    if (allFetchedBooks.length === 0 && !useRandomContent) {
+      console.error("No books found in database for selected IDs");
+      return new Response(
+        JSON.stringify({
+          success: false,
+          errorCode: "BOOKS_NOT_FOUND",
+          error: "Wybrane książki nie zostały znalezione w bazie danych.",
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+    
+    availableBooks = allFetchedBooks;
+  } else if (useRandomContent) {
+    console.log("Using random content mode - no books needed");
   }
 
   // Sort by price DESC - if more books than sales posts, use most expensive ones
-  availableBooks = allFetchedBooks.sort((a, b) => {
-    if (a.sale_price !== b.sale_price) {
-      if (a.sale_price === null) return 1;
-      if (b.sale_price === null) return -1;
-      return b.sale_price - a.sale_price;
-    }
-    return 0;
-  });
+  if (availableBooks.length > 0) {
+    availableBooks = availableBooks.sort((a: any, b: any) => {
+      if (a.sale_price !== b.sale_price) {
+        if (a.sale_price === null) return 1;
+        if (b.sale_price === null) return -1;
+        return b.sale_price - a.sale_price;
+      }
+      return 0;
+    });
+  }
 
   // Keep all books available for content generation
   const allBooksForContent = [...availableBooks];
