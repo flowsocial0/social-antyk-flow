@@ -36,17 +36,17 @@ interface RateLimitsResponse {
 
 export function XRateLimitStatus() {
   const { data, isLoading, error, refetch, isFetching } = useQuery<RateLimitsResponse>({
-    queryKey: ['x-rate-limits'],
+    queryKey: ["x-rate-limits"],
     queryFn: async () => {
       const { data: session } = await supabase.auth.getSession();
       if (!session.session) {
-        throw new Error('Not authenticated');
+        throw new Error("Not authenticated");
       }
 
-      const { data, error } = await supabase.functions.invoke('get-x-rate-limits', {
+      const { data, error } = await supabase.functions.invoke("get-x-rate-limits", {
         headers: {
-          Authorization: `Bearer ${session.session.access_token}`
-        }
+          Authorization: `Bearer ${session.session.access_token}`,
+        },
       });
 
       if (error) throw error;
@@ -82,9 +82,7 @@ export function XRateLimitStatus() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Nie udało się pobrać informacji o limitach
-          </p>
+          <p className="text-sm text-muted-foreground">Nie udało się pobrać informacji o limitach</p>
         </CardContent>
       </Card>
     );
@@ -100,9 +98,7 @@ export function XRateLimitStatus() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Brak połączonych kont X
-          </p>
+          <p className="text-sm text-muted-foreground">Brak połączonych kont X</p>
         </CardContent>
       </Card>
     );
@@ -118,14 +114,8 @@ export function XRateLimitStatus() {
             <Clock className="h-5 w-5" />
             Limity API X
           </CardTitle>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => refetch()}
-            disabled={isFetching}
-            className="h-8 w-8 p-0"
-          >
-            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+          <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isFetching} className="h-8 w-8 p-0">
+            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
           </Button>
         </div>
       </CardHeader>
@@ -135,11 +125,12 @@ export function XRateLimitStatus() {
           <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
             <AlertTriangle className="h-4 w-4 text-yellow-500" />
             <span className="text-sm">
-              Limit przekroczony. Reset{' '}
-              {summary.next_reset && formatDistanceToNow(new Date(summary.next_reset), { 
-                addSuffix: true, 
-                locale: pl 
-              })}
+              Limit przekroczony. Reset{" "}
+              {summary.next_reset &&
+                formatDistanceToNow(new Date(summary.next_reset), {
+                  addSuffix: true,
+                  locale: pl,
+                })}
             </span>
           </div>
         )}
@@ -157,9 +148,7 @@ export function XRateLimitStatus() {
             return (
               <div key={account.id} className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">
-                    @{account.screen_name || 'Unknown'}
-                  </span>
+                  <span className="text-sm font-medium">@{account.screen_name || "Unknown"}</span>
                   {isLimited ? (
                     <Badge variant="destructive" className="gap-1">
                       <AlertTriangle className="h-3 w-3" />
@@ -174,12 +163,12 @@ export function XRateLimitStatus() {
                     <Badge variant="secondary">Brak danych</Badge>
                   )}
                 </div>
-                
+
                 {hasData && (
                   <>
-                    <Progress 
-                      value={percentage} 
-                      className={`h-2 ${isLimited ? '[&>div]:bg-red-500' : percentage < 20 ? '[&>div]:bg-yellow-500' : ''}`}
+                    <Progress
+                      value={percentage}
+                      className={`h-2 ${isLimited ? "[&>div]:bg-red-500" : percentage < 20 ? "[&>div]:bg-yellow-500" : ""}`}
                     />
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>
@@ -187,9 +176,10 @@ export function XRateLimitStatus() {
                       </span>
                       {tweets?.reset_at && (
                         <span>
-                          Reset: {formatDistanceToNow(new Date(tweets.reset_at), { 
-                            addSuffix: true, 
-                            locale: pl 
+                          Reset:{" "}
+                          {formatDistanceToNow(new Date(tweets.reset_at), {
+                            addSuffix: true,
+                            locale: pl,
                           })}
                         </span>
                       )}
@@ -203,7 +193,7 @@ export function XRateLimitStatus() {
 
         {/* Info */}
         <p className="text-xs text-muted-foreground pt-2 border-t">
-          Darmowy plan X API: ~50 tweetów/dzień. Limit resetuje się co 24h.
+          Limit X: 10 tweetów/dzień. Limit resetuje się co 24h.
         </p>
       </CardContent>
     </Card>
