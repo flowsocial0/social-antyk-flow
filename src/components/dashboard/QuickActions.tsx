@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,13 +13,25 @@ import { toast } from "sonner";
 import { generateCSVTemplate, generateXMLTemplate, downloadTemplate } from "@/lib/templates";
 import { useUserRole } from "@/hooks/useUserRole";
 
+// User ID allowed to use XML online features
+const XML_ONLINE_ALLOWED_USER = "662824bf-77c0-4a1d-9113-2d2338bebb42";
+
 export const QuickActions = () => {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importXMLDialogOpen, setImportXMLDialogOpen] = useState(false);
   const [addBookDialogOpen, setAddBookDialogOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAdmin, loading: roleLoading } = useUserRole();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setCurrentUserId(data.session?.user?.id ?? null);
+    });
+  }, []);
+
+  const canUseXmlOnline = currentUserId === XML_ONLINE_ALLOWED_USER;
 
   const syncBooksMutation = useMutation({
     mutationFn: async () => {
@@ -136,10 +148,12 @@ export const QuickActions = () => {
                 <FileCode className="mr-2 h-4 w-4" />
                 Importuj XML
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => loadXmlBooksMutation.mutate()}>
-                <Download className="mr-2 h-4 w-4" />
-                Załaduj z XML (online)
-              </DropdownMenuItem>
+              {canUseXmlOnline && (
+                <DropdownMenuItem onClick={() => loadXmlBooksMutation.mutate()}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Załaduj z XML (online)
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={handleDownloadCSVTemplate}>
                 <FileDown className="mr-2 h-4 w-4" />
                 Pobierz szablon CSV
@@ -148,10 +162,12 @@ export const QuickActions = () => {
                 <FileDown className="mr-2 h-4 w-4" />
                 Pobierz szablon XML
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => syncBooksMutation.mutate()} disabled={syncBooksMutation.isPending}>
-                <RefreshCw className={`mr-2 h-4 w-4 ${syncBooksMutation.isPending ? "animate-spin" : ""}`} />
-                Synchronizuj z XML
-              </DropdownMenuItem>
+              {canUseXmlOnline && (
+                <DropdownMenuItem onClick={() => syncBooksMutation.mutate()} disabled={syncBooksMutation.isPending}>
+                  <RefreshCw className={`mr-2 h-4 w-4 ${syncBooksMutation.isPending ? "animate-spin" : ""}`} />
+                  Synchronizuj z XML
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 

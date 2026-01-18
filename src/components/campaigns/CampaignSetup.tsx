@@ -193,7 +193,7 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
     });
   };
 
-  const canSubmit = selectedBooks.length > 0;
+  const canSubmit = useRandomContent || selectedBooks.length > 0;
 
   return (
     <div className="space-y-6">
@@ -218,25 +218,27 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
           </p>
         </div>
         
-        {/* Use AI Checkbox */}
-        <div className="flex items-center space-x-3 mb-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
-          <Checkbox
-            id="useAI"
-            checked={useAI}
-            onCheckedChange={(checked) => setUseAI(checked === true)}
-          />
-          <div className="flex-1">
-            <Label htmlFor="useAI" className="flex items-center gap-2 cursor-pointer">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="font-medium">Użyj AI do generowania treści</span>
-            </Label>
-            <p className="text-xs text-muted-foreground mt-1">
-              {useAI 
-                ? "Grok AI wygeneruje unikalne, angażujące treści dla każdego posta" 
-                : "Posty zostaną utworzone z opisów książek z bazy danych"}
-            </p>
+        {/* Use AI Checkbox - hidden when useRandomContent is enabled */}
+        {!useRandomContent && (
+          <div className="flex items-center space-x-3 mb-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
+            <Checkbox
+              id="useAI"
+              checked={useAI}
+              onCheckedChange={(checked) => setUseAI(checked === true)}
+            />
+            <div className="flex-1">
+              <Label htmlFor="useAI" className="flex items-center gap-2 cursor-pointer">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <span className="font-medium">Użyj AI do generowania treści</span>
+              </Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                {useAI 
+                  ? "Grok AI wygeneruje unikalne, angażujące treści dla każdego posta" 
+                  : "Posty zostaną utworzone z opisów książek z bazy danych"}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
         
         {/* Regenerate Texts Checkbox */}
         <div className="flex items-center space-x-3 mb-4 p-4 bg-amber-500/5 rounded-lg border border-amber-500/20">
@@ -264,7 +266,14 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
             <Checkbox
               id="useRandomContent"
               checked={useRandomContent}
-              onCheckedChange={(checked) => setUseRandomContent(checked === true)}
+              onCheckedChange={(checked) => {
+                const isEnabled = checked === true;
+                setUseRandomContent(isEnabled);
+                // Auto-enable AI when random content is enabled
+                if (isEnabled) {
+                  setUseAI(true);
+                }
+              }}
             />
             <div className="flex-1">
               <Label htmlFor="useRandomContent" className="flex items-center gap-2 cursor-pointer">
@@ -272,7 +281,7 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
                 <span className="font-medium">Generuj losowe treści na określony temat</span>
               </Label>
               <p className="text-xs text-muted-foreground mt-1">
-                Posty contentowe będą generowane na podany temat zamiast na podstawie książek
+                Posty ciekawostki będą generowane na podany temat zamiast na podstawie książek (AI włączone automatycznie)
               </p>
             </div>
           </div>
@@ -359,10 +368,10 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
           <div className="space-y-4">
             <Label className="flex items-center gap-2">
               <Percent className="h-4 w-4" />
-              Proporcja postów contentowych vs sprzedażowych
+              Proporcja postów ciekawostek vs sprzedażowych
             </Label>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground w-24">Content: {contentRatio}%</span>
+              <span className="text-sm text-muted-foreground w-24">Ciekawostki: {contentRatio}%</span>
               <Slider
                 value={[contentRatio]}
                 onValueChange={(value) => setContentRatio(value[0])}
@@ -375,10 +384,10 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
             </div>
             <p className="text-xs text-muted-foreground">
               {contentRatio === 0 && "Tylko posty sprzedażowe - bezpośrednia promocja książek"}
-              {contentRatio > 0 && contentRatio < 30 && "Większość postów sprzedażowych z odrobiną contentu"}
-              {contentRatio >= 30 && contentRatio <= 50 && "Zrównoważona mieszanka contentu i sprzedaży"}
-              {contentRatio > 50 && contentRatio < 100 && "Większość postów contentowych, mniej promocji"}
-              {contentRatio === 100 && "Tylko posty contentowe - ciekawostki, zagadki, wydarzenia"}
+              {contentRatio > 0 && contentRatio < 30 && "Większość postów sprzedażowych z odrobiną ciekawostek"}
+              {contentRatio >= 30 && contentRatio <= 50 && "Zrównoważona mieszanka ciekawostek i sprzedaży"}
+              {contentRatio > 50 && contentRatio < 100 && "Większość postów ciekawostek, mniej promocji"}
+              {contentRatio === 100 && "Tylko posty ciekawostki - zagadki, wydarzenia historyczne"}
             </p>
           </div>
 
@@ -415,10 +424,6 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
             <div className="space-y-2">
               {postingTimes.map((time, index) => (
                 <div key={index} className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 border rounded-md px-3 py-2 bg-background min-w-[100px]">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">{time}</span>
-                  </div>
                   <Input
                     type="time"
                     value={time}
@@ -457,17 +462,28 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
         onChange={setSelectedAccounts}
       />
 
-      {/* Book Selection */}
-      <BookSelector
-        selectedBooks={selectedBooks}
-        onSelectionChange={setSelectedBooks}
-      />
+      {/* Book Selection - optional when using random content */}
+      {!useRandomContent && (
+        <BookSelector
+          selectedBooks={selectedBooks}
+          onSelectionChange={setSelectedBooks}
+        />
+      )}
+
+      {useRandomContent && (
+        <Card className="p-4 bg-purple-500/5 border-purple-500/20">
+          <p className="text-sm text-muted-foreground">
+            <Shuffle className="h-4 w-4 inline mr-2 text-purple-500" />
+            Wybór książek pominięty - posty ciekawostki będą generowane na podstawie podanego tematu.
+          </p>
+        </Card>
+      )}
 
       {!canSubmit && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Musisz wybrać co najmniej jedną książkę do kampanii
+            Musisz wybrać co najmniej jedną książkę lub włączyć generowanie losowych treści
           </AlertDescription>
         </Alert>
       )}
@@ -481,7 +497,7 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
             <p className="text-3xl font-bold text-primary">{totalPosts}</p>
           </div>
           <div>
-            <p className="text-sm text-muted-foreground">Posty contentowe ({contentRatio}%)</p>
+            <p className="text-sm text-muted-foreground">Posty ciekawostki ({contentRatio}%)</p>
             <p className="text-3xl font-bold text-blue-500">{contentPosts}</p>
           </div>
           <div>
@@ -490,7 +506,7 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Wybrane książki</p>
-            <p className="text-3xl font-bold text-amber-500">{selectedBooks.length}</p>
+            <p className="text-3xl font-bold text-amber-500">{useRandomContent ? '-' : selectedBooks.length}</p>
           </div>
         </div>
         
@@ -499,7 +515,7 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
             <strong>Strategia {contentRatio}/{100 - contentRatio}:</strong>
           </p>
           <ul className="text-sm space-y-1 text-muted-foreground">
-            <li>• {contentRatio}% postów to wartościowy content (ciekawostki, zagadki, wydarzenia)</li>
+            <li>• {contentRatio}% postów to ciekawostki (zagadki, wydarzenia historyczne)</li>
             <li>• {100 - contentRatio}% postów to bezpośrednia promocja i sprzedaż książek</li>
             <li>• {useAI ? "Grok AI automatycznie dobierze odpowiednie typy postów" : "Treści zostaną pobrane z opisów książek w bazie"}</li>
           </ul>

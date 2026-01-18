@@ -34,6 +34,9 @@ interface RateLimitsResponse {
   error?: string;
 }
 
+// Daily limit for X Free tier
+const DAILY_TWEET_LIMIT = 10;
+
 export function XRateLimitStatus() {
   const { data, isLoading, error, refetch, isFetching } = useQuery<RateLimitsResponse>({
     queryKey: ["x-rate-limits"],
@@ -149,10 +152,11 @@ export function XRateLimitStatus() {
         <div className="space-y-3">
           {accounts.map((account) => {
             const tweets = account.tweets;
-            const remaining = tweets?.remaining ?? 0;
-            const max = tweets?.limit_max ?? 50; // Default to 50 if unknown
-            const percentage = max > 0 ? (remaining / max) * 100 : 100;
-            const isLimited = tweets?.is_limited ?? false;
+            // Use fixed limit of 10 for Free tier, ignore API values
+            const remaining = Math.min(tweets?.remaining ?? DAILY_TWEET_LIMIT, DAILY_TWEET_LIMIT);
+            const max = DAILY_TWEET_LIMIT;
+            const percentage = (remaining / max) * 100;
+            const isLimited = remaining === 0;
             const hasData = tweets !== null;
 
             return (
@@ -178,11 +182,11 @@ export function XRateLimitStatus() {
                   <>
                     <Progress
                       value={percentage}
-                      className={`h-2 ${isLimited ? "[&>div]:bg-red-500" : percentage < 20 ? "[&>div]:bg-yellow-500" : ""}`}
+                      className={`h-2 ${isLimited ? "[&>div]:bg-red-500" : percentage < 30 ? "[&>div]:bg-yellow-500" : ""}`}
                     />
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>
-                        {remaining}/{max} tweetów
+                        {remaining}/{max} tweetów dziennie
                       </span>
                       {tweets?.reset_at && (
                         <span>
@@ -208,7 +212,7 @@ export function XRateLimitStatus() {
 
         {/* Info */}
         <p className="text-xs text-muted-foreground pt-2 border-t">
-          Limit X: 10 tweetów/dzień. Limit resetuje się co 24h.
+          Limit X (Free tier): {DAILY_TWEET_LIMIT} tweetów/dzień. Limit resetuje się co 24h.
         </p>
       </CardContent>
     </Card>
