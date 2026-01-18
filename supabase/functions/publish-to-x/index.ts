@@ -516,7 +516,7 @@ Deno.serve(async (req) => {
       try {
         const testUrl = "https://api.twitter.com/1.1/account/verify_credentials.json";
         const testMethod = "GET";
-        const testHeader = generateOAuthHeader(testUrl, testMethod, oauth1Token.oauth_token, oauth1Token.oauth_token_secret);
+        const testHeader = generateOAuthHeader(testMethod, testUrl, oauth1Token.oauth_token, oauth1Token.oauth_token_secret);
         
         const testResponse = await fetch(testUrl, {
           method: testMethod,
