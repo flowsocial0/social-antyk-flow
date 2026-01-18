@@ -136,14 +136,16 @@ export default function BookPreview() {
                     </div>
                   )}
 
-                  <Button
-                    onClick={() => window.location.href = productUrl}
-                    size="lg"
-                    className="w-full gap-2"
-                  >
-                    <ExternalLink className="w-5 h-5" />
-                    Zobacz w księgarni
-                  </Button>
+                  {productUrl && (
+                    <Button
+                      onClick={() => window.location.href = productUrl}
+                      size="lg"
+                      className="w-full gap-2"
+                    >
+                      <ExternalLink className="w-5 h-5" />
+                      Zobacz w księgarni
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
