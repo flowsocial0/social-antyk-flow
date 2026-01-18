@@ -163,6 +163,12 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
   const totalPosts = durationDays * postsPerDay;
   const contentPosts = Math.floor(totalPosts * (contentRatio / 100));
   const salesPosts = totalPosts - contentPosts;
+  
+  // X.com has a 10 posts/day limit, so max 60 posts per campaign (6 days)
+  const X_DAILY_LIMIT = 10;
+  const X_MAX_CAMPAIGN_POSTS = 60;
+  const hasX = targetPlatforms.includes('x');
+  const exceedsXLimit = hasX && totalPosts > X_MAX_CAMPAIGN_POSTS;
 
   const handleSubmit = () => {
     // Sort posting times before submitting
@@ -193,7 +199,7 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
     });
   };
 
-  const canSubmit = useRandomContent || selectedBooks.length > 0;
+  const canSubmit = (useRandomContent || selectedBooks.length > 0) && !exceedsXLimit;
 
   return (
     <div className="space-y-6">
@@ -561,11 +567,33 @@ export const CampaignSetup = ({ onComplete, initialConfig }: CampaignSetupProps)
             <li>• {useAI ? "Grok AI automatycznie dobierze odpowiednie typy postów" : "Treści zostaną pobrane z opisów książek w bazie"}</li>
           </ul>
         </div>
+        
+        {exceedsXLimit && (
+          <Alert variant="destructive" className="mt-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Przekroczono limit X.com!</strong>
+              <br />
+              Kampania na X.com może mieć maksymalnie {X_MAX_CAMPAIGN_POSTS} postów (limit {X_DAILY_LIMIT} postów/dzień).
+              <br />
+              Aktualnie zaplanowano: <strong>{totalPosts} postów</strong>. Zmniejsz liczbę dni lub postów dziennie.
+            </AlertDescription>
+          </Alert>
+        )}
       </Card>
 
       <Button onClick={handleSubmit} className="w-full" size="lg" disabled={!canSubmit}>
-        Przejdź do generowania planu
-        <ArrowRight className="ml-2 h-4 w-4" />
+        {exceedsXLimit ? (
+          <>
+            <AlertCircle className="mr-2 h-4 w-4" />
+            Przekroczono limit {X_MAX_CAMPAIGN_POSTS} postów dla X.com
+          </>
+        ) : (
+          <>
+            Przejdź do generowania planu
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </>
+        )}
       </Button>
     </div>
   );
