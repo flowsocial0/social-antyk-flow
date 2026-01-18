@@ -38,9 +38,15 @@ Deno.serve(async (req) => {
     const state = `${userId}_${crypto.randomUUID()}`;
     console.log('Generated state (userId embedded):', state);
 
-    // Basic scopes that don't require app review
-    // Note: For posting to pages, you'll need 'pages_manage_posts' which requires Facebook app review
-    const scopes = ['public_profile', 'pages_show_list', 'pages_manage_posts', 'pages_read_engagement'].join(',');
+    // Scopes for publishing to pages
+    // Note: pages_manage_posts and pages_read_engagement require Facebook app review
+    const scopes = [
+      'public_profile',
+      'pages_show_list',
+      'pages_manage_posts',
+      'pages_read_engagement',
+      'pages_manage_metadata'
+    ].join(',');
 
     // Build Facebook OAuth URL
     const authUrl = new URL('https://www.facebook.com/v18.0/dialog/oauth');
