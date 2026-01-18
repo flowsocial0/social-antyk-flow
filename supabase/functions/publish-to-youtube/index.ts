@@ -142,6 +142,19 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Fetch AI suffix from user_settings
+    if (userId) {
+      const { data: userSettings } = await supabase
+        .from('user_settings')
+        .select('ai_suffix_youtube')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (userSettings?.ai_suffix_youtube && description) {
+        description += `\n\n${userSettings.ai_suffix_youtube}`;
+      }
+    }
+
     // If contentId is provided, try to get userId from content
     if (requestData.contentId && !userId) {
       console.log('[YouTube] Fetching content for contentId:', requestData.contentId);

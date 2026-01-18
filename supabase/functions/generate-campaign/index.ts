@@ -57,14 +57,15 @@ function fixBrokenUrls(text: string): string {
   return result;
 }
 
-function sanitizeGeneratedText(text: string, bookData?: any): string {
+function sanitizeGeneratedText(text: string, bookData?: any, defaultWebsiteUrl?: string): string {
   let out = safeText(text);
 
   // FIRST: Fix any broken URLs before other processing
   out = fixBrokenUrls(out);
 
   // Replace common placeholders with real values (or empty strings)
-  const url = safeText(bookData?.product_url) || "https://sklep.antyk.org.pl";
+  const fallbackUrl = defaultWebsiteUrl || "https://sklep.antyk.org.pl";
+  const url = safeText(bookData?.product_url) || fallbackUrl;
   const title = safeText(bookData?.title);
   const author = safeText(bookData?.author);
   const priceNumber = bookData?.sale_price ?? bookData?.promotional_price;
@@ -339,13 +340,15 @@ function generateLocalStructure(totalPosts: number, contentPosts: number, salesP
 }
 
 async function generatePostsContent(body: any, apiKey: string) {
-  const { structure, targetPlatforms, selectedBooks, cachedTexts, regenerateTexts } = body;
+  const { structure, targetPlatforms, selectedBooks, cachedTexts, regenerateTexts, useRandomContent, randomContentTopic, userId } = body;
 
   console.log("=== generatePostsContent START ===");
   console.log("Generating content for posts:", structure.length);
   console.log("Target platforms:", targetPlatforms);
   console.log("Selected books:", selectedBooks?.length || 0);
   console.log("regenerateTexts flag:", regenerateTexts);
+  console.log("useRandomContent:", useRandomContent);
+  console.log("randomContentTopic:", randomContentTopic || "(not set)");
   console.log("cachedTexts received:", cachedTexts ? `object with ${Object.keys(cachedTexts).length} book IDs` : "null/undefined");
   if (cachedTexts && Object.keys(cachedTexts).length > 0) {
     console.log("First few cached book IDs:", Object.keys(cachedTexts).slice(0, 5).join(", "));
@@ -363,6 +366,21 @@ async function generatePostsContent(body: any, apiKey: string) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseKey);
+
+  // Fetch default website URL from user_settings
+  let defaultWebsiteUrl = "https://sklep.antyk.org.pl";
+  if (userId) {
+    const { data: userSettings } = await supabase
+      .from('user_settings')
+      .select('default_website_url')
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    if (userSettings?.default_website_url) {
+      defaultWebsiteUrl = userSettings.default_website_url;
+      console.log("Using default website URL from user settings:", defaultWebsiteUrl);
+    }
+  }
 
   // Get available books for sales posts - filter by selectedBooks if provided
   const salesPostsCount = structure.filter((item: any) => item.type === "sales").length;
@@ -480,36 +498,47 @@ async function generatePostsContent(body: any, apiKey: string) {
     }
   }
 
-  // Platform-specific prompts - updated to reference ONLY selected books
-  const getFacebookPrompts = (booksList: string): Record<string, string> => ({
-    trivia: `Stwórz ciekawostkę powiązaną z tematyką JEDNEJ z tych książek/produktów:
-${booksList}
+  // Platform-specific prompts - updated to reference ONLY selected books or random topic
+  const getFacebookPrompts = (booksList: string): Record<string, string> => {
+    // If using random content, use the topic instead of books
+    const contentSource = useRandomContent && randomContentTopic 
+      ? `Stwórz ciekawostkę na temat: ${randomContentTopic}`
+      : `Stwórz ciekawostkę powiązaną z tematyką JEDNEJ z tych książek/produktów:\n${booksList}`;
+    
+    return {
+      trivia: `${contentSource}
 
 Post może mieć do ${maxTextLength} znaków. Powinien:
-- Opowiadać o temacie, okresie historycznym, postaci lub wydarzeniu związanym z jedną z powyższych książek
+- ${useRandomContent ? 'Opowiadać fascynującą historię lub fakt na podany temat' : 'Opowiadać o temacie, okresie historycznym, postaci lub wydarzeniu związanym z jedną z powyższych książek'}
 - NIE wspominać bezpośrednio tytułu książki - to ma być ciekawostka, która wzbudzi zainteresowanie tematem
 - Być fascynujący i angażujący
-- Kończyć się linkiem: https://sklep.antyk.org.pl
+- Kończyć się linkiem: ${defaultWebsiteUrl}
 
 WAŻNE: 
 - NIE używaj placeholderów w nawiasach kwadratowych typu [link], [tytuł] itp.
 - NIE dodawaj informacji o liczbie znaków do treści posta.
 - Pisz KONKRETNE fakty, nie ogólniki.`,
-    sales: "Promocja konkretnej książki - szczegóły zostaną dodane dynamicznie",
-  });
+      sales: "Promocja konkretnej książki - szczegóły zostaną dodane dynamicznie",
+    };
+  };
 
-  const getXPrompts = (booksList: string): Record<string, string> => ({
-    trivia: `Stwórz krótką ciekawostkę (max 240 znaków) powiązaną z tematyką JEDNEJ z tych książek/produktów:
-${booksList}
+  const getXPrompts = (booksList: string): Record<string, string> => {
+    const contentSource = useRandomContent && randomContentTopic 
+      ? `Stwórz krótką ciekawostkę (max 240 znaków) na temat: ${randomContentTopic}`
+      : `Stwórz krótką ciekawostkę (max 240 znaków) powiązaną z tematyką JEDNEJ z tych książek/produktów:\n${booksList}`;
+    
+    return {
+      trivia: `${contentSource}
 
 Ciekawostka powinna:
-- Dotyczyć tematu, okresu historycznego lub postaci związanej z jedną z powyższych książek
+- ${useRandomContent ? 'Dotyczyć podanego tematu i być fascynująca' : 'Dotyczyć tematu, okresu historycznego lub postaci związanej z jedną z powyższych książek'}
 - NIE wspominać bezpośrednio tytułu - ma wzbudzić zainteresowanie tematem
-- Kończyć się linkiem: https://sklep.antyk.org.pl
+- Kończyć się linkiem: ${defaultWebsiteUrl}
 
 WAŻNE: NIE używaj placeholderów w nawiasach kwadratowych. NIE dodawaj informacji o liczbie znaków.`,
-    sales: "Promocja konkretnej książki - szczegóły zostaną dodane dynamicznie",
-  });
+      sales: "Promocja konkretnej książki - szczegóły zostaną dodane dynamicznie",
+    };
+  };
 
   const categoryPrompts: Record<string, string> = hasFacebook && !hasX 
     ? getFacebookPrompts(booksContext) 
@@ -568,8 +597,8 @@ WAŻNE: NIE używaj placeholderów w nawiasach kwadratowych. NIE dodawaj informa
             };
           }
           
-          // Fallback URL in case product_url is null
-          const bookUrl = bookData.product_url || "https://sklep.antyk.org.pl";
+          // Fallback URL in case product_url is null - use user's default
+          const bookUrl = bookData.product_url || defaultWebsiteUrl;
 
           if (hasFacebook && !hasX) {
             // Rich Facebook post for sales
@@ -643,9 +672,9 @@ KRYTYCZNE ZASADY:
           }
           
           // If we found a book, create trivia specifically about its topic
-          if (nearestBook) {
+          if (nearestBook && !useRandomContent) {
             bookData = nearestBook; // Set bookData for the return value
-            const bookUrl = nearestBook.product_url || "https://sklep.antyk.org.pl";
+            const bookUrl = nearestBook.product_url || defaultWebsiteUrl;
             const triviaContext = `Stwórz ciekawostkę BEZPOŚREDNIO związaną z tematyką tego produktu:
 Tytuł: ${nearestBook.title}
 ${nearestBook.author ? `Autor: ${nearestBook.author}` : ""}
@@ -663,12 +692,27 @@ WAŻNE:
             prompt = triviaContext + (hasFacebook && !hasX 
               ? `Post może mieć do ${maxTextLength} znaków. NIE dodawaj informacji o liczbie znaków do treści.`
               : `Max 240 znaków ŁĄCZNIE z linkiem. NIE dodawaj informacji o liczbie znaków do treści.`);
+          } else if (useRandomContent && randomContentTopic) {
+            // Use random content topic
+            console.log(`Generating random content trivia for topic: ${randomContentTopic}`);
+            const triviaContext = `Stwórz fascynującą ciekawostkę na temat: ${randomContentTopic}
+
+WAŻNE:
+- Pisz o konkretnych faktach, postaciach lub wydarzeniach związanych z tematem
+- Ciekawostka ma być wartościowa i angażująca
+- NIE używaj placeholderów w nawiasach kwadratowych
+- Zakończ DOKŁADNIE tym linkiem: ${defaultWebsiteUrl}
+
+`;
+            prompt = triviaContext + (hasFacebook && !hasX 
+              ? `Post może mieć do ${maxTextLength} znaków. NIE dodawaj informacji o liczbie znaków do treści.`
+              : `Max 240 znaków ŁĄCZNIE z linkiem. NIE dodawaj informacji o liczbie znaków do treści.`);
           } else {
             // Ultimate fallback: generic bookstore trivia
             console.log("No books available for trivia - using generic prompt");
             prompt = `Stwórz krótką ciekawostkę o książkach, literaturze lub historii Polski.
 - NIE używaj placeholderów w nawiasach kwadratowych
-- Zakończ linkiem: https://sklep.antyk.org.pl
+- Zakończ linkiem: ${defaultWebsiteUrl}
 
 ` + (hasFacebook && !hasX 
               ? `Post może mieć do ${maxTextLength} znaków.`
@@ -757,7 +801,7 @@ BEZWZGLĘDNE ZASADY:
         }
 
         // Always sanitize output (even if the model didn't use [placeholders])
-        text = sanitizeGeneratedText(text, bookData);
+        text = sanitizeGeneratedText(text, bookData, defaultWebsiteUrl);
 
         if (placeholders) {
           console.log(`Cleaned text: ${text}`);

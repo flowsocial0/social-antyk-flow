@@ -193,6 +193,17 @@ serve(async (req) => {
 
     textToPost = contentData?.custom_text || contentData?.ai_generated_text || bookData?.ai_generated_text || bookData?.title || 'Nowy post';
 
+    // Fetch AI suffix from user_settings
+    const { data: userSettings } = await supabase
+      .from('user_settings')
+      .select('ai_suffix_tiktok')
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    if (userSettings?.ai_suffix_tiktok && textToPost) {
+      textToPost += ` ${userSettings.ai_suffix_tiktok}`;
+    }
+
     console.log('Publishing VIDEO to TikTok:', { 
       textLength: textToPost.length, 
       hasVideo: !!videoUrl 
