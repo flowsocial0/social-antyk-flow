@@ -1094,21 +1094,30 @@ Deno.serve(async (req) => {
           console.log(`Campaign post ${campaignPostId} already published, but publishing to additional account ${accountId}`);
         }
 
-        // Fetch user's AI suffix from user_settings
+        // Fetch user's AI suffix and default website URL from user_settings
         let aiSuffix = '(ai)'; // Default
+        let defaultWebsiteUrl = '';
         const { data: userSettings } = await supabaseClient
           .from('user_settings')
-          .select('ai_suffix_x')
+          .select('ai_suffix_x, default_website_url')
           .eq('user_id', userId)
           .maybeSingle();
         
         if (userSettings?.ai_suffix_x !== null && userSettings?.ai_suffix_x !== undefined) {
           aiSuffix = userSettings.ai_suffix_x;
         }
-        console.log(`Using AI suffix for X: "${aiSuffix}"`);
+        if (userSettings?.default_website_url) {
+          defaultWebsiteUrl = userSettings.default_website_url;
+        }
+        console.log(`Using AI suffix for X: "${aiSuffix}", default URL: "${defaultWebsiteUrl}"`);
 
+        // Determine the link to use: book's product_url has priority, fallback to default_website_url
+        const linkToUse = campaignPost.book?.product_url || defaultWebsiteUrl || '';
+        const linkPart = linkToUse ? `\n${linkToUse}` : '';
         const suffixPart = aiSuffix ? `\n\n${aiSuffix}` : '';
-        let tweetText = fixUrlsInText(campaignPost.text) + suffixPart;
+        
+        // Add link and suffix to the campaign post text
+        let tweetText = fixUrlsInText(campaignPost.text) + linkPart + suffixPart;
 
         let mediaIds: string[] = [];
         if (campaignPost.book?.image_url || campaignPost.book?.storage_path) {
@@ -1347,31 +1356,43 @@ Deno.serve(async (req) => {
           .eq('platform', 'x')
           .maybeSingle();
 
-        // Fetch user's AI suffix from user_settings
+        // Fetch user's AI suffix and default website URL from user_settings
         let aiSuffix = '(ai)'; // Default
+        let defaultWebsiteUrl = '';
         const { data: userSettings } = await supabaseClient
           .from('user_settings')
-          .select('ai_suffix_x')
+          .select('ai_suffix_x, default_website_url')
           .eq('user_id', userId)
           .maybeSingle();
         
         if (userSettings?.ai_suffix_x !== null && userSettings?.ai_suffix_x !== undefined) {
           aiSuffix = userSettings.ai_suffix_x;
         }
-        console.log(`Using AI suffix for X: "${aiSuffix}"`);
+        if (userSettings?.default_website_url) {
+          defaultWebsiteUrl = userSettings.default_website_url;
+        }
+        console.log(`Using AI suffix for X: "${aiSuffix}", default URL: "${defaultWebsiteUrl}"`);
 
+        // Determine the link to use: book's product_url has priority, fallback to default_website_url
+        const linkToUse = book.product_url || defaultWebsiteUrl || '';
+        const linkPart = linkToUse ? `\n${linkToUse}` : '';
         const suffixPart = aiSuffix ? `\n\n${aiSuffix}` : '';
-        let tweetText = customText 
-          ? fixUrlsInText(customText) + suffixPart
+        
+        // Get the base text (without link and suffix)
+        let baseText = customText 
+          ? fixUrlsInText(customText)
           : platformContent?.custom_text
-            ? fixUrlsInText(platformContent.custom_text) + suffixPart
+            ? fixUrlsInText(platformContent.custom_text)
             : platformContent?.ai_generated_text
-              ? fixUrlsInText(platformContent.ai_generated_text) + suffixPart
+              ? fixUrlsInText(platformContent.ai_generated_text)
               : book.ai_text_x
-                ? fixUrlsInText(book.ai_text_x) + suffixPart
+                ? fixUrlsInText(book.ai_text_x)
                 : book.ai_generated_text
-                  ? fixUrlsInText(book.ai_generated_text) + suffixPart
-                  : `📚 ${book.title}${book.author ? ` - ${book.author}` : ''}${book.product_url ? `\n${book.product_url}` : ''}${suffixPart}`;
+                  ? fixUrlsInText(book.ai_generated_text)
+                  : `📚 ${book.title}${book.author ? ` - ${book.author}` : ''}`;
+        
+        // Always add link and suffix to the text
+        let tweetText = baseText + linkPart + suffixPart;
 
         let mediaIds: string[] = [];
         if (book.storage_path || book.image_url) {
