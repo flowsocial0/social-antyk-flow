@@ -5,7 +5,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Loader2, ExternalLink, Eye, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Snowflake, Pencil } from "lucide-react";
+import { Loader2, ExternalLink, Eye, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Snowflake, Pencil, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Tables } from "@/integrations/supabase/types";
@@ -27,6 +37,8 @@ export const GeneralBooksList = () => {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>("");
   const [editingBook, setEditingBook] = useState<Tables<"books"> | null>(null);
+  const [deletingBook, setDeletingBook] = useState<Tables<"books"> | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     setPageInput(String(currentPage));
@@ -192,6 +204,44 @@ export const GeneralBooksList = () => {
     }
   };
 
+  const handleDeleteBook = async () => {
+    if (!deletingBook) return;
+    
+    setIsDeleting(true);
+    try {
+      // First delete related book_platform_content
+      await supabase
+        .from("book_platform_content")
+        .delete()
+        .eq("book_id", deletingBook.id);
+
+      // Delete the book
+      const { error } = await supabase
+        .from("books")
+        .delete()
+        .eq("id", deletingBook.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Książka usunięta",
+        description: `"${deletingBook.title}" została usunięta z bazy`,
+      });
+
+      setDeletingBook(null);
+      refetch();
+    } catch (error) {
+      console.error("Error deleting book:", error);
+      toast({
+        title: "Błąd",
+        description: "Nie udało się usunąć książki",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -321,6 +371,15 @@ export const GeneralBooksList = () => {
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeletingBook(book)}
+                          title="Usuń książkę"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                         {book.product_url && (
                           <Button
                             variant="ghost"
@@ -404,6 +463,35 @@ export const GeneralBooksList = () => {
           refetch();
         }}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingBook} onOpenChange={(open) => !open && setDeletingBook(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Czy na pewno chcesz usunąć tę książkę?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Ta operacja jest nieodwracalna. Książka "{deletingBook?.title}" zostanie trwale usunięta z bazy danych wraz z powiązanymi danymi publikacji.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Anuluj</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteBook}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Usuwanie...
+                </>
+              ) : (
+                "Usuń"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
