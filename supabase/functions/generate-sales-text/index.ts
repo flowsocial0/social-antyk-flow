@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -99,7 +100,7 @@ serve(async (req) => {
   }
 
   try {
-    const { bookData, platform = 'x' } = await req.json();
+    const { bookData, platform = 'x', userId } = await req.json();
     const grokApiKey = Deno.env.get('GROK_API_KEY');
 
     if (!grokApiKey) {
@@ -111,15 +112,63 @@ serve(async (req) => {
     // Get platform-specific config
     const platformConfig = platformConfigs[platform as keyof typeof platformConfigs] || platformConfigs.x;
     
-    // Calculate available characters
-    const linkLength = bookData.product_url ? platformConfig.linkLength : 0;
-    const spacing = linkLength > 0 ? 4 : 0; // "\n\n" before link
-    const availableChars = platformConfig.maxChars - linkLength - spacing;
+    // For X platform, fetch user settings to calculate real character limits
+    let userSettings: { ai_suffix_x?: string; default_website_url?: string } | null = null;
+    
+    if (platform === 'x' && userId) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+      
+      const { data } = await supabaseClient
+        .from('user_settings')
+        .select('ai_suffix_x, default_website_url')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      userSettings = data;
+      console.log('Fetched user settings for X:', userSettings);
+    }
+    
+    // Calculate available characters - dynamic for X based on real link and suffix lengths
+    let availableChars: number;
+    
+    if (platform === 'x') {
+      let reservedChars = 0;
+      
+      // Link - use real length (not t.co shortening, as API doesn't always shorten)
+      const linkToUse = bookData.product_url || userSettings?.default_website_url || '';
+      if (linkToUse) {
+        reservedChars += linkToUse.length + 1; // +1 for \n before link
+      }
+      
+      // User's AI suffix
+      const aiSuffix = userSettings?.ai_suffix_x || '(ai)';
+      if (aiSuffix) {
+        reservedChars += aiSuffix.length + 2; // +2 for \n\n before suffix
+      }
+      
+      // Safety buffer
+      reservedChars += 5;
+      
+      availableChars = platformConfig.maxChars - reservedChars;
+      console.log(`X platform: reservedChars=${reservedChars}, availableChars=${availableChars}, link="${linkToUse}", suffix="${aiSuffix}"`);
+    } else {
+      // For other platforms - original logic
+      const linkLength = bookData.product_url ? platformConfig.linkLength : 0;
+      const spacing = linkLength > 0 ? 4 : 0; // "\n\n" before link
+      availableChars = platformConfig.maxChars - linkLength - spacing;
+    }
 
     // Build platform-specific requirements
     const requirementsList = platformConfig.requirements
       .map((req, idx) => `${idx + 1}. ${req}`)
       .join('\n');
+
+    // Determine if link will be added
+    const hasLink = platform === 'x' 
+      ? !!(bookData.product_url || userSettings?.default_website_url)
+      : !!bookData.product_url;
 
     // Construct platform-specific prompt
     const prompt = `Stwórz ultra skuteczny tekst sprzedażowy dla platformy ${platformConfig.name} dla następującej książki:
@@ -135,10 +184,11 @@ STYL: ${platformConfig.style}
 
 WYMAGANIA:
 ${requirementsList}
-- Tekst musi mieć MAKSYMALNIE ${availableChars} znaków${linkLength > 0 ? ' (link do sklepu zostanie dodany automatycznie na końcu)' : ''}
+- Tekst musi mieć MAKSYMALNIE ${availableChars} znaków${hasLink ? ' (link do sklepu zostanie dodany automatycznie na końcu)' : ''}
 - Tekst w języku polskim
 - Skupić się na unikalnej wartości oferty
-- NIE dodawaj linku ani [link] - link zostanie dodany automatycznie${linkLength > 0 ? '' : ' lub będzie w bio'}
+- NIE dodawaj linku ani [link] - link zostanie dodany automatycznie${hasLink ? '' : ' lub będzie w bio'}
+${platform === 'x' ? `- WAŻNE: Bądź bardzo zwięzły! Masz tylko ${availableChars} znaków na sam tekst, bo link i sufiks zostaną dodane automatycznie.` : ''}
 
 Wygeneruj TYLKO tekst posta, bez żadnych dodatkowych komentarzy ani linków.`;
 

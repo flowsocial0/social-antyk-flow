@@ -76,6 +76,10 @@ export const PlatformAITextDialog = ({
   const generateMutation = useMutation({
     mutationFn: async () => {
       setIsGenerating(true);
+      
+      // Get current user ID to fetch their settings for accurate character limits
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const { data, error } = await supabase.functions.invoke("generate-sales-text", {
         body: {
           bookData: {
@@ -86,6 +90,7 @@ export const PlatformAITextDialog = ({
             product_url: book.product_url,
           },
           platform: platform,
+          userId: user?.id,
         },
       });
 
