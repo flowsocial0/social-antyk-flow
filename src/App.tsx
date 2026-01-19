@@ -55,12 +55,34 @@ const queryClient = new QueryClient();
 // Component to handle auth state changes and clear cache
 const AuthStateHandler = () => {
   useEffect(() => {
+    // Track the initial session user ID to detect actual user changes
+    let initialUserId: string | null = null;
+    let isInitialized = false;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // Clear React Query cache when user changes (login, logout, token refresh)
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
-        console.log('Auth state changed, clearing query cache:', event);
-        queryClient.clear();
+      const currentUserId = session?.user?.id || null;
+      
+      console.log('Auth state changed:', event, 'userId:', currentUserId, 'isInitialized:', isInitialized);
+      
+      // On first event, just record the initial user - don't clear cache
+      if (!isInitialized) {
+        initialUserId = currentUserId;
+        isInitialized = true;
+        console.log('Auth initialized with userId:', initialUserId);
+        return;
       }
+      
+      // Clear cache only on actual user changes (different user or explicit logout)
+      if (event === 'SIGNED_OUT') {
+        console.log('User signed out, clearing query cache');
+        queryClient.clear();
+        initialUserId = null;
+      } else if (event === 'SIGNED_IN' && currentUserId !== initialUserId) {
+        console.log('Different user signed in, clearing query cache');
+        queryClient.clear();
+        initialUserId = currentUserId;
+      }
+      // USER_UPDATED typically means token refresh, not user change - don't clear
     });
 
     return () => subscription.unsubscribe();
