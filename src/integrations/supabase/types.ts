@@ -519,6 +519,120 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_publications: {
+        Row: {
+          account_id: string
+          book_id: string | null
+          campaign_post_id: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          platform: string
+          post_id: string | null
+          published_at: string
+          quota_cost: number | null
+          source: string | null
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          book_id?: string | null
+          campaign_post_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          platform: string
+          post_id?: string | null
+          published_at?: string
+          quota_cost?: number | null
+          source?: string | null
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          book_id?: string | null
+          campaign_post_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          platform?: string
+          post_id?: string | null
+          published_at?: string
+          quota_cost?: number | null
+          source?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_publications_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_publications_campaign_post_id_fkey"
+            columns: ["campaign_post_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_rate_limits: {
+        Row: {
+          account_id: string
+          api_headers: Json | null
+          created_at: string
+          id: string
+          last_api_check: string | null
+          limit_max: number
+          limit_name: string | null
+          limit_type: string
+          notes: string | null
+          platform: string
+          remaining: number
+          reset_at: string | null
+          updated_at: string
+          used: number | null
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          api_headers?: Json | null
+          created_at?: string
+          id?: string
+          last_api_check?: string | null
+          limit_max: number
+          limit_name?: string | null
+          limit_type: string
+          notes?: string | null
+          platform: string
+          remaining: number
+          reset_at?: string | null
+          updated_at?: string
+          used?: number | null
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          api_headers?: Json | null
+          created_at?: string
+          id?: string
+          last_api_check?: string | null
+          limit_max?: number
+          limit_name?: string | null
+          limit_type?: string
+          notes?: string | null
+          platform?: string
+          remaining?: number
+          reset_at?: string | null
+          updated_at?: string
+          used?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       tiktok_oauth_tokens: {
         Row: {
           access_token: string
