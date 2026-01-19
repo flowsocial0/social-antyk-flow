@@ -24,21 +24,95 @@ Deno.serve(async (req) => {
 
     // Get request body
     const body = await req.json();
-    const { text, imageUrl, userId, accountId } = body;
+    const { text, imageUrl, userId, accountId, bookId, contentId } = body;
 
     console.log('Publish request:', {
       textLength: text?.length || 0,
       hasImage: !!imageUrl,
       userId: userId ? 'present' : 'missing',
-      accountId: accountId || 'not specified'
+      accountId: accountId || 'not specified',
+      bookId: bookId || 'not specified',
+      contentId: contentId || 'not specified'
     });
-
-    if (!text) {
-      throw new Error('Text content is required');
-    }
 
     if (!userId) {
       throw new Error('User ID is required');
+    }
+
+    // Determine post text and image
+    let postText = text;
+    let finalImageUrl = imageUrl;
+
+    // If bookId is provided, fetch book data and use AI text
+    if (bookId) {
+      console.log('Fetching book data for bookId:', bookId);
+      
+      const { data: book, error: bookError } = await supabase
+        .from('books')
+        .select('*')
+        .eq('id', bookId)
+        .single();
+
+      if (bookError || !book) {
+        console.error('Book fetch error:', bookError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            message: 'Nie znaleziono książki',
+            errorCode: 'BOOK_NOT_FOUND'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
+
+      // Use LinkedIn-specific AI text, fallback to generic
+      postText = book.ai_text_linkedin || book.ai_generated_text;
+      
+      // If no AI text, create default text from book data
+      if (!postText) {
+        const price = book.promotional_price || book.sale_price;
+        postText = `📚 ${book.title}${book.author ? ` - ${book.author}` : ''}`;
+        if (book.description) {
+          postText += `\n\n${book.description.substring(0, 500)}`;
+        }
+        if (price) {
+          postText += `\n\n💰 Cena: ${price} zł`;
+        }
+      }
+      
+      // Add product URL if not already present
+      if (book.product_url && !postText.includes(book.product_url)) {
+        postText += `\n\n🔗 ${book.product_url}`;
+      }
+
+      // Get image from book if not provided
+      if (!finalImageUrl) {
+        if (book.storage_path) {
+          finalImageUrl = `${SUPABASE_URL}/storage/v1/object/public/ObrazkiKsiazek/${book.storage_path}`;
+        } else if (book.image_url) {
+          finalImageUrl = book.image_url;
+        }
+      }
+
+      console.log('Book data loaded:', {
+        title: book.title,
+        hasAiText: !!book.ai_text_linkedin,
+        hasGenericAiText: !!book.ai_generated_text,
+        postTextLength: postText?.length || 0,
+        hasImage: !!finalImageUrl
+      });
+    }
+
+    // Validate - require text
+    if (!postText) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Brak tekstu do publikacji. Wygeneruj tekst AI lub dodaj opis książki.',
+          errorCode: 'NO_TEXT'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
     }
 
     // Get LinkedIn token for user
@@ -86,11 +160,10 @@ Deno.serve(async (req) => {
     }
 
     // Build the LinkedIn post
-    // Using the UGC Post API (Posts API v2)
     let mediaAssets: string[] = [];
 
     // If there's an image, we need to upload it first
-    if (imageUrl) {
+    if (finalImageUrl) {
       console.log('Uploading image to LinkedIn...');
       
       // Step 1: Register the image upload
@@ -125,7 +198,7 @@ Deno.serve(async (req) => {
 
       if (uploadUrl && asset) {
         // Step 2: Download the image
-        const imageResponse = await fetch(imageUrl);
+        const imageResponse = await fetch(finalImageUrl);
         if (!imageResponse.ok) {
           throw new Error('Failed to fetch image from URL');
         }
@@ -157,7 +230,7 @@ Deno.serve(async (req) => {
       specificContent: {
         'com.linkedin.ugc.ShareContent': {
           shareCommentary: {
-            text: text
+            text: postText
           },
           shareMediaCategory: mediaAssets.length > 0 ? 'IMAGE' : 'NONE',
         }
@@ -218,8 +291,29 @@ Deno.serve(async (req) => {
         account_id: tokenData.id,
         post_id: postId,
         published_at: new Date().toISOString(),
-        source: 'manual',
+        source: bookId ? 'book' : 'manual',
+        book_id: bookId || null,
       });
+
+    // Update book_platform_content if contentId or bookId provided
+    if (contentId || bookId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      await supabase
+        .from('book_platform_content')
+        .upsert({
+          id: contentId && !contentId.startsWith('temp-') ? contentId : undefined,
+          book_id: bookId,
+          platform: 'linkedin',
+          user_id: userId,
+          published: true,
+          published_at: new Date().toISOString(),
+          post_id: postId,
+        }, { 
+          onConflict: 'book_id,platform,user_id',
+          ignoreDuplicates: false 
+        });
+    }
 
     return new Response(
       JSON.stringify({ 

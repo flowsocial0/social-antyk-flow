@@ -449,6 +449,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
       const platformAiText = platform === 'x' ? c.book.ai_text_x : 
                              platform === 'facebook' ? c.book.ai_text_facebook : 
                              platform === 'youtube' ? c.book.ai_text_youtube :
+                             platform === 'linkedin' ? c.book.ai_text_linkedin :
                              null;
       return !platformAiText;
     });
