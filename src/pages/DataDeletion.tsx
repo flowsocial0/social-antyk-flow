@@ -1,6 +1,7 @@
 import { useSearchParams, Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, Trash2, Mail, Shield } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CheckCircle, Trash2, Mail, Shield, ArrowLeft } from "lucide-react";
 import { Helmet } from "react-helmet";
 import { Footer } from "@/components/layout/Footer";
 
@@ -53,6 +54,14 @@ const DataDeletion = () => {
       
       <main className="flex-1 py-12 px-4">
         <div className="max-w-3xl mx-auto">
+          <div className="mb-6">
+            <Button variant="outline" asChild>
+              <Link to="/">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Powrót do strony głównej
+              </Link>
+            </Button>
+          </div>
           <div className="text-center mb-8">
             <div className="flex justify-center mb-4">
               <Shield className="h-16 w-16 text-primary" />
