@@ -78,12 +78,13 @@ export const CampaignsList = () => {
       if (!campaigns || campaigns.length === 0) return;
 
       // Collect all unique account IDs from all campaigns
-      const allAccountIds: { x: string[]; facebook: string[]; instagram: string[]; tiktok: string[]; youtube: string[] } = {
+      const allAccountIds: { x: string[]; facebook: string[]; instagram: string[]; tiktok: string[]; youtube: string[]; linkedin: string[] } = {
         x: [],
         facebook: [],
         instagram: [],
         tiktok: [],
         youtube: [],
+        linkedin: [],
       };
 
       campaigns.forEach((campaign) => {
@@ -174,6 +175,21 @@ export const CampaignsList = () => {
             id: a.id,
             display_name: a.channel_title || a.account_name || 'Kanał YouTube',
             platform: 'youtube'
+          };
+        });
+      }
+
+      // Load LinkedIn accounts
+      if (allAccountIds.linkedin.length > 0) {
+        const { data } = await (supabase as any)
+          .from('linkedin_oauth_tokens')
+          .select('id, display_name, account_name')
+          .in('id', allAccountIds.linkedin);
+        data?.forEach((a: any) => {
+          newAccountsMap[a.id] = {
+            id: a.id,
+            display_name: a.display_name || a.account_name || 'Profil LinkedIn',
+            platform: 'linkedin'
           };
         });
       }
