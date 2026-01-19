@@ -1262,13 +1262,14 @@ Deno.serve(async (req) => {
           return new Response(
             JSON.stringify({ 
               success: false, 
-              error: isDailyLimit ? 'daily_limit' : 'rate_limit',
+              error: errorMessage,
+              errorCode: isDailyLimit ? 'X_DAILY_LIMIT' : 'X_RATE_LIMIT',
               retry_count: retryCount,
               next_retry_at: nextRetryAt,
               message: errorMessage
             }),
             { 
-              status: 429,
+              status: 200,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             }
           );
@@ -1484,18 +1485,27 @@ Deno.serve(async (req) => {
     const allSucceeded = results.every(r => r.success);
     const anySucceeded = results.some(r => r.success);
 
+    // Check if any result has daily limit error
+    const dailyLimitResult = results.find(r => r.isDailyLimit);
+    const failedResults = results.filter(r => !r.success);
+    const errorMessage = allSucceeded 
+      ? `Successfully published ${results.length} book(s)` 
+      : anySucceeded
+        ? `Częściowo opublikowano: ${results.filter(r => r.success).length}/${results.length} udanych`
+        : dailyLimitResult
+          ? failedResults[0]?.error || 'Dzienny limit publikacji wyczerpany'
+          : failedResults[0]?.error || 'Wszystkie publikacje zakończyły się błędem';
+
     return new Response(
       JSON.stringify({ 
         success: anySucceeded,
         results,
-        message: allSucceeded 
-          ? `Successfully published ${results.length} book(s)` 
-          : anySucceeded
-            ? `Partially published: ${results.filter(r => r.success).length}/${results.length} succeeded`
-            : 'All publications failed'
+        error: anySucceeded ? undefined : errorMessage,
+        errorCode: dailyLimitResult ? 'X_DAILY_LIMIT' : undefined,
+        message: errorMessage
       }),
       { 
-        status: allSucceeded ? 200 : anySucceeded ? 207 : 500,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
