@@ -132,6 +132,16 @@ Deno.serve(async (req) => {
     const youtubeUserId = ytTokenData?.user_id;
     console.log('YouTube user ID for publishing:', youtubeUserId || 'none');
 
+    // Get first available user with LinkedIn token for LinkedIn posts
+    const { data: linkedinTokenData } = await supabase
+      .from('linkedin_oauth_tokens')
+      .select('user_id')
+      .limit(1)
+      .maybeSingle();
+    
+    const linkedinUserId = linkedinTokenData?.user_id;
+    console.log('LinkedIn user ID for publishing:', linkedinUserId || 'none');
+
     if ((!contentToPublish || contentToPublish.length === 0) && 
         (!campaignPostsToPublish || campaignPostsToPublish.length === 0)) {
       return new Response(
@@ -169,6 +179,9 @@ Deno.serve(async (req) => {
             break;
           case 'youtube':
             publishFunctionName = 'publish-to-youtube';
+            break;
+          case 'linkedin':
+            publishFunctionName = 'publish-to-linkedin';
             break;
           // Add more platforms as they are implemented
           default:
@@ -268,6 +281,9 @@ Deno.serve(async (req) => {
             case 'youtube':
               publishFunctionName = 'publish-to-youtube';
               break;
+            case 'linkedin':
+              publishFunctionName = 'publish-to-linkedin';
+              break;
             default:
               console.error(`No publish function for platform: ${platform}`);
               platformFailCount++;
@@ -284,6 +300,8 @@ Deno.serve(async (req) => {
             platformUserId = instagramUserId;
           } else if (platform === 'youtube') {
             platformUserId = youtubeUserId;
+          } else if (platform === 'linkedin') {
+            platformUserId = linkedinUserId;
           }
 
           // Get selected accounts for this platform, or use empty array for fallback behavior

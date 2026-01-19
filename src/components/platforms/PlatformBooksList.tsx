@@ -245,7 +245,12 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                           platform === 'tiktok' ? 'publish-to-tiktok' :
                           platform === 'instagram' ? 'publish-to-instagram' :
                           platform === 'youtube' ? 'publish-to-youtube' :
-                          'publish-to-x'; // fallback to X for other platforms
+                          platform === 'linkedin' ? 'publish-to-linkedin' :
+                          null;
+
+      if (!functionName) {
+        throw new Error(`Publikacja na platformie ${platform} nie jest jeszcze obsługiwana`);
+      }
 
       const { data, error } = await supabase.functions.invoke(functionName, {
         body: { contentId, bookId, platform },
@@ -286,6 +291,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                           platform === 'youtube' ? 'YouTube' :
                           platform === 'instagram' ? 'Instagramie' :
                           platform === 'tiktok' ? 'TikToku' :
+                          platform === 'linkedin' ? 'LinkedIn' :
                           platform;
       toast({
         title: "✅ Opublikowano pomyślnie",
