@@ -127,6 +127,8 @@ export const PlatformAITextDialog = ({
       // Determine which column to update based on platform
       const updateField = platform === 'x' ? 'ai_text_x' : 
                          platform === 'facebook' ? 'ai_text_facebook' : 
+                         platform === 'linkedin' ? 'ai_text_linkedin' :
+                         platform === 'youtube' ? 'ai_text_youtube' :
                          'ai_generated_text';
 
       // Update books table with platform-specific AI text
@@ -221,6 +223,8 @@ export const PlatformAITextDialog = ({
           {(() => {
             const existingPlatformText = platform === 'x' ? book.ai_text_x : 
                                          platform === 'facebook' ? book.ai_text_facebook : 
+                                         platform === 'linkedin' ? book.ai_text_linkedin :
+                                         platform === 'youtube' ? book.ai_text_youtube :
                                          null;
             return existingPlatformText && !customText ? (
               <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
