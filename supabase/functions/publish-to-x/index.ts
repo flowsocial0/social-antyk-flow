@@ -6,6 +6,8 @@ const API_SECRET = Deno.env.get("TWITTER_CONSUMER_SECRET")?.trim();
 
 // Daily limit for X Free tier (17 tweets per 24 hours)
 const X_FREE_TIER_DAILY_LIMIT = 17;
+// Monthly limit for X Free tier (estimated ~500/month)
+const X_FREE_TIER_MONTHLY_LIMIT = 500;
 
 function validateEnvironmentVariables() {
   if (!API_KEY) throw new Error("Missing TWITTER_CONSUMER_KEY environment variable");
@@ -153,6 +155,78 @@ async function saveRateLimitInfo(
   }
 }
 
+// Pre-check X API limits before publishing (lightweight GET request to check headers)
+async function preCheckXApiLimits(
+  userAccessToken: string,
+  userAccessTokenSecret: string
+): Promise<{ 
+  canPublish: boolean; 
+  appRemaining: number; 
+  userRemaining: number; 
+  resetAt: Date | null;
+  message?: string;
+}> {
+  try {
+    const url = "https://api.x.com/2/users/me";
+    const method = "GET";
+    const header = generateOAuthHeader(method, url, userAccessToken, userAccessTokenSecret);
+    
+    const response = await fetch(url, {
+      method,
+      headers: { Authorization: header }
+    });
+
+    // Parse rate limit headers
+    const appRemaining = response.headers.get('x-app-limit-24hour-remaining');
+    const userRemaining = response.headers.get('x-user-limit-24hour-remaining');
+    const appReset = response.headers.get('x-app-limit-24hour-reset');
+    const userReset = response.headers.get('x-user-limit-24hour-reset');
+
+    console.log('📊 X API pre-check headers:', {
+      appRemaining, userRemaining, appReset, userReset
+    });
+
+    const appRem = appRemaining ? parseInt(appRemaining) : 999;
+    const userRem = userRemaining ? parseInt(userRemaining) : 999;
+    const effectiveRemaining = Math.min(appRem, userRem);
+    
+    let resetAt: Date | null = null;
+    if (effectiveRemaining === 0) {
+      const resetTimestamp = appReset || userReset;
+      if (resetTimestamp) {
+        resetAt = new Date(parseInt(resetTimestamp) * 1000);
+      }
+    }
+
+    if (effectiveRemaining === 0) {
+      return {
+        canPublish: false,
+        appRemaining: appRem,
+        userRemaining: userRem,
+        resetAt,
+        message: `X API dzienny limit wyczerpany (pozostało: app=${appRem}, user=${userRem}). Reset: ${resetAt?.toISOString() || 'nieznany'}`
+      };
+    }
+
+    return {
+      canPublish: true,
+      appRemaining: appRem,
+      userRemaining: userRem,
+      resetAt: null
+    };
+  } catch (error) {
+    console.error('Error in X API pre-check:', error);
+    // If pre-check fails, allow publishing (fail open)
+    return {
+      canPublish: true,
+      appRemaining: -1,
+      userRemaining: -1,
+      resetAt: null,
+      message: 'Pre-check failed, proceeding with publish attempt'
+    };
+  }
+}
+
 // Check daily publication limit (our own tracking, not API headers)
 async function checkDailyPublicationLimit(
   supabaseClient: any,
@@ -204,6 +278,57 @@ async function checkDailyPublicationLimit(
   } catch (err) {
     console.error('Error in checkDailyPublicationLimit:', err);
     return { canPublish: true, publishedToday: 0, resetAt: new Date() };
+  }
+}
+
+// Check monthly publication limit
+async function checkMonthlyPublicationLimit(
+  supabaseClient: any,
+  accountId: string
+): Promise<{ canPublish: boolean; publishedThisMonth: number; resetAt: Date }> {
+  try {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
+    // Count publications in last 30 days for this account
+    const { count, error } = await supabaseClient
+      .from('x_daily_publications')
+      .select('*', { count: 'exact', head: true })
+      .eq('account_id', accountId)
+      .gte('published_at', thirtyDaysAgo.toISOString());
+
+    if (error) {
+      console.error('Error checking monthly publication limit:', error);
+      return { canPublish: true, publishedThisMonth: 0, resetAt: now };
+    }
+
+    const publishedThisMonth = count || 0;
+    const canPublish = publishedThisMonth < X_FREE_TIER_MONTHLY_LIMIT;
+    
+    // Calculate approximate reset (oldest tweet in 30d window)
+    let resetAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    
+    if (!canPublish) {
+      const { data: oldestPublication } = await supabaseClient
+        .from('x_daily_publications')
+        .select('published_at')
+        .eq('account_id', accountId)
+        .gte('published_at', thirtyDaysAgo.toISOString())
+        .order('published_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      
+      if (oldestPublication?.published_at) {
+        resetAt = new Date(new Date(oldestPublication.published_at).getTime() + 30 * 24 * 60 * 60 * 1000);
+      }
+    }
+
+    console.log(`📊 Monthly publication check: ${publishedThisMonth}/${X_FREE_TIER_MONTHLY_LIMIT} tweets in last 30 days. Can publish: ${canPublish}`);
+    
+    return { canPublish, publishedThisMonth, resetAt };
+  } catch (err) {
+    console.error('Error in checkMonthlyPublicationLimit:', err);
+    return { canPublish: true, publishedThisMonth: 0, resetAt: new Date() };
   }
 }
 

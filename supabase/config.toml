@@ -83,3 +83,6 @@ verify_jwt = false
 
 [functions.get-x-rate-limits]
 verify_jwt = false
+
+[functions.get-platform-limits]
+verify_jwt = false
