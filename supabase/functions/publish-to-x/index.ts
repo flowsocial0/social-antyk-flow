@@ -687,14 +687,26 @@ async function sendTweet(
   });
 
   if (!response.ok) {
-    // Check for 403 Forbidden - permissions issue
+    // 403 Forbidden can mean several things on X (not only app permissions).
+    // Always surface the original API message to the user.
     if (response.status === 403) {
-      const error = new Error(`Błąd 403 Forbidden: Brak uprawnień do publikowania. Sprawdź w Developer Portal X, czy aplikacja ma uprawnienia "Read and Write" (nie tylko "Read"), a następnie odłącz i połącz konto X ponownie w ustawieniach.`);
+      let detail = responseText;
+      try {
+        const parsed = JSON.parse(responseText);
+        detail = parsed?.detail || parsed?.title || responseText;
+      } catch {
+        // keep raw text
+      }
+
+      const error = new Error(
+        `Błąd 403 Forbidden z X: ${detail}. ` +
+          `Jeśli to błąd uprawnień, sprawdź w Developer Portal X ustawienie aplikacji na "Read and Write" oraz odłącz i połącz konto X ponownie.`
+      );
       (error as any).statusCode = 403;
       (error as any).response = response;
       throw error;
     }
-    
+
     // Check for 429 and provide better error message
     if (response.status === 429) {
       const remaining = response.headers.get('x-rate-limit-remaining');
@@ -1117,7 +1129,7 @@ Deno.serve(async (req) => {
         const suffixPart = aiSuffix ? `\n\n${aiSuffix}` : '';
         
         // Add link and suffix to the campaign post text
-        let tweetText = fixUrlsInText(campaignPost.text) + linkPart + suffixPart;
+        let tweetText = (fixUrlsInText(campaignPost.text) + linkPart + suffixPart).trim();
 
         let mediaIds: string[] = [];
         if (campaignPost.book?.image_url || campaignPost.book?.storage_path) {
@@ -1392,7 +1404,7 @@ Deno.serve(async (req) => {
                   : `📚 ${book.title}${book.author ? ` - ${book.author}` : ''}`;
         
         // Always add link and suffix to the text
-        let tweetText = baseText + linkPart + suffixPart;
+        let tweetText = (baseText + linkPart + suffixPart).trim();
 
         let mediaIds: string[] = [];
         if (book.storage_path || book.image_url) {
