@@ -261,8 +261,9 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
       
       // CRITICAL: Check top-level success field - this is the primary error handling
       if (data && data.success === false) {
-        // Extract error message from response
-        const errorMsg = data.error || 
+        // Extract error message - prefer 'message' over 'error' for user-friendly text
+        const errorMsg = data.message || 
+                        data.error || 
                         data.results?.find((r: any) => !r.success)?.error || 
                         'Publikacja nie powiodła się';
         throw new Error(errorMsg);
