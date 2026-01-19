@@ -519,6 +519,57 @@ export type Database = {
         }
         Relationships: []
       }
+      linkedin_oauth_tokens: {
+        Row: {
+          access_token: string
+          account_name: string | null
+          created_at: string | null
+          display_name: string | null
+          expires_at: string | null
+          id: string
+          is_default: boolean | null
+          linkedin_id: string | null
+          profile_picture_url: string | null
+          refresh_token: string | null
+          scope: string | null
+          token_type: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          account_name?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          expires_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          linkedin_id?: string | null
+          profile_picture_url?: string | null
+          refresh_token?: string | null
+          scope?: string | null
+          token_type?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          account_name?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          expires_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          linkedin_id?: string | null
+          profile_picture_url?: string | null
+          refresh_token?: string | null
+          scope?: string | null
+          token_type?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       platform_publications: {
         Row: {
           account_id: string
