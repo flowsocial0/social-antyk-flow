@@ -901,6 +901,49 @@ Deno.serve(async (req) => {
         }
       );
     }
+
+    // === Pre-check X API limits before any publish attempt (skip for test connection) ===
+    if (!shouldTestConnection) {
+      console.log('🔍 Pre-checking X API limits...');
+      const apiPreCheck = await preCheckXApiLimits(
+        oauth1Token.oauth_token, 
+        oauth1Token.oauth_token_secret
+      );
+
+      if (!apiPreCheck.canPublish) {
+        console.log(`⚠️ X API pre-check failed: ${apiPreCheck.message}`);
+        
+        // If this is a campaign post, update its status
+        if (campaignPostId) {
+          await supabaseClient
+            .from('campaign_posts')
+            .update({ 
+              status: 'rate_limited',
+              error_code: 'X_API_DAILY_LIMIT',
+              error_message: apiPreCheck.message,
+              next_retry_at: apiPreCheck.resetAt?.toISOString()
+            })
+            .eq('id', campaignPostId);
+        }
+        
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'daily_limit',
+            errorCode: 'X_API_DAILY_LIMIT',
+            app_remaining: apiPreCheck.appRemaining,
+            user_remaining: apiPreCheck.userRemaining,
+            reset_at: apiPreCheck.resetAt?.toISOString(),
+            message: apiPreCheck.message
+          }),
+          { 
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+      console.log(`✅ X API pre-check passed: app=${apiPreCheck.appRemaining}, user=${apiPreCheck.userRemaining}`);
+    }
     
     // Test connection endpoint
     if (shouldTestConnection) {
