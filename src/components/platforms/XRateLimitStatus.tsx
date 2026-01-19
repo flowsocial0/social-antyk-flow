@@ -13,13 +13,16 @@ interface AccountRateLimit {
   screen_name: string | null;
   account_name: string | null;
   tweets: {
-    limit_max: number | null;
-    remaining: number | null;
+    limit_max: number;
+    remaining: number;
+    published_today: number;
     reset_at: string | null;
     is_limited: boolean;
     minutes_until_reset: number | null;
     updated_at: string | null;
-  } | null;
+    api_remaining?: number | null;
+    api_reset_at?: string | null;
+  };
 }
 
 interface RateLimitsResponse {
@@ -29,13 +32,15 @@ interface RateLimitsResponse {
     total_accounts: number;
     any_limited: boolean;
     total_remaining: number;
+    total_published_today: number;
+    daily_limit: number;
     next_reset: string | null;
   };
   error?: string;
 }
 
 // Daily limit for X Free tier
-const DAILY_TWEET_LIMIT = 10;
+const DAILY_TWEET_LIMIT = 17;
 
 export function XRateLimitStatus() {
   const { data, isLoading, error, refetch, isFetching } = useQuery<RateLimitsResponse>({
@@ -118,6 +123,7 @@ export function XRateLimitStatus() {
   }
 
   const { accounts, summary } = data;
+  const dailyLimit = summary.daily_limit || DAILY_TWEET_LIMIT;
 
   return (
     <Card className={summary.any_limited ? "border-yellow-500/50" : ""}>
@@ -136,9 +142,9 @@ export function XRateLimitStatus() {
         {/* Summary */}
         {summary.any_limited && (
           <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+            <AlertTriangle className="h-4 w-4 text-yellow-500 flex-shrink-0" />
             <span className="text-sm">
-              Limit przekroczony. Reset{" "}
+              Dzienny limit publikacji wyczerpany. Reset{" "}
               {summary.next_reset &&
                 formatDistanceToNow(new Date(summary.next_reset), {
                   addSuffix: true,
@@ -152,12 +158,11 @@ export function XRateLimitStatus() {
         <div className="space-y-3">
           {accounts.map((account) => {
             const tweets = account.tweets;
-            // Use fixed limit of 10 for Free tier, ignore API values
-            const remaining = Math.min(tweets?.remaining ?? DAILY_TWEET_LIMIT, DAILY_TWEET_LIMIT);
-            const max = DAILY_TWEET_LIMIT;
+            const publishedToday = tweets.published_today || 0;
+            const remaining = tweets.remaining;
+            const max = tweets.limit_max || dailyLimit;
             const percentage = (remaining / max) * 100;
-            const isLimited = remaining === 0;
-            const hasData = tweets !== null;
+            const isLimited = tweets.is_limited;
 
             return (
               <div key={account.id} className="space-y-2">
@@ -168,52 +173,52 @@ export function XRateLimitStatus() {
                       <AlertTriangle className="h-3 w-3" />
                       Limit
                     </Badge>
-                  ) : hasData ? (
+                  ) : (
                     <Badge variant="outline" className="gap-1 text-green-600 border-green-600/30">
                       <CheckCircle2 className="h-3 w-3" />
                       OK
                     </Badge>
-                  ) : (
-                    <Badge variant="secondary">Brak danych</Badge>
                   )}
                 </div>
 
-                {hasData ? (
-                  <>
-                    <Progress
-                      value={percentage}
-                      className={`h-2 ${isLimited ? "[&>div]:bg-red-500" : percentage < 30 ? "[&>div]:bg-yellow-500" : ""}`}
-                    />
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>
-                        {remaining}/{max} tweetów dziennie
-                      </span>
-                      {tweets?.reset_at && (
-                        <span>
-                          Reset:{" "}
-                          {formatDistanceToNow(new Date(tweets.reset_at), {
-                            addSuffix: true,
-                            locale: pl,
-                          })}
-                        </span>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Info className="h-3 w-3" />
-                    <span>Limity zaktualizują się po pierwszej publikacji</span>
-                  </div>
-                )}
+                <Progress
+                  value={percentage}
+                  className={`h-2 ${isLimited ? "[&>div]:bg-red-500" : percentage < 30 ? "[&>div]:bg-yellow-500" : ""}`}
+                />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>
+                    Opublikowano: {publishedToday}/{max} (pozostało: {remaining})
+                  </span>
+                  {tweets.reset_at && (
+                    <span>
+                      Reset:{" "}
+                      {formatDistanceToNow(new Date(tweets.reset_at), {
+                        addSuffix: true,
+                        locale: pl,
+                      })}
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}
         </div>
 
         {/* Info */}
-        <p className="text-xs text-muted-foreground pt-2 border-t">
-          Limit X (Free tier): {DAILY_TWEET_LIMIT} tweetów/dzień. Limit resetuje się co 24h.
-        </p>
+        <div className="text-xs text-muted-foreground pt-2 border-t space-y-1">
+          <p className="flex items-start gap-1">
+            <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+            <span>
+              Limit X Free tier: {dailyLimit} tweetów/24h. 
+              Liczba bazuje na faktycznych publikacjach z aplikacji.
+            </span>
+          </p>
+          {summary.total_published_today > 0 && (
+            <p className="text-muted-foreground/70">
+              Łącznie opublikowano dziś: {summary.total_published_today} tweet(ów)
+            </p>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

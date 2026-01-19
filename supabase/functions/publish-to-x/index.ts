@@ -4,6 +4,9 @@ import { createHmac } from "node:crypto";
 const API_KEY = Deno.env.get("TWITTER_CONSUMER_KEY")?.trim();
 const API_SECRET = Deno.env.get("TWITTER_CONSUMER_SECRET")?.trim();
 
+// Daily limit for X Free tier (17 tweets per 24 hours)
+const X_FREE_TIER_DAILY_LIMIT = 17;
+
 function validateEnvironmentVariables() {
   if (!API_KEY) throw new Error("Missing TWITTER_CONSUMER_KEY environment variable");
   if (!API_SECRET) throw new Error("Missing TWITTER_CONSUMER_SECRET environment variable");
@@ -150,7 +153,93 @@ async function saveRateLimitInfo(
   }
 }
 
-// Helper function to check rate limits before publishing
+// Check daily publication limit (our own tracking, not API headers)
+async function checkDailyPublicationLimit(
+  supabaseClient: any,
+  accountId: string
+): Promise<{ canPublish: boolean; publishedToday: number; resetAt: Date }> {
+  try {
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
+    // Count publications in last 24 hours for this account
+    const { count, error } = await supabaseClient
+      .from('x_daily_publications')
+      .select('*', { count: 'exact', head: true })
+      .eq('account_id', accountId)
+      .gte('published_at', twentyFourHoursAgo.toISOString());
+
+    if (error) {
+      console.error('Error checking daily publication limit:', error);
+      // If we can't check, assume we can publish (fail open)
+      return { canPublish: true, publishedToday: 0, resetAt: now };
+    }
+
+    const publishedToday = count || 0;
+    const canPublish = publishedToday < X_FREE_TIER_DAILY_LIMIT;
+    
+    // Calculate when the oldest tweet in the window will "expire"
+    let resetAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Default: 24h from now
+    
+    if (!canPublish) {
+      // Find the oldest publication in the last 24h to calculate exact reset time
+      const { data: oldestPublication } = await supabaseClient
+        .from('x_daily_publications')
+        .select('published_at')
+        .eq('account_id', accountId)
+        .gte('published_at', twentyFourHoursAgo.toISOString())
+        .order('published_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      
+      if (oldestPublication?.published_at) {
+        // Reset happens 24h after the oldest tweet in the window
+        resetAt = new Date(new Date(oldestPublication.published_at).getTime() + 24 * 60 * 60 * 1000);
+      }
+    }
+
+    console.log(`📊 Daily publication check: ${publishedToday}/${X_FREE_TIER_DAILY_LIMIT} tweets in last 24h. Can publish: ${canPublish}`);
+    
+    return { canPublish, publishedToday, resetAt };
+  } catch (err) {
+    console.error('Error in checkDailyPublicationLimit:', err);
+    return { canPublish: true, publishedToday: 0, resetAt: new Date() };
+  }
+}
+
+// Save successful publication to our tracking table
+async function savePublication(
+  supabaseClient: any,
+  accountId: string,
+  userId: string,
+  tweetId: string | null,
+  source: string,
+  bookId?: string,
+  campaignPostId?: string
+): Promise<void> {
+  try {
+    const { error } = await supabaseClient
+      .from('x_daily_publications')
+      .insert({
+        account_id: accountId,
+        user_id: userId,
+        tweet_id: tweetId,
+        source: source,
+        book_id: bookId || null,
+        campaign_post_id: campaignPostId || null
+      });
+
+    if (error) {
+      console.error('Failed to save publication record:', error);
+    } else {
+      console.log(`✅ Publication record saved (tweet: ${tweetId}, source: ${source})`);
+    }
+  } catch (err) {
+    console.error('Error saving publication record:', err);
+  }
+}
+
+// Helper function to check rate limits before publishing (old API-based check)
 async function checkRateLimits(
   supabaseClient: any,
   accountId: string
@@ -480,6 +569,22 @@ async function sendTweet(
       (error as any).response = response;
       throw error;
     }
+    
+    // Check for 429 and provide better error message
+    if (response.status === 429) {
+      const remaining = response.headers.get('x-rate-limit-remaining');
+      const remainingNum = remaining ? parseInt(remaining) : 0;
+      
+      // If remaining is high but we got 429, it's the daily publication limit
+      if (remainingNum > 100) {
+        const error = new Error(`Osiągnięto dzienny limit publikacji X (${X_FREE_TIER_DAILY_LIMIT} tweetów/24h dla Free tier). API rate limit OK (${remaining} pozostało), ale dzienny limit wyczerpany. Spróbuj ponownie za kilka godzin lub rozważ upgrade do Basic tier (100 tweetów/dzień).`);
+        (error as any).statusCode = 429;
+        (error as any).isDailyLimit = true;
+        (error as any).response = response;
+        throw error;
+      }
+    }
+    
     const error = new Error(`Failed to send tweet: ${response.status}, body: ${responseText}`);
     (error as any).response = response;
     throw error;
@@ -522,6 +627,12 @@ async function sendTweetWithRateLimitTracking(
       }
       
       if (error.message.includes('429')) {
+        // Check if this is a daily limit error (not API rate limit)
+        if (error.isDailyLimit) {
+          console.error('Daily publication limit reached - no retries will help');
+          throw error;
+        }
+        
         if (attempt < maxRetries) {
           const waitTime = Math.min(15000 * Math.pow(2, attempt), 60000);
           console.log(`Rate limited (429). Waiting ${waitTime/1000}s before retry ${attempt + 1}/${maxRetries}...`);
@@ -716,17 +827,51 @@ Deno.serve(async (req) => {
 
     console.log("Received request:", { bookId, bookIds, campaignPostId });
 
+    // Get account ID for daily limit tracking
+    const xAccountId = oauth1Token.id || await getAccountIdFromToken(supabaseClient, userId, accountId);
+
     // Handle campaign post
     if (campaignPostId) {
       try {
-        // Get account ID for rate limit tracking
-        const xAccountId = oauth1Token.id || await getAccountIdFromToken(supabaseClient, userId, accountId);
-        
-        // Check rate limits before attempting to publish
+        // Check daily publication limit FIRST (our own tracking)
+        if (xAccountId) {
+          const dailyLimitCheck = await checkDailyPublicationLimit(supabaseClient, xAccountId);
+          if (!dailyLimitCheck.canPublish) {
+            console.log(`⚠️ Daily publication limit reached (${dailyLimitCheck.publishedToday}/${X_FREE_TIER_DAILY_LIMIT}). Reset at: ${dailyLimitCheck.resetAt.toISOString()}`);
+            
+            // Update campaign post with daily limit info
+            await supabaseClient
+              .from('campaign_posts')
+              .update({ 
+                status: 'rate_limited',
+                error_code: 'DAILY_LIMIT',
+                error_message: `Dzienny limit publikacji X wyczerpany (${dailyLimitCheck.publishedToday}/${X_FREE_TIER_DAILY_LIMIT} tweetów). Automatyczne ponowienie po resecie.`,
+                next_retry_at: dailyLimitCheck.resetAt.toISOString()
+              })
+              .eq('id', campaignPostId);
+            
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: 'daily_limit',
+                published_today: dailyLimitCheck.publishedToday,
+                daily_limit: X_FREE_TIER_DAILY_LIMIT,
+                reset_at: dailyLimitCheck.resetAt.toISOString(),
+                message: `Dzienny limit publikacji X wyczerpany (${dailyLimitCheck.publishedToday}/${X_FREE_TIER_DAILY_LIMIT}). Free tier pozwala na ${X_FREE_TIER_DAILY_LIMIT} tweetów/24h. Publikacja zostanie wznowiona automatycznie.`
+              }),
+              { 
+                status: 429,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
+          }
+        }
+
+        // Also check API rate limits (existing check)
         if (xAccountId) {
           const rateLimitCheck = await checkRateLimits(supabaseClient, xAccountId);
           if (!rateLimitCheck.canPublish) {
-            console.log(`⚠️ Rate limit check failed - cannot publish. Reset at: ${rateLimitCheck.resetAt}`);
+            console.log(`⚠️ API Rate limit check failed - cannot publish. Reset at: ${rateLimitCheck.resetAt}`);
             
             // Update campaign post with rate limit info
             await supabaseClient
@@ -863,6 +1008,19 @@ Deno.serve(async (req) => {
           : await sendTweetWithRetry(tweetText, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, mediaIds);
         console.log("Tweet sent successfully:", tweetResponse);
 
+        // SAVE PUBLICATION RECORD for daily limit tracking
+        if (xAccountIdForTracking && tweetResponse?.data?.id) {
+          await savePublication(
+            supabaseClient,
+            xAccountIdForTracking,
+            userId,
+            tweetResponse.data.id,
+            'campaign',
+            campaignPost.book_id,
+            campaignPostId
+          );
+        }
+
         // Only update status to published if no specific accountId was provided
         // When accountId is provided, auto-publish-books will handle the final status update
         // after all accounts have been processed
@@ -894,7 +1052,8 @@ Deno.serve(async (req) => {
         const isRateLimitError = error.statusCode === 429 || 
           error.message?.includes('429') || 
           error.message?.includes('Too Many Requests') ||
-          error.message?.includes('rate limit');
+          error.message?.includes('rate limit') ||
+          error.isDailyLimit;
         
         if (isRateLimitError) {
           const { data: currentPost } = await supabaseClient
@@ -905,16 +1064,22 @@ Deno.serve(async (req) => {
           
           const retryCount = (currentPost?.retry_count || 0) + 1;
           
-          const retryDelays = [15, 30, 60];
+          // For daily limit, use longer delays
+          const isDailyLimit = error.isDailyLimit || error.message?.includes('dzienny limit');
+          const retryDelays = isDailyLimit ? [60, 120, 240] : [15, 30, 60];
           const delayMinutes = retryDelays[Math.min(retryCount - 1, retryDelays.length - 1)];
           const nextRetryAt = new Date(Date.now() + delayMinutes * 60 * 1000).toISOString();
+          
+          const errorMessage = isDailyLimit 
+            ? `Dzienny limit publikacji X wyczerpany (${X_FREE_TIER_DAILY_LIMIT} tweetów/24h). Automatyczne ponowienie za ${delayMinutes} minut.`
+            : `Rate limit osiągnięty. Automatyczne ponowienie za ${delayMinutes} minut.`;
           
           const { error: rateLimitUpdateError } = await supabaseClient
             .from('campaign_posts')
             .update({ 
               status: 'rate_limited',
-              error_code: '429',
-              error_message: `Rate limit osiągnięty. Automatyczne ponowienie za ${delayMinutes} minut.`,
+              error_code: isDailyLimit ? 'DAILY_LIMIT' : '429',
+              error_message: errorMessage,
               retry_count: retryCount,
               next_retry_at: nextRetryAt
             })
@@ -929,10 +1094,10 @@ Deno.serve(async (req) => {
           return new Response(
             JSON.stringify({ 
               success: false, 
-              error: 'rate_limit',
+              error: isDailyLimit ? 'daily_limit' : 'rate_limit',
               retry_count: retryCount,
               next_retry_at: nextRetryAt,
-              message: `Rate limit osiągnięty. Automatyczne ponowienie za ${delayMinutes} minut.`
+              message: errorMessage
             }),
             { 
               status: 429,
@@ -983,6 +1148,20 @@ Deno.serve(async (req) => {
     
     for (const id of idsToPublish) {
       try {
+        // Check daily publication limit before each book
+        if (xAccountId) {
+          const dailyLimitCheck = await checkDailyPublicationLimit(supabaseClient, xAccountId);
+          if (!dailyLimitCheck.canPublish) {
+            console.log(`⚠️ Daily publication limit reached for book ${id}`);
+            results.push({
+              bookId: id,
+              success: false,
+              error: `Dzienny limit publikacji X wyczerpany (${dailyLimitCheck.publishedToday}/${X_FREE_TIER_DAILY_LIMIT}). Spróbuj ponownie za kilka godzin.`
+            });
+            continue;
+          }
+        }
+
         const { data: book, error: bookError } = await supabaseClient
           .from('books')
           .select('*')
@@ -999,175 +1178,170 @@ Deno.serve(async (req) => {
           .eq('platform', 'x')
           .maybeSingle();
 
-        if (platformContent?.published) {
-          console.log(`Book ${id} already published on X, skipping`);
-          results.push({ id, success: false, error: "Already published on this platform" });
-          continue;
-        }
-
-        let tweetText;
-        // Use platform-specific AI text (ai_text_x) first, then fallback to legacy ai_generated_text
-        const aiTextForX = book.ai_text_x || book.ai_generated_text;
-        if (aiTextForX) {
-          tweetText = `${fixUrlsInText(aiTextForX)}\n\n${book.product_url}\n\n(ai)`;
-          console.log("Using AI-generated text for X from database");
-        } else if (customText) {
-          tweetText = `${fixUrlsInText(customText)}\n\n(ai)`;
-          console.log("Using custom text parameter");
-        } else {
-          tweetText = `✨ LIMITOWANA OFERTA ✨\n\n📚 ${book.title}\n\n`;
-          
-          if (book.sale_price) {
-            tweetText += `💰 Tylko ${book.sale_price} zł\n\n`;
-          }
-          
-          if (book.description) {
-            const maxDescLength = 120;
-            const truncatedDesc = book.description.length > maxDescLength 
-              ? book.description.substring(0, maxDescLength).trim() + '...'
-              : book.description;
-            tweetText += `${truncatedDesc}\n\n`;
-          }
-          
-          tweetText += `🔥 Kup teraz:\n👉 ${book.product_url}\n\n(ai)`;
-        }
-
-        console.log("Tweet to send:", tweetText);
-
-        let mediaIds: string[] | undefined = undefined;
-        try {
-          if (book.storage_path) {
-            console.log("Uploading media from book.storage_path...", { storage_path: book.storage_path });
-            const { data: storageBlob, error: storageError } = await supabaseClient.storage
-              .from('ObrazkiKsiazek')
-              .download(book.storage_path);
-            if (storageError) throw storageError;
-            const arrayBuffer = await storageBlob.arrayBuffer();
-            const inferType = (p: string) => {
-              const ext = p.split('.').pop()?.toLowerCase();
-              switch (ext) {
-                case 'png': return 'image/png';
-                case 'webp': return 'image/webp';
-                case 'gif': return 'image/gif';
-                case 'jpg':
-                case 'jpeg':
-                default: return 'image/jpeg';
-              }
-            };
-            const contentType = storageBlob.type || inferType(book.storage_path);
-            const mediaId = await uploadMedia(undefined, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, { arrayBuffer, contentType });
-            mediaIds = [mediaId];
-            console.log("Media uploaded successfully from book.storage_path, media_id:", mediaId);
-          } else if (storageBucket && storagePath) {
-            console.log("Uploading media from Supabase Storage override...", { storageBucket, storagePath });
-            const { data: storageBlob, error: storageError } = await supabaseClient.storage
-              .from(storageBucket)
-              .download(storagePath);
-            if (storageError) throw storageError;
-            const arrayBuffer = await storageBlob.arrayBuffer();
-            const inferType = (p: string) => {
-              const ext = p.split('.').pop()?.toLowerCase();
-              switch (ext) {
-                case 'png': return 'image/png';
-                case 'webp': return 'image/webp';
-                case 'gif': return 'image/gif';
-                case 'jpg':
-                case 'jpeg':
-                default: return 'image/jpeg';
-              }
-            };
-            const contentType = storageBlob.type || inferType(storagePath);
-            const mediaId = await uploadMedia(undefined, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, { arrayBuffer, contentType });
-            mediaIds = [mediaId];
-            console.log("Media uploaded successfully from storage override, media_id:", mediaId);
-          } else if (book.image_url) {
-            console.log("Uploading media from image_url...");
-            const mediaId = await uploadMedia(book.image_url, oauth1Token.oauth_token, oauth1Token.oauth_token_secret);
-            mediaIds = [mediaId];
-            console.log("Media uploaded successfully, media_id:", mediaId);
-          }
-        } catch (error) {
-          console.error("Failed to upload media, continuing without image:", error);
-        }
-
-        // Use rate limit tracking for book publishing too
-        const bookAccountId = oauth1Token.id || await getAccountIdFromToken(supabaseClient, userId, accountId);
-        const tweetResponse = bookAccountId
-          ? await sendTweetWithRateLimitTracking(supabaseClient, bookAccountId, tweetText, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, mediaIds)
-          : await sendTweetWithRetry(tweetText, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, mediaIds);
-        console.log("Tweet sent successfully:", tweetResponse);
-
-        const { data: existingContent } = await supabaseClient
-          .from('book_platform_content')
-          .select('*')
-          .eq('book_id', id)
-          .eq('platform', 'x')
+        // Fetch user's AI suffix from user_settings
+        let aiSuffix = '(ai)'; // Default
+        const { data: userSettings } = await supabaseClient
+          .from('user_settings')
+          .select('ai_suffix_x')
+          .eq('user_id', userId)
           .maybeSingle();
+        
+        if (userSettings?.ai_suffix_x !== null && userSettings?.ai_suffix_x !== undefined) {
+          aiSuffix = userSettings.ai_suffix_x;
+        }
+        console.log(`Using AI suffix for X: "${aiSuffix}"`);
 
-        if (existingContent) {
-          const { error: updateError } = await supabaseClient
+        const suffixPart = aiSuffix ? `\n\n${aiSuffix}` : '';
+        let tweetText = customText 
+          ? fixUrlsInText(customText) + suffixPart
+          : platformContent?.custom_text
+            ? fixUrlsInText(platformContent.custom_text) + suffixPart
+            : platformContent?.ai_generated_text
+              ? fixUrlsInText(platformContent.ai_generated_text) + suffixPart
+              : book.ai_text_x
+                ? fixUrlsInText(book.ai_text_x) + suffixPart
+                : book.ai_generated_text
+                  ? fixUrlsInText(book.ai_generated_text) + suffixPart
+                  : `📚 ${book.title}${book.author ? ` - ${book.author}` : ''}${book.product_url ? `\n${book.product_url}` : ''}${suffixPart}`;
+
+        let mediaIds: string[] = [];
+        if (book.storage_path || book.image_url) {
+          try {
+            if (book.storage_path) {
+              console.log(`📤 Uploading media from book storage_path: ${book.storage_path}`);
+              const { data: storageBlob, error: storageError } = await supabaseClient.storage
+                .from('ObrazkiKsiazek')
+                .download(book.storage_path);
+              
+              if (storageError) {
+                console.error("❌ Storage download error:", storageError);
+                throw new Error(`Failed to download from storage: ${storageError.message}`);
+              }
+              
+              const arrayBuffer = await storageBlob.arrayBuffer();
+              console.log(`✅ Downloaded ${arrayBuffer.byteLength} bytes from storage`);
+              
+              const inferType = (p: string) => {
+                const ext = p.split('.').pop()?.toLowerCase();
+                switch (ext) {
+                  case 'png': return 'image/png';
+                  case 'webp': return 'image/webp';
+                  case 'gif': return 'image/gif';
+                  case 'jpg':
+                  case 'jpeg':
+                  default: return 'image/jpeg';
+                }
+              };
+              const contentType = storageBlob.type || inferType(book.storage_path);
+              console.log(`📸 Uploading to X.com with content type: ${contentType}`);
+              
+              const mediaId = await uploadMedia(undefined, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, { arrayBuffer, contentType });
+              mediaIds = [mediaId];
+              console.log("✅ Media uploaded successfully, media_id:", mediaId);
+            } else if (book.image_url) {
+              console.log(`📤 Uploading media from book image_url: ${book.image_url}`);
+              const mediaId = await uploadMedia(book.image_url, oauth1Token.oauth_token, oauth1Token.oauth_token_secret);
+              mediaIds = [mediaId];
+              console.log("✅ Media uploaded successfully, media_id:", mediaId);
+            }
+          } catch (error: any) {
+            console.error("❌ Media upload failed:", error);
+          }
+        }
+
+        console.log(`🐦 Sending tweet for book ${id} with ${mediaIds.length} media attachments`);
+
+        const xAccountIdForTracking = oauth1Token.id || xAccountId;
+        const tweetResponse = xAccountIdForTracking
+          ? await sendTweetWithRateLimitTracking(supabaseClient, xAccountIdForTracking, tweetText, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, mediaIds)
+          : await sendTweetWithRetry(tweetText, oauth1Token.oauth_token, oauth1Token.oauth_token_secret, mediaIds);
+        console.log("Tweet sent successfully for book:", id, tweetResponse);
+
+        // SAVE PUBLICATION RECORD for daily limit tracking
+        if (xAccountIdForTracking && tweetResponse?.data?.id) {
+          await savePublication(
+            supabaseClient,
+            xAccountIdForTracking,
+            userId,
+            tweetResponse.data.id,
+            'book',
+            id,
+            undefined
+          );
+        }
+
+        // Update book_platform_content
+        if (platformContent) {
+          await supabaseClient
             .from('book_platform_content')
             .update({ 
               published: true,
               published_at: new Date().toISOString(),
               post_id: tweetResponse.data?.id
             })
-            .eq('id', existingContent.id);
-
-          if (updateError) throw updateError;
+            .eq('id', platformContent.id);
         } else {
-          const { error: insertError } = await supabaseClient
+          await supabaseClient
             .from('book_platform_content')
             .insert({
               book_id: id,
               platform: 'x',
+              user_id: userId,
               published: true,
               published_at: new Date().toISOString(),
-              post_id: tweetResponse.data?.id,
-              ai_generated_text: book.ai_generated_text,
-              user_id: book.user_id
+              post_id: tweetResponse.data?.id
             });
-
-          if (insertError) throw insertError;
         }
 
-        results.push({ 
-          id, 
-          success: true, 
-          tweetId: tweetResponse.data?.id 
+        results.push({
+          bookId: id,
+          success: true,
+          tweetId: tweetResponse.data?.id
         });
 
       } catch (error: any) {
         console.error(`Error publishing book ${id}:`, error);
-        results.push({ 
-          id, 
-          success: false, 
-          error: error.message 
+        
+        const isDailyLimit = error.isDailyLimit || error.message?.includes('dzienny limit');
+        
+        results.push({
+          bookId: id,
+          success: false,
+          error: error.message,
+          isDailyLimit
         });
       }
     }
 
+    const allSucceeded = results.every(r => r.success);
+    const anySucceeded = results.some(r => r.success);
+
     return new Response(
       JSON.stringify({ 
-        success: results.every(r => r.success),
+        success: anySucceeded,
         results,
-        summary: {
-          total: results.length,
-          successful: results.filter(r => r.success).length,
-          failed: results.filter(r => !r.success).length
-        }
+        message: allSucceeded 
+          ? `Successfully published ${results.length} book(s)` 
+          : anySucceeded
+            ? `Partially published: ${results.filter(r => r.success).length}/${results.length} succeeded`
+            : 'All publications failed'
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: allSucceeded ? 200 : anySucceeded ? 207 : 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
     );
 
   } catch (error: any) {
-    console.error('Error in publish-to-x function:', error);
-    // Return 200 with success: false so Supabase client can parse the error message
+    console.error('Error in publish-to-x:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { 
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      JSON.stringify({ 
+        success: false,
+        error: error.message || 'Unknown error' 
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   }

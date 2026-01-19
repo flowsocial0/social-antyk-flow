@@ -726,6 +726,61 @@ export type Database = {
         }
         Relationships: []
       }
+      x_daily_publications: {
+        Row: {
+          account_id: string
+          book_id: string | null
+          campaign_post_id: string | null
+          id: string
+          published_at: string
+          source: string
+          tweet_id: string | null
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          book_id?: string | null
+          campaign_post_id?: string | null
+          id?: string
+          published_at?: string
+          source?: string
+          tweet_id?: string | null
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          book_id?: string | null
+          campaign_post_id?: string | null
+          id?: string
+          published_at?: string
+          source?: string
+          tweet_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "x_daily_publications_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "twitter_oauth1_tokens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "x_daily_publications_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "x_daily_publications_campaign_post_id_fkey"
+            columns: ["campaign_post_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       x_rate_limits: {
         Row: {
           account_id: string
