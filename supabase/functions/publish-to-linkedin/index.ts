@@ -15,6 +15,7 @@ Deno.serve(async (req) => {
     
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
 
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error('Missing Supabase environment variables');
@@ -24,7 +25,32 @@ Deno.serve(async (req) => {
 
     // Get request body
     const body = await req.json();
-    const { text, imageUrl, userId, accountId, bookId, contentId } = body;
+    const { text, imageUrl, userId: userIdFromBody, accountId, bookId, contentId } = body;
+
+    // Determine userId - from body (auto-publish) or from JWT (direct user call)
+    let userId: string | null = null;
+
+    if (userIdFromBody) {
+      userId = userIdFromBody;
+      console.log('Using userId from request body:', userId);
+    } else {
+      // Get user_id from Authorization header
+      const authHeader = req.headers.get('authorization');
+      console.log('Authorization header:', authHeader ? 'present' : 'MISSING');
+      
+      if (authHeader && SUPABASE_ANON_KEY) {
+        const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          global: { headers: { Authorization: authHeader } }
+        });
+
+        const { data: { user }, error: userError } = await supabaseAnon.auth.getUser();
+        
+        if (!userError && user) {
+          userId = user.id;
+          console.log('User ID from JWT:', userId);
+        }
+      }
+    }
 
     console.log('Publish request:', {
       textLength: text?.length || 0,
@@ -36,7 +62,14 @@ Deno.serve(async (req) => {
     });
 
     if (!userId) {
-      throw new Error('User ID is required');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Musisz być zalogowany aby publikować na LinkedIn',
+          errorCode: 'NO_USER_ID'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
     }
 
     // Determine post text and image
