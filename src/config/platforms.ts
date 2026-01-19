@@ -92,7 +92,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-blue-700/20',
     gradientTo: 'to-blue-800/20',
     path: '/platforms/linkedin',
-    status: 'coming-soon',
+    status: 'active',
     priority: 5,
     mediaType: 'both',
   },

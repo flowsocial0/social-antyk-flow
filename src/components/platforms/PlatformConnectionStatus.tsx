@@ -87,7 +87,7 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
   const handleConnect = async () => {
     if (onConnect) {
       onConnect();
-    } else if (platform === "x" || platform === "facebook" || platform === "tiktok" || platform === "instagram" || platform === "youtube") {
+    } else if (platform === "x" || platform === "facebook" || platform === "tiktok" || platform === "instagram" || platform === "youtube" || platform === "linkedin") {
       // Start OAuth flow
       window.location.href = "/settings/social-accounts";
     } else {
@@ -118,6 +118,9 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
     }
     if (platform === "youtube") {
       return tokenData.channel_title || null;
+    }
+    if (platform === "linkedin") {
+      return tokenData.display_name || null;
     }
     return null;
   };

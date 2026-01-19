@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Twitter, Facebook, Instagram, Youtube, CheckCircle2, Loader2, Video, ArrowLeft, Plus, Star, Trash2 } from "lucide-react";
+import { Twitter, Facebook, Instagram, Youtube, CheckCircle2, Loader2, Video, ArrowLeft, Plus, Star, Trash2, Linkedin } from "lucide-react";
 import { Footer } from "@/components/layout/Footer";
 import {
   AlertDialog,
@@ -31,6 +31,7 @@ interface PlatformAccounts {
   instagram: SocialAccount[];
   tiktok: SocialAccount[];
   youtube: SocialAccount[];
+  linkedin: SocialAccount[];
 }
 
 export default function SocialAccounts() {
@@ -42,6 +43,7 @@ export default function SocialAccounts() {
     instagram: [],
     tiktok: [],
     youtube: [],
+    linkedin: [],
   });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; platform: string; accountId: string; accountName: string }>({
     open: false,
@@ -72,12 +74,13 @@ export default function SocialAccounts() {
     if (!session) return;
 
     // Load all accounts for each platform
-    const [xResult, fbResult, igResult, tiktokResult, ytResult] = await Promise.all([
+    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult] = await Promise.all([
       supabase.from('twitter_oauth1_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('facebook_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('instagram_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('tiktok_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('youtube_oauth_tokens').select('*').eq('user_id', session.user.id),
+      (supabase as any).from('linkedin_oauth_tokens').select('*').eq('user_id', session.user.id),
     ]);
 
     setAccounts({
@@ -110,6 +113,12 @@ export default function SocialAccounts() {
         account_name: a.account_name,
         is_default: a.is_default ?? false,
         display_name: a.channel_title || 'Kanał YouTube',
+      })),
+      linkedin: (linkedinResult.data || []).map((a: any) => ({
+        id: a.id,
+        account_name: a.account_name,
+        is_default: a.is_default ?? false,
+        display_name: a.display_name || 'Profil LinkedIn',
       })),
     });
   };
@@ -260,6 +269,35 @@ export default function SocialAccounts() {
     }
   };
 
+  const connectLinkedIn = async () => {
+    setLoading('linkedin', true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Musisz być zalogowany');
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('linkedin-oauth-start', {
+        body: { userId: session.user.id }
+      });
+      
+      if (error) throw error;
+      
+      if (data?.url) {
+        if (data.state) {
+          sessionStorage.setItem('linkedin_state', data.state);
+          sessionStorage.setItem('linkedin_user_id', session.user.id);
+        }
+        window.location.href = data.url;
+      }
+    } catch (error: any) {
+      toast.error('Nie udało się połączyć z LinkedIn', { description: error.message });
+    } finally {
+      setLoading('linkedin', false);
+    }
+  };
+
   const deleteAccount = async (platform: string, accountId: string) => {
     setLoading(`delete-${accountId}`, true);
     try {
@@ -272,6 +310,7 @@ export default function SocialAccounts() {
         instagram: 'instagram_oauth_tokens',
         tiktok: 'tiktok_oauth_tokens',
         youtube: 'youtube_oauth_tokens',
+        linkedin: 'linkedin_oauth_tokens',
       };
 
       const { error } = await (supabase as any)
@@ -303,6 +342,7 @@ export default function SocialAccounts() {
         instagram: 'instagram_oauth_tokens',
         tiktok: 'tiktok_oauth_tokens',
         youtube: 'youtube_oauth_tokens',
+        linkedin: 'linkedin_oauth_tokens',
       };
 
       // First, unset all defaults for this platform
@@ -330,6 +370,7 @@ export default function SocialAccounts() {
     { id: 'instagram', name: 'Instagram', icon: Instagram, color: 'text-pink-500', bgColor: 'bg-pink-500/10', connect: connectInstagram },
     { id: 'tiktok', name: 'TikTok', icon: Video, color: 'text-black dark:text-white', bgColor: 'bg-black/10 dark:bg-white/10', connect: connectTikTok },
     { id: 'youtube', name: 'YouTube', icon: Youtube, color: 'text-red-500', bgColor: 'bg-red-500/10', connect: connectYouTube },
+    { id: 'linkedin', name: 'LinkedIn', icon: Linkedin, color: 'text-blue-700', bgColor: 'bg-blue-700/10', connect: connectLinkedIn },
   ];
 
   return (
