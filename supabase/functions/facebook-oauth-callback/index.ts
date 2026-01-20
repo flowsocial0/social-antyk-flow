@@ -113,10 +113,17 @@ Deno.serve(async (req) => {
     const longLivedToken = longLivedData.access_token;
     console.log('Obtained long-lived user token');
 
-    // Step 3: Get user's pages
-    const pagesUrl = `https://graph.facebook.com/v18.0/me/accounts?access_token=${longLivedToken}`;
+    // Step 3: Get user's pages with additional fields for debugging
+    const pagesUrl = `https://graph.facebook.com/v18.0/me/accounts?access_token=${longLivedToken}&fields=id,name,category,access_token,tasks`;
     const pagesResponse = await fetch(pagesUrl);
     const pagesData = await pagesResponse.json();
+
+    // Enhanced logging for debugging
+    console.log('=== Facebook Pages Response Debug ===');
+    console.log('Pages response status:', pagesResponse.status);
+    console.log('Full pages response:', JSON.stringify(pagesData));
+    console.log('Pages data.data:', pagesData.data);
+    console.log('Pages data.data length:', pagesData.data?.length || 0);
 
     if (!pagesResponse.ok || pagesData.error) {
       console.error('Facebook pages error:', pagesData);
@@ -124,7 +131,26 @@ Deno.serve(async (req) => {
     }
 
     if (!pagesData.data || pagesData.data.length === 0) {
-      throw new Error('No Facebook Pages found. You need to be an admin of at least one Facebook Page to publish posts.');
+      // Additional debugging - get user info to understand the account
+      console.log('No pages found - fetching user info for diagnostics...');
+      const userInfoUrl = `https://graph.facebook.com/v18.0/me?access_token=${longLivedToken}&fields=id,name,email`;
+      const userInfoResponse = await fetch(userInfoUrl);
+      const userInfo = await userInfoResponse.json();
+      console.log('User info from Facebook:', JSON.stringify(userInfo));
+      
+      // Check granted permissions
+      const permissionsUrl = `https://graph.facebook.com/v18.0/me/permissions?access_token=${longLivedToken}`;
+      const permissionsResponse = await fetch(permissionsUrl);
+      const permissionsData = await permissionsResponse.json();
+      console.log('Granted permissions:', JSON.stringify(permissionsData));
+      
+      throw new Error(
+        'Nie znaleziono żadnych stron Facebook, do których masz uprawnienia administratora. ' +
+        'Upewnij się, że: 1) Jesteś administratorem lub redaktorem przynajmniej jednej strony Facebook (nie profilu osobistego), ' +
+        '2) Strona jest aktywna i opublikowana, ' +
+        '3) W poprzednim kroku zaakceptowałeś uprawnienia do zarządzania stronami (pages_show_list, pages_manage_posts). ' +
+        'Jeśli problem się powtarza, spróbuj usunąć aplikację z ustawień Facebooka i połączyć się ponownie.'
+      );
     }
 
     const pages = pagesData.data;

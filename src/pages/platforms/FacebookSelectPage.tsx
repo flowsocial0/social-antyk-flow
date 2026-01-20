@@ -24,6 +24,21 @@ export default function FacebookSelectPage() {
 
   useEffect(() => {
     const fetchPagesData = async () => {
+      // First verify user session is still active after OAuth redirect
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        console.error('User session not found on FacebookSelectPage - redirecting to login');
+        setError("Sesja wygasła podczas łączenia z Facebookiem. Zaloguj się ponownie i spróbuj połączyć konto Facebook.");
+        setIsLoading(false);
+        // Redirect to login with return path
+        setTimeout(() => {
+          navigate('/login?redirect=/platforms/facebook');
+        }, 3000);
+        return;
+      }
+      
+      console.log('Session verified for user:', session.user.id);
+      
       const sessionId = searchParams.get("session_id");
       
       // Legacy support: check for old base64 pages parameter
