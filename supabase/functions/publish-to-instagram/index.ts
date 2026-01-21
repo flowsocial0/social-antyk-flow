@@ -48,6 +48,7 @@ serve(async (req) => {
     let imageUrl: string | undefined;
     let testConnection: boolean | undefined;
     let userIdFromBody: string | undefined;
+    let accountId: string | undefined; // Specific Instagram account to publish to
 
     try {
       const body = await req.json();
@@ -58,6 +59,7 @@ serve(async (req) => {
       imageUrl = body.imageUrl;
       testConnection = body.testConnection;
       userIdFromBody = body.userId;
+      accountId = body.accountId; // For multi-account support
       
       console.log('Request body:', { 
         bookId, 
@@ -66,7 +68,8 @@ serve(async (req) => {
         caption: caption ? 'present' : undefined,
         imageUrl: imageUrl ? 'present' : undefined, 
         testConnection,
-        userId: userIdFromBody ? 'present' : undefined
+        userId: userIdFromBody ? 'present' : undefined,
+        accountId: accountId || 'not specified (will use default)'
       });
     } catch (_) {
       testConnection = true;
@@ -104,13 +107,37 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Get Instagram token from database
-    console.log('Fetching Instagram token for user:', userId);
+    // If accountId is provided, use that specific account; otherwise use default
+    console.log('Fetching Instagram token for user:', userId, 'accountId:', accountId || 'default');
     
-    const { data: tokenData, error: tokenError } = await supabase
+    let tokenQuery = supabase
       .from('instagram_oauth_tokens')
       .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
+      .eq('user_id', userId);
+
+    if (accountId) {
+      // Use specific account
+      tokenQuery = tokenQuery.eq('id', accountId);
+    } else {
+      // Use default account or first available
+      tokenQuery = tokenQuery.eq('is_default', true);
+    }
+
+    let { data: tokenData, error: tokenError } = await tokenQuery.maybeSingle();
+
+    // If no default account found, try to get any account for this user
+    if (!tokenData && !accountId) {
+      console.log('No default account found, trying to get any account...');
+      const { data: anyToken, error: anyTokenError } = await supabase
+        .from('instagram_oauth_tokens')
+        .select('*')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+      
+      tokenData = anyToken;
+      tokenError = anyTokenError;
+    }
 
     if (tokenError) {
       console.error('Error fetching Instagram token:', tokenError);
@@ -118,11 +145,14 @@ serve(async (req) => {
     }
     
     if (!tokenData) {
-      console.error('No Instagram token found for user:', userId);
-      throw new Error('Instagram nie jest połączony. Połącz konto Instagram w ustawieniach.');
+      console.error('No Instagram token found for user:', userId, 'accountId:', accountId);
+      throw new Error(accountId 
+        ? `Konto Instagram (${accountId}) nie znalezione. Konto mogło zostać odłączone.`
+        : 'Instagram nie jest połączony. Połącz konto Instagram w ustawieniach.');
     }
 
-    const { access_token, instagram_account_id, instagram_username, expires_at } = tokenData;
+    const { id: tokenId, access_token, instagram_account_id, instagram_username, expires_at } = tokenData;
+    console.log('Using Instagram account:', { tokenId, instagram_account_id, instagram_username });
     console.log('Found Instagram token:', { instagram_account_id, instagram_username, expires_at });
 
     // Check if token is expired
