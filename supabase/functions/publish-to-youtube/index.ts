@@ -14,6 +14,7 @@ interface PublishRequest {
   contentId?: string;
   campaignPostId?: string;
   platform?: string;
+  accountId?: string; // For multi-account support
   // Legacy API - backwards compatibility
   userId?: string;
   title?: string;
@@ -201,14 +202,33 @@ Deno.serve(async (req) => {
 
     console.log('[YouTube] Publishing video:', title);
 
-    // Get user's YouTube tokens
-    const { data: tokenData, error: tokenError } = await supabase
+    // Get user's YouTube tokens (multi-account support)
+    let tokenQuery = supabase
       .from('youtube_oauth_tokens')
       .select('*')
-      .eq('user_id', userId)
-      .single();
+      .eq('user_id', userId);
 
-    if (tokenError || !tokenData) {
+    if (requestData.accountId) {
+      tokenQuery = tokenQuery.eq('id', requestData.accountId);
+    } else {
+      tokenQuery = tokenQuery.eq('is_default', true);
+    }
+
+    let { data: tokenData, error: tokenError } = await tokenQuery.maybeSingle();
+
+    // Fallback: if no default account found and no specific account requested, get any account
+    if (!tokenData && !requestData.accountId) {
+      console.log('[YouTube] No default account found, fetching any available account...');
+      const { data: anyToken } = await supabase
+        .from('youtube_oauth_tokens')
+        .select('*')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+      tokenData = anyToken;
+    }
+
+    if (!tokenData) {
       console.error('[YouTube] Token fetch error:', tokenError);
       throw new Error('YouTube account not connected');
     }
