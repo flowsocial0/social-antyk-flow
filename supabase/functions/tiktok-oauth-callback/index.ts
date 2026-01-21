@@ -92,14 +92,8 @@ serve(async (req) => {
         throw new Error('Failed to update TikTok token');
       }
     } else {
-      // Insert new account - check if user has any existing accounts to set is_default
-      const { count } = await supabase
-        .from('tiktok_oauth_tokens')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
-
-      const isDefault = (count || 0) === 0;
-      console.log('Inserting new TikTok account, is_default:', isDefault);
+      // Insert new account - never set as default (we publish to all accounts)
+      console.log('Inserting new TikTok account');
 
       const { error: insertError } = await supabase
         .from('tiktok_oauth_tokens')
@@ -110,7 +104,7 @@ serve(async (req) => {
           open_id,
           scope,
           expires_at: expiresAt,
-          is_default: isDefault,
+          is_default: false, // Never set default - we publish to all accounts
         });
 
       if (insertError) {

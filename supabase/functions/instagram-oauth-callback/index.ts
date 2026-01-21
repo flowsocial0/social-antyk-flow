@@ -198,14 +198,8 @@ serve(async (req) => {
         return Response.redirect(`${FRONTEND_URL}/settings/social-accounts?instagram=error&message=save_failed`, 302);
       }
     } else {
-      // Insert new account - check if user has any existing accounts to set is_default
-      const { count } = await supabase
-        .from('instagram_oauth_tokens')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
-
-      const isDefault = (count || 0) === 0;
-      console.log('Inserting new Instagram account, is_default:', isDefault);
+      // Insert new account - never set as default (we publish to all accounts)
+      console.log('Inserting new Instagram account');
 
       const { error: insertError } = await supabase
         .from('instagram_oauth_tokens')
@@ -219,7 +213,7 @@ serve(async (req) => {
           facebook_page_id: connectedPage.id,
           account_name: instagramAccount.username,
           scope: 'instagram_basic,instagram_content_publish',
-          is_default: isDefault,
+          is_default: false, // Never set default - we publish to all accounts
         });
 
       if (insertError) {

@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Twitter, Facebook, Instagram, Youtube, CheckCircle2, Loader2, Video, ArrowLeft, Plus, Star, Trash2, Linkedin } from "lucide-react";
+import { Twitter, Facebook, Instagram, Youtube, CheckCircle2, Loader2, Video, ArrowLeft, Plus, Trash2, Linkedin } from "lucide-react";
 import { Footer } from "@/components/layout/Footer";
 import {
   AlertDialog,
@@ -21,7 +21,6 @@ import {
 interface SocialAccount {
   id: string;
   account_name: string | null;
-  is_default: boolean;
   display_name: string;
 }
 
@@ -87,37 +86,31 @@ export default function SocialAccounts() {
       x: (xResult.data || []).map((a: any) => ({
         id: a.id,
         account_name: a.account_name,
-        is_default: a.is_default ?? false,
         display_name: a.screen_name ? `@${a.screen_name}` : 'Konto X',
       })),
       facebook: (fbResult.data || []).map((a: any) => ({
         id: a.id,
         account_name: a.account_name,
-        is_default: a.is_default ?? false,
         display_name: a.page_name || 'Strona Facebook',
       })),
       instagram: (igResult.data || []).map((a: any) => ({
         id: a.id,
         account_name: a.account_name,
-        is_default: a.is_default ?? false,
         display_name: a.instagram_username ? `@${a.instagram_username}` : 'Konto Instagram',
       })),
       tiktok: (tiktokResult.data || []).map((a: any) => ({
         id: a.id,
         account_name: a.account_name,
-        is_default: a.is_default ?? false,
         display_name: a.account_name || a.open_id?.substring(0, 8) || 'Konto TikTok',
       })),
       youtube: (ytResult.data || []).map((a: any) => ({
         id: a.id,
         account_name: a.account_name,
-        is_default: a.is_default ?? false,
         display_name: a.channel_title || 'Kanał YouTube',
       })),
       linkedin: (linkedinResult.data || []).map((a: any) => ({
         id: a.id,
         account_name: a.account_name,
-        is_default: a.is_default ?? false,
         display_name: a.display_name || 'Profil LinkedIn',
       })),
     });
@@ -331,38 +324,8 @@ export default function SocialAccounts() {
     }
   };
 
-  const setAsDefault = async (platform: string, accountId: string) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const tableMap: Record<string, string> = {
-        x: 'twitter_oauth1_tokens',
-        facebook: 'facebook_oauth_tokens',
-        instagram: 'instagram_oauth_tokens',
-        tiktok: 'tiktok_oauth_tokens',
-        youtube: 'youtube_oauth_tokens',
-        linkedin: 'linkedin_oauth_tokens',
-      };
-
-      // First, unset all defaults for this platform
-      await (supabase as any)
-        .from(tableMap[platform])
-        .update({ is_default: false })
-        .eq('user_id', session.user.id);
-
-      // Then set this one as default
-      await (supabase as any)
-        .from(tableMap[platform])
-        .update({ is_default: true })
-        .eq('id', accountId);
-
-      toast.success('Ustawiono jako domyślne');
-      loadAllAccounts();
-    } catch (error: any) {
-      toast.error('Nie udało się ustawić jako domyślne');
-    }
-  };
+  // Removed setAsDefault function - we no longer use default accounts
+  // All connected accounts receive publications simultaneously
 
   const platformConfig = [
     { id: 'x', name: 'X (Twitter)', icon: Twitter, color: 'text-blue-500', bgColor: 'bg-blue-500/10', connect: connectX },
@@ -446,25 +409,9 @@ export default function SocialAccounts() {
                         <div className="flex items-center gap-3">
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
                           <span className="font-medium">{account.display_name}</span>
-                          {account.is_default && (
-                            <Badge variant="default" className="text-xs gap-1">
-                              <Star className="h-3 w-3" />
-                              Domyślne
-                            </Badge>
-                          )}
                         </div>
                         
                         <div className="flex items-center gap-2">
-                          {!account.is_default && platformAccounts.length > 1 && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setAsDefault(platform.id, account.id)}
-                              className="text-xs"
-                            >
-                              Ustaw domyślne
-                            </Button>
-                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -497,7 +444,7 @@ export default function SocialAccounts() {
           <h4 className="font-medium mb-2">Wskazówki</h4>
           <ul className="text-sm text-muted-foreground space-y-1">
             <li>• Możesz podłączyć wiele kont do każdej platformy</li>
-            <li>• Konto domyślne będzie używane automatycznie w kampaniach</li>
+            <li>• Publikacja z listy książek trafi na WSZYSTKIE połączone konta</li>
             <li>• W ustawieniach kampanii możesz wybrać konkretne konta do publikacji</li>
           </ul>
         </div>

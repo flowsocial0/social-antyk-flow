@@ -148,26 +148,32 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get LinkedIn token for user
-    let tokenQuery = supabase
-      .from('linkedin_oauth_tokens')
-      .select('*')
-      .eq('user_id', userId);
-
-    if (accountId) {
-      tokenQuery = tokenQuery.eq('id', accountId);
-    } else {
-      tokenQuery = tokenQuery.eq('is_default', true);
+    // Get LinkedIn token for user - require explicit accountId
+    if (!accountId) {
+      console.error('No accountId provided - required for multi-account publish');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Brak ID konta LinkedIn. Wybierz konto do publikacji.',
+          errorCode: 'NO_ACCOUNT_ID'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
     }
 
-    const { data: tokenData, error: tokenError } = await tokenQuery.single();
+    const { data: tokenData, error: tokenError } = await supabase
+      .from('linkedin_oauth_tokens')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('id', accountId)
+      .maybeSingle();
 
     if (tokenError || !tokenData) {
       console.error('No LinkedIn token found:', tokenError);
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: 'Brak połączonego konta LinkedIn',
+          message: `Konto LinkedIn (${accountId}) nie znalezione lub nie połączone`,
           errorCode: 'NO_LINKEDIN_TOKEN'
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }

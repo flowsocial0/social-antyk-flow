@@ -165,14 +165,8 @@ Deno.serve(async (req) => {
         throw new Error('Failed to update LinkedIn token: ' + updateError.message);
       }
     } else {
-      // Insert new account - check if user has any existing accounts to set is_default
-      const { count } = await supabase
-        .from('linkedin_oauth_tokens')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
-
-      const isDefault = (count || 0) === 0;
-      console.log('Inserting new LinkedIn account, is_default:', isDefault);
+      // Insert new account - never set as default (we publish to all accounts)
+      console.log('Inserting new LinkedIn account');
 
       const { error: insertError } = await supabase
         .from('linkedin_oauth_tokens')
@@ -187,7 +181,7 @@ Deno.serve(async (req) => {
           account_name: displayName,
           profile_picture_url: profilePictureUrl,
           scope: scope,
-          is_default: isDefault,
+          is_default: false, // Never set default - we publish to all accounts
         });
 
       if (insertError) {
