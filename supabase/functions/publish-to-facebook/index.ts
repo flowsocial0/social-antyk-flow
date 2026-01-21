@@ -40,7 +40,8 @@ Deno.serve(async (req) => {
         campaignPostId: string | undefined,
         imageUrl: string | undefined,
         testConnection: boolean | undefined,
-        userIdFromBody: string | undefined;
+        userIdFromBody: string | undefined,
+        accountId: string | undefined; // Specific Facebook account to publish to
     
     try {
       const body = await req.json();
@@ -50,13 +51,15 @@ Deno.serve(async (req) => {
       imageUrl = body.imageUrl;
       testConnection = body.testConnection;
       userIdFromBody = body.userId;
+      accountId = body.accountId; // For multi-account support
       console.log('Request body:', { 
         text: text ? 'present' : undefined, 
         bookId, 
         campaignPostId, 
         imageUrl: imageUrl ? 'present' : undefined, 
         testConnection,
-        userId: userIdFromBody ? 'present' : undefined
+        userId: userIdFromBody ? 'present' : undefined,
+        accountId: accountId || 'not specified (will use default)'
       });
     } catch (_) {
       testConnection = true;
@@ -99,13 +102,37 @@ Deno.serve(async (req) => {
     console.log('Is test connection:', isTest);
 
     // Get Facebook Page Access Token for this user
-    console.log('Fetching Facebook token for user:', userId);
+    // If accountId is provided, use that specific account; otherwise use default
+    console.log('Fetching Facebook token for user:', userId, 'accountId:', accountId || 'default');
     
-    const { data: tokenData, error: tokenError } = await supabase
+    let tokenQuery = supabase
       .from('facebook_oauth_tokens')
       .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
+      .eq('user_id', userId);
+
+    if (accountId) {
+      // Use specific account
+      tokenQuery = tokenQuery.eq('id', accountId);
+    } else {
+      // Use default account or first available
+      tokenQuery = tokenQuery.eq('is_default', true);
+    }
+
+    let { data: tokenData, error: tokenError } = await tokenQuery.maybeSingle();
+
+    // If no default account found, try to get any account for this user
+    if (!tokenData && !accountId) {
+      console.log('No default account found, trying to get any account...');
+      const { data: anyToken, error: anyTokenError } = await supabase
+        .from('facebook_oauth_tokens')
+        .select('*')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+      
+      tokenData = anyToken;
+      tokenError = anyTokenError;
+    }
 
     if (tokenError) {
       console.error('Error fetching Facebook token:', tokenError);
@@ -113,11 +140,14 @@ Deno.serve(async (req) => {
     }
     
     if (!tokenData) {
-      console.error('No Facebook token found for user:', userId);
-      throw new Error('Facebook not connected. Please connect your Facebook account first.');
+      console.error('No Facebook token found for user:', userId, 'accountId:', accountId);
+      throw new Error(accountId 
+        ? `Facebook account (${accountId}) not found. The account may have been disconnected.`
+        : 'Facebook not connected. Please connect your Facebook account first.');
     }
 
-    const { access_token, page_id, page_name, expires_at } = tokenData;
+    const { id: tokenId, access_token, page_id, page_name, expires_at } = tokenData;
+    console.log('Using Facebook account:', { tokenId, page_name, page_id });
     console.log('Found Facebook token:', { page_id, page_name, expires_at });
 
     // Check if token is expired
