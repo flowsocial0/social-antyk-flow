@@ -11,67 +11,83 @@ interface PlatformConnectionStatusProps {
   onConnect?: () => void;
 }
 
+interface AccountInfo {
+  id: string;
+  name: string;
+  expires_at?: string;
+}
+
 export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnectionStatusProps) => {
   const { toast } = useToast();
 
-  const { data: tokenData, isLoading, refetch } = useQuery({
-    queryKey: ["oauth-token", platform],
+  const getTableName = (platform: string): string => {
+    if (platform === "x") return "twitter_oauth1_tokens";
+    return `${platform}_oauth_tokens`;
+  };
+
+  const { data: accounts, isLoading, refetch } = useQuery({
+    queryKey: ["oauth-tokens", platform],
     refetchOnWindowFocus: true,
     staleTime: 0,
-    queryFn: async () => {
-      // Get current user session
+    queryFn: async (): Promise<AccountInfo[]> => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return null;
+      if (!session) return [];
 
-      // For X platform, check OAuth 1.0a tokens
-      if (platform === "x") {
-        const { data, error } = await supabase
-          .from("twitter_oauth1_tokens")
-          .select("*")
-          .eq("user_id", session.user.id)
-          .maybeSingle();
-
-        if (error && error.code !== "PGRST116") throw error;
-        return data;
-      }
-
-      // For other platforms, check OAuth2 tokens
-      const tableName = `${platform}_oauth_tokens`;
+      const tableName = getTableName(platform);
       const { data, error } = await (supabase as any)
         .from(tableName)
         .select("*")
-        .eq("user_id", session.user.id)
-        .maybeSingle();
+        .eq("user_id", session.user.id);
 
       if (error && error.code !== "PGRST116") throw error;
-      return data;
+      if (!data || data.length === 0) return [];
+
+      // Map to account info based on platform
+      return data.map((token: any) => {
+        let name = "Konto";
+        if (platform === "x") name = token.screen_name ? `@${token.screen_name}` : "Konto X";
+        else if (platform === "facebook") name = token.page_name || "Strona Facebook";
+        else if (platform === "instagram") name = token.instagram_username ? `@${token.instagram_username}` : "Konto Instagram";
+        else if (platform === "tiktok") name = token.account_name || token.open_id?.substring(0, 8) || "Konto TikTok";
+        else if (platform === "youtube") name = token.channel_title || "Kanał YouTube";
+        else if (platform === "linkedin") name = token.display_name || "Profil LinkedIn";
+
+        return {
+          id: token.id,
+          name,
+          expires_at: token.expires_at,
+        };
+      });
     },
   });
 
   const testConnectionMutation = useMutation({
     mutationFn: async () => {
-      // Get current user session
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Musisz być zalogowany');
-      }
+      if (!session) throw new Error('Musisz być zalogowany');
 
+      // Test connection for all accounts by calling the function
+      // The function will report how many accounts are connected
       const functionName = platform === "x" ? "publish-to-x" : `publish-to-${platform}`;
       const { data, error } = await supabase.functions.invoke(functionName, {
         body: { testConnection: true },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
+        headers: { Authorization: `Bearer ${session.access_token}` }
       });
       if (error) throw error;
       return data;
     },
     onSuccess: (data: any) => {
       const isOk = !!(data?.connected ?? data?.success ?? data?.oauth1?.ok ?? data?.oauth2?.ok);
-      const pageName = data?.pageName || data?.page_name;
+      const accountCount = accounts?.length || 0;
+      const pageName = data?.pageName || data?.page_name || data?.username || data?.name;
+      
       toast({
-        title: isOk ? "✅ Połączenie działa" : "❌ Problem z połączeniem",
-        description: isOk ? (pageName ? `Połączono jako: ${pageName}` : "Konto jest prawidłowo połączone") : "Sprawdź ustawienia połączenia",
+        title: isOk 
+          ? `✅ Połączono ${accountCount} ${accountCount === 1 ? 'konto' : 'kont'}`
+          : "❌ Problem z połączeniem",
+        description: isOk 
+          ? (pageName ? `Testowano: ${pageName}` : `${accountCount} kont połączonych`) 
+          : "Sprawdź ustawienia połączenia",
         variant: isOk ? "default" : "destructive",
       });
     },
@@ -87,8 +103,7 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
   const handleConnect = async () => {
     if (onConnect) {
       onConnect();
-    } else if (platform === "x" || platform === "facebook" || platform === "tiktok" || platform === "instagram" || platform === "youtube" || platform === "linkedin") {
-      // Start OAuth flow
+    } else if (["x", "facebook", "tiktok", "instagram", "youtube", "linkedin"].includes(platform)) {
       window.location.href = "/settings/social-accounts";
     } else {
       toast({
@@ -98,34 +113,8 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
     }
   };
 
-  const isConnected = !!tokenData;
-
-  // Get account name based on platform
-  const getAccountName = (): string | null => {
-    if (!tokenData) return null;
-    
-    if (platform === "x") {
-      return tokenData.screen_name ? `@${tokenData.screen_name}` : null;
-    }
-    if (platform === "facebook") {
-      return tokenData.page_name || null;
-    }
-    if (platform === "tiktok") {
-      return tokenData.open_id ? `ID: ${tokenData.open_id.substring(0, 8)}...` : null;
-    }
-    if (platform === "instagram") {
-      return tokenData.instagram_username ? `@${tokenData.instagram_username}` : null;
-    }
-    if (platform === "youtube") {
-      return tokenData.channel_title || null;
-    }
-    if (platform === "linkedin") {
-      return tokenData.display_name || null;
-    }
-    return null;
-  };
-
-  const accountName = getAccountName();
+  const accountCount = accounts?.length || 0;
+  const isConnected = accountCount > 0;
 
   if (isLoading) {
     return (
@@ -150,7 +139,7 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
           {isConnected ? (
             <Badge variant="default" className="gap-1">
               <CheckCircle2 className="h-3 w-3" />
-              Połączono
+              {accountCount} {accountCount === 1 ? 'konto' : 'kont'}
             </Badge>
           ) : (
             <Badge variant="destructive" className="gap-1">
@@ -164,18 +153,19 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
         {isConnected ? (
           <>
             <div className="space-y-2">
-              {accountName && (
-                <p className="text-sm font-medium text-foreground">
-                  {accountName}
-                </p>
-              )}
+              <div className="flex flex-wrap gap-2">
+                {accounts?.map((account) => (
+                  <Badge key={account.id} variant="secondary" className="text-xs">
+                    {account.name}
+                  </Badge>
+                ))}
+              </div>
               <p className="text-sm text-muted-foreground">
-                Konto zostało autoryzowane i jest gotowe do publikacji
+                Publikacja trafi na wszystkie połączone konta
               </p>
-              {tokenData?.expires_at && (
-                <p className="text-xs text-muted-foreground">
-                  Token wygasa:{" "}
-                  {new Date(tokenData.expires_at).toLocaleDateString("pl-PL")}
+              {accounts?.some(a => a.expires_at && new Date(a.expires_at) < new Date()) && (
+                <p className="text-xs text-destructive">
+                  ⚠️ Niektóre tokeny wygasły - odśwież połączenie
                 </p>
               )}
             </div>

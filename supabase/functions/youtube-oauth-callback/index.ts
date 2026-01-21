@@ -136,14 +136,8 @@ Deno.serve(async (req) => {
         throw new Error('Failed to update tokens');
       }
     } else {
-      // Insert new account - check if user has any existing accounts to set is_default
-      const { count } = await supabaseAdmin
-        .from('youtube_oauth_tokens')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-
-      const isDefault = (count || 0) === 0;
-      console.log('Inserting new YouTube account, is_default:', isDefault);
+      // Insert new account - never set as default (we publish to all accounts)
+      console.log('Inserting new YouTube account');
 
       const { error: insertError } = await supabaseAdmin
         .from('youtube_oauth_tokens')
@@ -157,7 +151,7 @@ Deno.serve(async (req) => {
           channel_title: channelTitle,
           account_name: channelTitle,
           scope,
-          is_default: isDefault,
+          is_default: false, // Never set default - we publish to all accounts
         });
 
       if (insertError) {

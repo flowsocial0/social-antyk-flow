@@ -222,9 +222,14 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
     );
   };
 
+  // Helper function to get token table name for platform
+  const getTokenTableName = (platform: string): string => {
+    if (platform === 'x') return 'twitter_oauth1_tokens';
+    return `${platform}_oauth_tokens`;
+  };
+
   const publishMutation = useMutation({
     mutationFn: async ({ contentId, bookId, book }: { contentId: string; bookId: string; book?: any }) => {
-      // Get current session for Authorization header
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('Musisz być zalogowany aby publikować');
@@ -237,6 +242,21 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
         if (!hasVideo) {
           throw new Error(`Platforma ${platform.toUpperCase()} wymaga wideo. Proszę najpierw dodać wideo do tej książki.`);
         }
+      }
+
+      // Get ALL accounts for this platform
+      const tableName = getTokenTableName(platform);
+      const { data: accounts, error: accountsError } = await (supabase as any)
+        .from(tableName)
+        .select('id')
+        .eq('user_id', session.user.id);
+
+      if (accountsError) {
+        throw new Error('Nie udało się pobrać listy kont');
+      }
+
+      if (!accounts || accounts.length === 0) {
+        throw new Error(`Brak połączonych kont ${platform.toUpperCase()}. Połącz konto w ustawieniach.`);
       }
 
       // Select the correct function based on platform
@@ -252,37 +272,38 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
         throw new Error(`Publikacja na platformie ${platform} nie jest jeszcze obsługiwana`);
       }
 
-      const { data, error } = await supabase.functions.invoke(functionName, {
-        body: { contentId, bookId, platform },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-      
-      // Handle Supabase client error (network issues, etc.)
-      if (error) {
-        throw new Error(error.message || 'Błąd połączenia z serwerem');
-      }
-      
-      // CRITICAL: Check top-level success field - this is the primary error handling
-      if (data && data.success === false) {
-        // Extract error message - prefer 'message' over 'error' for user-friendly text
-        const errorMsg = data.message || 
-                        data.error || 
-                        data.results?.find((r: any) => !r.success)?.error || 
-                        'Publikacja nie powiodła się';
-        throw new Error(errorMsg);
-      }
+      // Publish to ALL accounts in parallel
+      const results = await Promise.allSettled(
+        accounts.map((account: { id: string }) =>
+          supabase.functions.invoke(functionName, {
+            body: { contentId, bookId, platform, accountId: account.id },
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          })
+        )
+      );
 
-      // Additional validation for results array
-      if (data && data.results) {
-        const failed = data.results.filter((r: any) => !r.success);
-        if (failed.length > 0) {
-          throw new Error(failed[0].error || 'Publikacja nie powiodła się');
-        }
-      }
-      
-      return data;
+      // Analyze results
+      const successfulResults = results.filter(
+        (r): r is PromiseFulfilledResult<any> => 
+          r.status === 'fulfilled' && r.value.data?.success !== false
+      );
+      const failedResults = results.filter(
+        (r) => r.status === 'rejected' || (r.status === 'fulfilled' && r.value.data?.success === false)
+      );
+
+      // Return aggregated result
+      return {
+        totalAccounts: accounts.length,
+        successCount: successfulResults.length,
+        failedCount: failedResults.length,
+        results: results.map((r, i) => ({
+          accountId: accounts[i].id,
+          success: r.status === 'fulfilled' && r.value.data?.success !== false,
+          error: r.status === 'rejected' 
+            ? (r as PromiseRejectedResult).reason?.message 
+            : (r.status === 'fulfilled' && r.value.data?.success === false ? r.value.data?.message || r.value.data?.error : null)
+        }))
+      };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["platform-content"] });
@@ -293,10 +314,26 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
                           platform === 'tiktok' ? 'TikToku' :
                           platform === 'linkedin' ? 'LinkedIn' :
                           platform;
-      toast({
-        title: "✅ Opublikowano pomyślnie",
-        description: `Post został opublikowany na ${platformName}`,
-      });
+      
+      if (data.failedCount === 0) {
+        toast({
+          title: `✅ Opublikowano na ${data.successCount} ${data.successCount === 1 ? 'koncie' : 'kontach'}`,
+          description: `Post został opublikowany na ${platformName}`,
+        });
+      } else if (data.successCount > 0) {
+        toast({
+          title: `⚠️ Częściowy sukces: ${data.successCount}/${data.totalAccounts} kont`,
+          description: `${data.failedCount} publikacji nie powiodło się`,
+          variant: "default",
+        });
+      } else {
+        const firstError = data.results.find(r => !r.success)?.error;
+        toast({
+          title: "❌ Wszystkie publikacje nie powiodły się",
+          description: firstError || "Sprawdź połączenia z kontami",
+          variant: "destructive",
+        });
+      }
     },
     onError: (error: any) => {
       toast({

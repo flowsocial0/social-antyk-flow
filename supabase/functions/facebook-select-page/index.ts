@@ -76,16 +76,8 @@ Deno.serve(async (req) => {
         }
         return { id: existingPage.id, updated: true };
       } else {
-        // Check if user has any pages already (for is_default logic)
-        const { count } = await supabase
-          .from('facebook_oauth_tokens')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', userId);
-
-        const isDefault = setAsDefault || (count === 0);
-
-        // Insert new page
-        console.log('Inserting new page:', pName, 'isDefault:', isDefault);
+        // Insert new page - never set as default (publish to all accounts)
+        console.log('Inserting new page:', pName);
         const { data: newToken, error: insertError } = await supabase
           .from('facebook_oauth_tokens')
           .insert({
@@ -96,7 +88,7 @@ Deno.serve(async (req) => {
             page_id: pId,
             page_name: pName,
             scope: 'pages_manage_posts,pages_read_engagement',
-            is_default: isDefault,
+            is_default: false, // Never set default - we publish to all accounts
           })
           .select('id')
           .single();

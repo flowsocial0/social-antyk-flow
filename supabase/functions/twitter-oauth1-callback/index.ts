@@ -161,6 +161,7 @@ Deno.serve(async (req) => {
     console.log("Access token received for @" + screen_name);
 
     // Store access token in database (upsert by x_user_id to allow multiple X accounts per user)
+    // Never set is_default - we publish to all accounts
     console.log("Storing access token in database...");
     const { data: upsertData, error: upsertError } = await supabase
       .from('twitter_oauth1_tokens')
@@ -170,6 +171,7 @@ Deno.serve(async (req) => {
         oauth_token_secret,
         screen_name,
         x_user_id: user_id,
+        is_default: false, // Never set default - we publish to all accounts
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'x_user_id'
