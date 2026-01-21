@@ -156,47 +156,89 @@ Deno.serve(async (req) => {
     const pages = pagesData.data;
     console.log(`Found ${pages.length} Facebook Page(s)`);
 
-    // If only one page, save it automatically
-    if (pages.length === 1) {
-      const page = pages[0];
+    // Helper function to save a single page (INSERT or UPDATE based on page_id)
+    const savePage = async (page: any, setAsDefault: boolean = false) => {
       const pageAccessToken = page.access_token;
       const pageId = page.id;
       const pageName = page.name;
 
-      console.log('Single page found, saving automatically:', pageName, pageId);
+      console.log('Saving page:', pageName, pageId, 'setAsDefault:', setAsDefault);
 
       // Calculate expiration (long-lived tokens last ~60 days)
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 60);
 
-      // Store Page Access Token (upsert based on user_id)
-      const { data: tokenRecord, error: insertError } = await supabase
+      // Check if this specific page is already connected for this user
+      const { data: existingPage } = await supabase
         .from('facebook_oauth_tokens')
-        .upsert({
-          user_id: userId,
-          access_token: pageAccessToken,
-          token_type: 'Bearer',
-          expires_at: expiresAt.toISOString(),
-          page_id: pageId,
-          page_name: pageName,
-          scope: 'pages_manage_posts,pages_read_engagement'
-        }, {
-          onConflict: 'user_id'
-        })
-        .select()
-        .single();
+        .select('id')
+        .eq('user_id', userId)
+        .eq('page_id', pageId)
+        .maybeSingle();
 
-      if (insertError) {
-        console.error('Error storing Facebook token:', insertError);
-        throw new Error('Failed to store Facebook token: ' + insertError.message);
+      if (existingPage) {
+        // Update existing page token
+        console.log('Page already exists, updating token for:', pageName);
+        const { error: updateError } = await supabase
+          .from('facebook_oauth_tokens')
+          .update({
+            access_token: pageAccessToken,
+            expires_at: expiresAt.toISOString(),
+            page_name: pageName,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingPage.id);
+
+        if (updateError) {
+          console.error('Error updating Facebook token:', updateError);
+          throw new Error('Failed to update Facebook token: ' + updateError.message);
+        }
+        return existingPage.id;
+      } else {
+        // Check if user has any pages already (for is_default logic)
+        const { count } = await supabase
+          .from('facebook_oauth_tokens')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId);
+
+        const isDefault = setAsDefault || (count === 0);
+
+        // Insert new page
+        console.log('Inserting new page:', pageName, 'isDefault:', isDefault);
+        const { data: newToken, error: insertError } = await supabase
+          .from('facebook_oauth_tokens')
+          .insert({
+            user_id: userId,
+            access_token: pageAccessToken,
+            token_type: 'Bearer',
+            expires_at: expiresAt.toISOString(),
+            page_id: pageId,
+            page_name: pageName,
+            scope: 'pages_manage_posts,pages_read_engagement',
+            is_default: isDefault,
+          })
+          .select('id')
+          .single();
+
+        if (insertError) {
+          console.error('Error storing Facebook token:', insertError);
+          throw new Error('Failed to store Facebook token: ' + insertError.message);
+        }
+        return newToken.id;
       }
+    };
 
-      console.log('Successfully stored Facebook Page token:', tokenRecord);
+    // If only one page, save it automatically
+    if (pages.length === 1) {
+      const page = pages[0];
+      console.log('Single page found, saving automatically:', page.name, page.id);
+
+      await savePage(page, true);
 
       // Redirect user back to the application
       const redirectUrl = new URL(`${FRONTEND_URL}/platforms/facebook`);
       redirectUrl.searchParams.set('connected', 'true');
-      redirectUrl.searchParams.set('page_name', pageName);
+      redirectUrl.searchParams.set('page_name', page.name);
       
       return new Response(null, {
         status: 302,

@@ -11,14 +11,25 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('=== Facebook Select Page ===');
+    console.log('=== Facebook Select Page(s) ===');
     
-    const { userId, pageId, pageName, pageAccessToken } = await req.json();
+    const body = await req.json();
     
-    console.log('Received selection:', { userId, pageId, pageName });
+    // Support both single page and multiple pages
+    const { userId, pageId, pageName, pageAccessToken, pages } = body;
+    
+    console.log('Received selection:', { userId, pageId, pageName, pagesCount: pages?.length });
 
-    if (!userId || !pageId || !pageName || !pageAccessToken) {
-      throw new Error('Missing required parameters: userId, pageId, pageName, pageAccessToken');
+    if (!userId) {
+      throw new Error('Missing required parameter: userId');
+    }
+
+    // Validate: either single page params or pages array
+    const isSinglePage = pageId && pageName && pageAccessToken;
+    const isMultiplePages = Array.isArray(pages) && pages.length > 0;
+
+    if (!isSinglePage && !isMultiplePages) {
+      throw new Error('Missing required parameters: provide either (pageId, pageName, pageAccessToken) or pages array');
     }
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
@@ -34,37 +45,94 @@ Deno.serve(async (req) => {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 60);
 
-    // Store Page Access Token (upsert based on user_id)
-    console.log('Storing token for userId:', userId, 'pageId:', pageId, 'pageName:', pageName);
-    
-    const { data: tokenRecord, error: insertError } = await supabase
-      .from('facebook_oauth_tokens')
-      .upsert({
-        user_id: userId,
-        access_token: pageAccessToken,
-        token_type: 'Bearer',
-        expires_at: expiresAt.toISOString(),
-        page_id: pageId,
-        page_name: pageName,
-        scope: 'pages_manage_posts,pages_read_engagement'
-      }, {
-        onConflict: 'user_id'
-      })
-      .select()
-      .single();
+    // Helper function to save a single page
+    const savePage = async (pId: string, pName: string, pToken: string, setAsDefault: boolean = false) => {
+      console.log('Processing page:', pName, pId);
 
-    if (insertError) {
-      console.error('Error storing Facebook token:', insertError);
-      throw new Error('Failed to store Facebook token: ' + insertError.message);
+      // Check if this specific page is already connected for this user
+      const { data: existingPage } = await supabase
+        .from('facebook_oauth_tokens')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('page_id', pId)
+        .maybeSingle();
+
+      if (existingPage) {
+        // Update existing page token
+        console.log('Page already exists, updating token for:', pName);
+        const { error: updateError } = await supabase
+          .from('facebook_oauth_tokens')
+          .update({
+            access_token: pToken,
+            expires_at: expiresAt.toISOString(),
+            page_name: pName,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingPage.id);
+
+        if (updateError) {
+          console.error('Error updating Facebook token:', updateError);
+          throw new Error('Failed to update Facebook token: ' + updateError.message);
+        }
+        return { id: existingPage.id, updated: true };
+      } else {
+        // Check if user has any pages already (for is_default logic)
+        const { count } = await supabase
+          .from('facebook_oauth_tokens')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId);
+
+        const isDefault = setAsDefault || (count === 0);
+
+        // Insert new page
+        console.log('Inserting new page:', pName, 'isDefault:', isDefault);
+        const { data: newToken, error: insertError } = await supabase
+          .from('facebook_oauth_tokens')
+          .insert({
+            user_id: userId,
+            access_token: pToken,
+            token_type: 'Bearer',
+            expires_at: expiresAt.toISOString(),
+            page_id: pId,
+            page_name: pName,
+            scope: 'pages_manage_posts,pages_read_engagement',
+            is_default: isDefault,
+          })
+          .select('id')
+          .single();
+
+        if (insertError) {
+          console.error('Error storing Facebook token:', insertError);
+          throw new Error('Failed to store Facebook token: ' + insertError.message);
+        }
+        return { id: newToken.id, updated: false };
+      }
+    };
+
+    const savedPages: { id: string; name: string; updated: boolean }[] = [];
+
+    if (isSinglePage) {
+      // Single page selection (legacy support)
+      const result = await savePage(pageId, pageName, pageAccessToken, true);
+      savedPages.push({ id: pageId, name: pageName, updated: result.updated });
+    } else {
+      // Multiple pages selection
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i];
+        const setAsDefault = i === 0; // First page in the list becomes default if no default exists
+        const result = await savePage(page.id, page.name, page.access_token, setAsDefault);
+        savedPages.push({ id: page.id, name: page.name, updated: result.updated });
+      }
     }
 
-    console.log('Successfully stored Facebook Page token:', tokenRecord);
+    console.log('Successfully saved Facebook Page tokens:', savedPages);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Page connected successfully',
-        page_name: pageName 
+        message: `${savedPages.length} page(s) connected successfully`,
+        saved_pages: savedPages,
+        page_name: savedPages[0]?.name // For backwards compatibility
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
