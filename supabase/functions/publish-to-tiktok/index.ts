@@ -82,10 +82,11 @@ serve(async (req) => {
       platform, 
       testConnection,
       userId: userIdFromBody,
-      videoUrl: videoUrlFromBody
+      videoUrl: videoUrlFromBody,
+      accountId // For multi-account support
     } = body;
 
-    console.log('Request body:', { contentId, bookId, platform, testConnection, hasVideoUrl: !!videoUrlFromBody });
+    console.log('Request body:', { contentId, bookId, platform, testConnection, hasVideoUrl: !!videoUrlFromBody, accountId });
 
     const authHeader = req.headers.get('Authorization');
     if (authHeader) {
@@ -108,13 +109,33 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const { data: tokenData, error: tokenError } = await supabase
+    // Get TikTok tokens (multi-account support)
+    let tokenQuery = supabase
       .from('tiktok_oauth_tokens')
       .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
+      .eq('user_id', userId);
 
-    if (tokenError || !tokenData) {
+    if (accountId) {
+      tokenQuery = tokenQuery.eq('id', accountId);
+    } else {
+      tokenQuery = tokenQuery.eq('is_default', true);
+    }
+
+    let { data: tokenData, error: tokenError } = await tokenQuery.maybeSingle();
+
+    // Fallback: if no default account found and no specific account requested, get any account
+    if (!tokenData && !accountId) {
+      console.log('No default TikTok account found, fetching any available account...');
+      const { data: anyToken } = await supabase
+        .from('tiktok_oauth_tokens')
+        .select('*')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+      tokenData = anyToken;
+    }
+
+    if (!tokenData) {
       console.error('Token fetch error:', tokenError);
       throw new Error('TikTok nie jest połączony. Przejdź do ustawień kont społecznościowych.');
     }

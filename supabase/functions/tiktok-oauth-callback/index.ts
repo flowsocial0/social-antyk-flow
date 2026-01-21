@@ -60,29 +60,63 @@ serve(async (req) => {
     // Calculate expiration time
     const expiresAt = new Date(Date.now() + (expires_in || 86400) * 1000).toISOString();
 
-    // Store token in database using service role
+    // Store token in database using service role (multi-account support)
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Upsert token (update if exists, insert if not)
-    const { error: dbError } = await supabase
+    // Check if this TikTok account already exists for this user
+    const { data: existingAccount } = await supabase
       .from('tiktok_oauth_tokens')
-      .upsert({
-        user_id: userId,
-        access_token,
-        refresh_token,
-        open_id,
-        scope,
-        expires_at: expiresAt,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'user_id'
-      });
+      .select('id')
+      .eq('user_id', userId)
+      .eq('open_id', open_id)
+      .maybeSingle();
 
-    if (dbError) {
-      console.error('Database error:', dbError);
-      throw new Error('Failed to save TikTok token');
+    if (existingAccount) {
+      // Update existing account
+      console.log('Updating existing TikTok account:', existingAccount.id);
+      const { error: updateError } = await supabase
+        .from('tiktok_oauth_tokens')
+        .update({
+          access_token,
+          refresh_token,
+          scope,
+          expires_at: expiresAt,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingAccount.id);
+
+      if (updateError) {
+        console.error('Database update error:', updateError);
+        throw new Error('Failed to update TikTok token');
+      }
+    } else {
+      // Insert new account - check if user has any existing accounts to set is_default
+      const { count } = await supabase
+        .from('tiktok_oauth_tokens')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+
+      const isDefault = (count || 0) === 0;
+      console.log('Inserting new TikTok account, is_default:', isDefault);
+
+      const { error: insertError } = await supabase
+        .from('tiktok_oauth_tokens')
+        .insert({
+          user_id: userId,
+          access_token,
+          refresh_token,
+          open_id,
+          scope,
+          expires_at: expiresAt,
+          is_default: isDefault,
+        });
+
+      if (insertError) {
+        console.error('Database insert error:', insertError);
+        throw new Error('Failed to save TikTok token');
+      }
     }
 
     console.log('TikTok token saved successfully for user:', userId);

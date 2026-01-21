@@ -103,29 +103,67 @@ Deno.serve(async (req) => {
       // Continue without channel info
     }
 
-    // Store tokens using service role for database access
+    // Store tokens using service role for database access (multi-account support)
     const supabaseServiceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRole);
 
-    const { error: upsertError } = await supabaseAdmin
+    // Check if this YouTube channel already exists for this user
+    const { data: existingAccount } = await supabaseAdmin
       .from('youtube_oauth_tokens')
-      .upsert({
-        user_id: user.id,
-        access_token,
-        refresh_token,
-        token_type: 'Bearer',
-        expires_at: expiresAt,
-        channel_id: channelId,
-        channel_title: channelTitle,
-        scope,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'user_id',
-      });
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('channel_id', channelId)
+      .maybeSingle();
 
-    if (upsertError) {
-      console.error('Error storing tokens:', upsertError);
-      throw new Error('Failed to store tokens');
+    if (existingAccount) {
+      // Update existing account
+      console.log('Updating existing YouTube account:', existingAccount.id);
+      const { error: updateError } = await supabaseAdmin
+        .from('youtube_oauth_tokens')
+        .update({
+          access_token,
+          refresh_token,
+          token_type: 'Bearer',
+          expires_at: expiresAt,
+          channel_title: channelTitle,
+          scope,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingAccount.id);
+
+      if (updateError) {
+        console.error('Error updating tokens:', updateError);
+        throw new Error('Failed to update tokens');
+      }
+    } else {
+      // Insert new account - check if user has any existing accounts to set is_default
+      const { count } = await supabaseAdmin
+        .from('youtube_oauth_tokens')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      const isDefault = (count || 0) === 0;
+      console.log('Inserting new YouTube account, is_default:', isDefault);
+
+      const { error: insertError } = await supabaseAdmin
+        .from('youtube_oauth_tokens')
+        .insert({
+          user_id: user.id,
+          access_token,
+          refresh_token,
+          token_type: 'Bearer',
+          expires_at: expiresAt,
+          channel_id: channelId,
+          channel_title: channelTitle,
+          account_name: channelTitle,
+          scope,
+          is_default: isDefault,
+        });
+
+      if (insertError) {
+        console.error('Error inserting tokens:', insertError);
+        throw new Error('Failed to store tokens');
+      }
     }
 
     console.log('YouTube OAuth completed successfully');

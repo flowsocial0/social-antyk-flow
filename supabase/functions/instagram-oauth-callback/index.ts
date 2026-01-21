@@ -163,31 +163,69 @@ serve(async (req) => {
       return Response.redirect(`${FRONTEND_URL}/settings/social-accounts?instagram=error&message=no_instagram_account`, 302);
     }
 
-    // Step 5: Save to database
+    // Step 5: Save to database (multi-account support)
     console.log('Saving Instagram token to database...');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { error: upsertError } = await supabase
+    // Check if this Instagram account already exists for this user
+    const { data: existingAccount } = await supabase
       .from('instagram_oauth_tokens')
-      .upsert({
-        user_id: userId,
-        access_token: connectedPage.access_token, // Use page access token for Instagram API
-        token_type: 'Bearer',
-        expires_at: expiresAt.toISOString(),
-        instagram_account_id: instagramAccount.id,
-        instagram_username: instagramAccount.username,
-        facebook_page_id: connectedPage.id,
-        scope: 'instagram_basic,instagram_content_publish',
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'user_id',
-      });
+      .select('id')
+      .eq('user_id', userId)
+      .eq('instagram_account_id', instagramAccount.id)
+      .maybeSingle();
 
-    if (upsertError) {
-      console.error('Error saving token:', upsertError);
-      return Response.redirect(`${FRONTEND_URL}/settings/social-accounts?instagram=error&message=save_failed`, 302);
+    if (existingAccount) {
+      // Update existing account
+      console.log('Updating existing Instagram account:', existingAccount.id);
+      const { error: updateError } = await supabase
+        .from('instagram_oauth_tokens')
+        .update({
+          access_token: connectedPage.access_token,
+          token_type: 'Bearer',
+          expires_at: expiresAt.toISOString(),
+          instagram_username: instagramAccount.username,
+          facebook_page_id: connectedPage.id,
+          scope: 'instagram_basic,instagram_content_publish',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingAccount.id);
+
+      if (updateError) {
+        console.error('Error updating token:', updateError);
+        return Response.redirect(`${FRONTEND_URL}/settings/social-accounts?instagram=error&message=save_failed`, 302);
+      }
+    } else {
+      // Insert new account - check if user has any existing accounts to set is_default
+      const { count } = await supabase
+        .from('instagram_oauth_tokens')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+
+      const isDefault = (count || 0) === 0;
+      console.log('Inserting new Instagram account, is_default:', isDefault);
+
+      const { error: insertError } = await supabase
+        .from('instagram_oauth_tokens')
+        .insert({
+          user_id: userId,
+          access_token: connectedPage.access_token,
+          token_type: 'Bearer',
+          expires_at: expiresAt.toISOString(),
+          instagram_account_id: instagramAccount.id,
+          instagram_username: instagramAccount.username,
+          facebook_page_id: connectedPage.id,
+          account_name: instagramAccount.username,
+          scope: 'instagram_basic,instagram_content_publish',
+          is_default: isDefault,
+        });
+
+      if (insertError) {
+        console.error('Error inserting token:', insertError);
+        return Response.redirect(`${FRONTEND_URL}/settings/social-accounts?instagram=error&message=save_failed`, 302);
+      }
     }
 
     console.log('Instagram connection saved successfully for user:', userId);

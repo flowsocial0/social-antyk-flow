@@ -134,32 +134,47 @@ Deno.serve(async (req) => {
     const expiresAt = new Date();
     expiresAt.setSeconds(expiresAt.getSeconds() + (expiresIn || 3600));
 
-    // Step 3: Store token in database
-    const { data: tokenRecord, error: insertError } = await supabase
+    // Step 3: Store token in database (multi-account support)
+    // Check if this LinkedIn account already exists for this user
+    const { data: existingAccount } = await supabase
       .from('linkedin_oauth_tokens')
-      .upsert({
-        user_id: userId,
-        access_token: accessToken,
-        refresh_token: refreshToken,
-        token_type: 'Bearer',
-        expires_at: expiresAt.toISOString(),
-        linkedin_id: linkedinId,
-        display_name: displayName,
-        profile_picture_url: profilePictureUrl,
-        scope: scope,
-        is_default: true, // Set as default for first connection
-      }, {
-        onConflict: 'user_id,linkedin_id',
-        ignoreDuplicates: false
-      })
-      .select()
-      .single();
+      .select('id')
+      .eq('user_id', userId)
+      .eq('linkedin_id', linkedinId)
+      .maybeSingle();
 
-    if (insertError) {
-      console.error('Error storing LinkedIn token:', insertError);
-      
-      // Try insert without onConflict if upsert failed
-      const { data: insertData, error: directInsertError } = await supabase
+    if (existingAccount) {
+      // Update existing account
+      console.log('Updating existing LinkedIn account:', existingAccount.id);
+      const { error: updateError } = await supabase
+        .from('linkedin_oauth_tokens')
+        .update({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+          token_type: 'Bearer',
+          expires_at: expiresAt.toISOString(),
+          display_name: displayName,
+          profile_picture_url: profilePictureUrl,
+          scope: scope,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingAccount.id);
+
+      if (updateError) {
+        console.error('Error updating LinkedIn token:', updateError);
+        throw new Error('Failed to update LinkedIn token: ' + updateError.message);
+      }
+    } else {
+      // Insert new account - check if user has any existing accounts to set is_default
+      const { count } = await supabase
+        .from('linkedin_oauth_tokens')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+
+      const isDefault = (count || 0) === 0;
+      console.log('Inserting new LinkedIn account, is_default:', isDefault);
+
+      const { error: insertError } = await supabase
         .from('linkedin_oauth_tokens')
         .insert({
           user_id: userId,
@@ -169,15 +184,15 @@ Deno.serve(async (req) => {
           expires_at: expiresAt.toISOString(),
           linkedin_id: linkedinId,
           display_name: displayName,
+          account_name: displayName,
           profile_picture_url: profilePictureUrl,
           scope: scope,
-          is_default: true,
-        })
-        .select()
-        .single();
-        
-      if (directInsertError) {
-        throw new Error('Failed to store LinkedIn token: ' + directInsertError.message);
+          is_default: isDefault,
+        });
+
+      if (insertError) {
+        console.error('Error inserting LinkedIn token:', insertError);
+        throw new Error('Failed to store LinkedIn token: ' + insertError.message);
       }
     }
 
