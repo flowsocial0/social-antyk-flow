@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Facebook, CheckCircle, AlertCircle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, Facebook, CheckCircle, AlertCircle, CheckSquare } from "lucide-react";
 import { toast } from "sonner";
 
 interface FacebookPage {
@@ -19,8 +20,9 @@ export default function FacebookSelectPage() {
   const [pages, setPages] = useState<FacebookPage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
+  const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchPagesData = async () => {
@@ -38,6 +40,7 @@ export default function FacebookSelectPage() {
       }
       
       console.log('Session verified for user:', session.user.id);
+      setUserId(session.user.id);
       
       const sessionId = searchParams.get("session_id");
       
@@ -50,6 +53,8 @@ export default function FacebookSelectPage() {
         try {
           const decodedPages = JSON.parse(decodeURIComponent(atob(pagesParam)));
           setPages(decodedPages);
+          // Pre-select all pages by default
+          setSelectedPages(new Set(decodedPages.map((p: FacebookPage) => p.id)));
           setIsLoading(false);
           return;
         } catch (err) {
@@ -91,7 +96,10 @@ export default function FacebookSelectPage() {
           return;
         }
 
-        setPages(data.pages_data as unknown as FacebookPage[]);
+        const pagesData = data.pages_data as unknown as FacebookPage[];
+        setPages(pagesData);
+        // Pre-select all pages by default
+        setSelectedPages(new Set(pagesData.map(p => p.id)));
         setIsLoading(false);
       } catch (err) {
         console.error("Error loading pages:", err);
@@ -101,38 +109,68 @@ export default function FacebookSelectPage() {
     };
 
     fetchPagesData();
-  }, [searchParams]);
+  }, [searchParams, navigate]);
 
-  const handleSelectPage = async (page: FacebookPage) => {
+  const handleTogglePage = (pageId: string) => {
+    setSelectedPages(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(pageId)) {
+        newSet.delete(pageId);
+      } else {
+        newSet.add(pageId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedPages.size === pages.length) {
+      // Deselect all
+      setSelectedPages(new Set());
+    } else {
+      // Select all
+      setSelectedPages(new Set(pages.map(p => p.id)));
+    }
+  };
+
+  const handleSaveSelectedPages = async () => {
+    if (selectedPages.size === 0) {
+      toast.error("Wybierz przynajmniej jedną stronę");
+      return;
+    }
+
+    if (!userId) {
+      toast.error("Nie jesteś zalogowany");
+      return;
+    }
+
     setIsSaving(true);
-    setSelectedPageId(page.id);
 
     try {
-      // Get current user session
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.user?.id) {
-        throw new Error("Nie jesteś zalogowany");
-      }
+      const selectedPagesData = pages
+        .filter(p => selectedPages.has(p.id))
+        .map(p => ({
+          id: p.id,
+          name: p.name,
+          access_token: p.access_token
+        }));
 
       const { data, error } = await supabase.functions.invoke("facebook-select-page", {
         body: {
-          userId: session.user.id,
-          pageId: page.id,
-          pageName: page.name,
-          pageAccessToken: page.access_token
+          userId,
+          pages: selectedPagesData
         }
       });
 
       if (error) throw error;
       if (!data.success) throw new Error(data.error);
 
-      toast.success(`Strona "${page.name}" została połączona!`);
-      navigate("/platforms/facebook?connected=true&page_name=" + encodeURIComponent(page.name));
+      const count = selectedPagesData.length;
+      toast.success(`Połączono ${count} ${count === 1 ? 'stronę' : count < 5 ? 'strony' : 'stron'} Facebook!`);
+      navigate("/platforms/facebook?connected=true&count=" + count);
     } catch (err: any) {
-      console.error("Error selecting page:", err);
-      toast.error(err.message || "Błąd podczas zapisywania strony");
-      setSelectedPageId(null);
+      console.error("Error saving pages:", err);
+      toast.error(err.message || "Błąd podczas zapisywania stron");
     } finally {
       setIsSaving(false);
     }
@@ -174,48 +212,78 @@ export default function FacebookSelectPage() {
           <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-[#1877F2] flex items-center justify-center">
             <Facebook className="h-6 w-6 text-white" />
           </div>
-          <CardTitle>Wybierz stronę Facebook</CardTitle>
+          <CardTitle>Wybierz strony Facebook</CardTitle>
           <CardDescription>
-            Masz dostęp do {pages.length} stron. Wybierz tę, na której chcesz publikować posty.
+            Masz dostęp do {pages.length} stron. Możesz wybrać wiele stron jednocześnie.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {pages.map((page) => (
-            <button
-              key={page.id}
-              onClick={() => handleSelectPage(page)}
-              disabled={isSaving}
-              className={`
-                w-full p-4 rounded-lg border text-left transition-all
-                ${selectedPageId === page.id 
-                  ? "border-primary bg-primary/5" 
-                  : "border-border hover:border-primary/50 hover:bg-muted/50"
-                }
-                ${isSaving && selectedPageId !== page.id ? "opacity-50 cursor-not-allowed" : ""}
-              `}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-foreground truncate">
-                    {page.name}
-                  </h3>
-                  {page.category && (
-                    <p className="text-sm text-muted-foreground truncate">
-                      {page.category}
-                    </p>
+          {/* Select All button */}
+          <button
+            onClick={handleSelectAll}
+            disabled={isSaving}
+            className="w-full p-3 rounded-lg border border-dashed border-primary/50 text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
+          >
+            <CheckSquare className="h-4 w-4" />
+            {selectedPages.size === pages.length ? "Odznacz wszystkie" : "Zaznacz wszystkie"}
+          </button>
+
+          {pages.map((page) => {
+            const isSelected = selectedPages.has(page.id);
+            return (
+              <button
+                key={page.id}
+                onClick={() => handleTogglePage(page.id)}
+                disabled={isSaving}
+                className={`
+                  w-full p-4 rounded-lg border text-left transition-all
+                  ${isSelected 
+                    ? "border-primary bg-primary/5" 
+                    : "border-border hover:border-primary/50 hover:bg-muted/50"
+                  }
+                  ${isSaving ? "opacity-50 cursor-not-allowed" : ""}
+                `}
+              >
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={() => handleTogglePage(page.id)}
+                    disabled={isSaving}
+                    className="pointer-events-none"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-foreground truncate">
+                      {page.name}
+                    </h3>
+                    {page.category && (
+                      <p className="text-sm text-muted-foreground truncate">
+                        {page.category}
+                      </p>
+                    )}
+                  </div>
+                  {isSelected && (
+                    <CheckCircle className="h-5 w-5 text-primary flex-shrink-0" />
                   )}
                 </div>
-                {selectedPageId === page.id && isSaving && (
-                  <Loader2 className="h-5 w-5 animate-spin text-primary ml-2 flex-shrink-0" />
-                )}
-                {selectedPageId === page.id && !isSaving && (
-                  <CheckCircle className="h-5 w-5 text-primary ml-2 flex-shrink-0" />
-                )}
-              </div>
-            </button>
-          ))}
+              </button>
+            );
+          })}
 
-          <div className="pt-4 border-t">
+          <div className="pt-4 border-t space-y-2">
+            <Button
+              onClick={handleSaveSelectedPages}
+              disabled={isSaving || selectedPages.size === 0}
+              className="w-full"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Łączenie...
+                </>
+              ) : (
+                `Połącz ${selectedPages.size} ${selectedPages.size === 1 ? 'stronę' : selectedPages.size < 5 ? 'strony' : 'stron'}`
+              )}
+            </Button>
             <Button
               variant="ghost"
               className="w-full"
