@@ -551,7 +551,7 @@ const CampaignDetails = () => {
               {campaign.status !== "paused" && campaign.status !== "completed" && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="outline" className="gap-2">
+                    <Button variant="outline" className="gap-2" title="Zatrzymaj kampanię">
                       <Pause className="h-4 w-4" />
                     </Button>
                   </AlertDialogTrigger>
@@ -575,15 +575,15 @@ const CampaignDetails = () => {
                   </AlertDialogContent>
                 </AlertDialog>
               )}
-              <Button variant="secondary" className="gap-2" onClick={() => setIsResumeDialogOpen(true)}>
+              <Button variant="secondary" className="gap-2" title="Wznów kampanię" onClick={() => setIsResumeDialogOpen(true)}>
                 <RefreshCw className="h-4 w-4" />
               </Button>
-              <Button variant="secondary" className="gap-2" onClick={() => setIsCopyDialogOpen(true)}>
+              <Button variant="secondary" className="gap-2" title="Powiel kampanię" onClick={() => setIsCopyDialogOpen(true)}>
                 <Copy className="h-4 w-4" />
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive" className="gap-2">
+                  <Button variant="destructive" className="gap-2" title="Usuń kampanię">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </AlertDialogTrigger>
