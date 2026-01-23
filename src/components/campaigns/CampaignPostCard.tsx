@@ -288,7 +288,7 @@ export const CampaignPostCard = ({ post, onSave, onRegenerate, onDelete, onUpdat
           <p className="text-sm whitespace-pre-wrap">{post.text}</p>
           
           {/* Error message display - collapsible */}
-          {(post.status === 'rate_limited' || post.status === 'failed' || (post.status === 'scheduled' && post.error_message)) && post.error_message && (
+          {(post.status === 'rate_limited' || post.status === 'failed' || (post.status === 'scheduled' && post.retry_count)) && (
             <Collapsible open={isErrorExpanded} onOpenChange={setIsErrorExpanded}>
               <div className={`rounded-lg border ${
                 post.status === 'rate_limited' 
@@ -323,7 +323,7 @@ export const CampaignPostCard = ({ post, onSave, onRegenerate, onDelete, onUpdat
                       post.status === 'rate_limited' ? 'text-yellow-600/90' : 
                       post.status === 'failed' ? 'text-red-600/90' : 'text-orange-600/90'
                     }`}>
-                      {post.error_message}
+                      {post.error_message || 'Wystąpił błąd podczas publikacji. Sprawdź połączenie z kontem i spróbuj ponownie.'}
                     </p>
                     {post.error_code && (
                       <p className="text-xs text-muted-foreground mt-1">
