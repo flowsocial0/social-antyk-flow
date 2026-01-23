@@ -91,7 +91,10 @@ Deno.serve(async (req) => {
     }
 
     if (!userId) {
-      throw new Error('No user ID available. Please provide userId in request body or valid authorization header.');
+      return new Response(
+        JSON.stringify({ success: false, message: 'Brak identyfikatora użytkownika. Zaloguj się ponownie.', errorCode: 'NO_USER_ID' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
     }
 
     console.log('Final User ID:', userId);
@@ -136,14 +139,21 @@ Deno.serve(async (req) => {
 
     if (tokenError) {
       console.error('Error fetching Facebook token:', tokenError);
-      throw new Error('Error fetching Facebook token: ' + tokenError.message);
+      return new Response(
+        JSON.stringify({ success: false, message: 'Błąd pobierania tokenu Facebook: ' + tokenError.message, errorCode: 'TOKEN_FETCH_ERROR' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
     }
     
     if (!tokenData) {
       console.error('No Facebook token found for user:', userId, 'accountId:', accountId);
-      throw new Error(accountId 
-        ? `Facebook account (${accountId}) not found. The account may have been disconnected.`
-        : 'Facebook not connected. Please connect your Facebook account first.');
+      const errorMessage = accountId 
+        ? `Konto Facebook (${accountId.substring(0, 8)}...) nie zostało znalezione. Mogło zostać odłączone.`
+        : 'Facebook nie jest połączony. Połącz konto Facebook w ustawieniach.';
+      return new Response(
+        JSON.stringify({ success: false, message: errorMessage, errorCode: 'NO_FACEBOOK_TOKEN' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
     }
 
     const { id: tokenId, access_token, page_id, page_name, expires_at } = tokenData;
@@ -152,7 +162,10 @@ Deno.serve(async (req) => {
 
     // Check if token is expired
     if (expires_at && new Date(expires_at) < new Date()) {
-      throw new Error('Facebook token expired. Please reconnect your Facebook account.');
+      return new Response(
+        JSON.stringify({ success: false, message: 'Token Facebook wygasł. Połącz konto Facebook ponownie.', errorCode: 'TOKEN_EXPIRED' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
     }
 
     console.log('Publishing to Facebook Page:', page_name, page_id);

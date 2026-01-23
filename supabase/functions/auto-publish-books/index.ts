@@ -28,10 +28,44 @@ interface CampaignPost {
   id: string;
   text: string;
   type: string;
+  category?: string;
   book_id?: string;
   scheduled_at: string;
   platforms?: string[];
   target_accounts?: Record<string, string[]>; // Platform -> Account IDs array
+  campaign?: {
+    id: string;
+    user_id: string;
+    target_platforms?: string[];
+    status: string;
+  };
+  book?: Book;
+}
+
+// Helper to get token table name for platform
+function getTokenTableName(platform: string): string {
+  switch (platform) {
+    case 'facebook': return 'facebook_oauth_tokens';
+    case 'x': return 'twitter_oauth1_tokens';
+    case 'instagram': return 'instagram_oauth_tokens';
+    case 'youtube': return 'youtube_oauth_tokens';
+    case 'linkedin': return 'linkedin_oauth_tokens';
+    case 'tiktok': return 'tiktok_oauth_tokens';
+    default: return '';
+  }
+}
+
+// Helper to get platform display name in Polish
+function getPlatformNamePL(platform: string): string {
+  switch (platform) {
+    case 'facebook': return 'Facebook';
+    case 'x': return 'X (Twitter)';
+    case 'instagram': return 'Instagram';
+    case 'youtube': return 'YouTube';
+    case 'linkedin': return 'LinkedIn';
+    case 'tiktok': return 'TikTok';
+    default: return platform;
+  }
 }
 
 Deno.serve(async (req) => {
@@ -48,7 +82,6 @@ Deno.serve(async (req) => {
     console.log('Current time:', new Date().toISOString());
 
     // Get book platform content that is ready to be published
-    // Get book platform content that should be published now
     // Exclude books that are frozen from campaigns
     const { data: contentToPublish, error: fetchError } = await supabase
       .from('book_platform_content')
@@ -71,13 +104,14 @@ Deno.serve(async (req) => {
 
     // Get campaign posts that are ready to be published (scheduled OR rate_limited with retry time passed)
     // Exclude posts from paused campaigns
+    // IMPORTANT: Include campaign.user_id to know who owns the campaign!
     const now = new Date().toISOString();
     const { data: campaignPostsToPublish, error: campaignFetchError } = await supabase
       .from('campaign_posts')
       .select(`
         *,
         book:books(id, code, title, image_url, sale_price, promotional_price),
-        campaign:campaigns!inner(id, target_platforms, status)
+        campaign:campaigns!inner(id, user_id, target_platforms, status)
       `)
       .lte('scheduled_at', now)
       .neq('campaign.status', 'paused')
@@ -90,57 +124,6 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Found ${campaignPostsToPublish?.length || 0} campaign posts ready to publish`);
-    
-    // Get first available user with Facebook token for Facebook posts
-    // In a real multi-user app, this should be stored per campaign
-    const { data: fbTokenData } = await supabase
-      .from('facebook_oauth_tokens')
-      .select('user_id')
-      .limit(1)
-      .maybeSingle();
-    
-    const facebookUserId = fbTokenData?.user_id;
-    console.log('Facebook user ID for publishing:', facebookUserId || 'none');
-    
-    // Get first available user with Twitter token for X posts
-    const { data: xTokenData } = await supabase
-      .from('twitter_oauth1_tokens')
-      .select('user_id')
-      .limit(1)
-      .maybeSingle();
-    
-    const xUserId = xTokenData?.user_id;
-    console.log('X user ID for publishing:', xUserId || 'none');
-
-    // Get first available user with Instagram token for Instagram posts
-    const { data: igTokenData } = await supabase
-      .from('instagram_oauth_tokens')
-      .select('user_id')
-      .limit(1)
-      .maybeSingle();
-    
-    const instagramUserId = igTokenData?.user_id;
-    console.log('Instagram user ID for publishing:', instagramUserId || 'none');
-
-    // Get first available user with YouTube token for YouTube posts
-    const { data: ytTokenData } = await supabase
-      .from('youtube_oauth_tokens')
-      .select('user_id')
-      .limit(1)
-      .maybeSingle();
-    
-    const youtubeUserId = ytTokenData?.user_id;
-    console.log('YouTube user ID for publishing:', youtubeUserId || 'none');
-
-    // Get first available user with LinkedIn token for LinkedIn posts
-    const { data: linkedinTokenData } = await supabase
-      .from('linkedin_oauth_tokens')
-      .select('user_id')
-      .limit(1)
-      .maybeSingle();
-    
-    const linkedinUserId = linkedinTokenData?.user_id;
-    console.log('LinkedIn user ID for publishing:', linkedinUserId || 'none');
 
     if ((!contentToPublish || contentToPublish.length === 0) && 
         (!campaignPostsToPublish || campaignPostsToPublish.length === 0)) {
@@ -183,7 +166,6 @@ Deno.serve(async (req) => {
           case 'linkedin':
             publishFunctionName = 'publish-to-linkedin';
             break;
-          // Add more platforms as they are implemented
           default:
             console.error(`No publish function for platform: ${content.platform}`);
             results.push({
@@ -256,14 +238,38 @@ Deno.serve(async (req) => {
     }
 
     // Publish campaign posts
-    for (const post of campaignPostsToPublish || []) {
+    for (const post of (campaignPostsToPublish || []) as CampaignPost[]) {
       console.log(`Publishing campaign post: ${post.id}`);
+      
+      // Get campaign owner's user_id - this is critical!
+      const campaignOwnerId = post.campaign?.user_id;
+      
+      if (!campaignOwnerId) {
+        console.error(`No campaign owner for post ${post.id}`);
+        await supabase
+          .from('campaign_posts')
+          .update({
+            status: 'failed',
+            error_message: 'Nie można ustalić właściciela kampanii. Utwórz kampanię ponownie.',
+            error_code: 'NO_CAMPAIGN_OWNER'
+          })
+          .eq('id', post.id);
+        failCount++;
+        results.push({
+          id: post.id,
+          type: 'campaign_post',
+          success: false,
+          error: 'No campaign owner'
+        });
+        continue;
+      }
       
       try {
         const platforms = post.platforms || ['x'];
         const targetAccounts = post.target_accounts || {};
         let platformSuccessCount = 0;
         let platformFailCount = 0;
+        const platformErrors: string[] = [];
         
         for (const platform of platforms) {
           let publishFunctionName = '';
@@ -286,46 +292,61 @@ Deno.serve(async (req) => {
               break;
             default:
               console.error(`No publish function for platform: ${platform}`);
+              platformErrors.push(`Platforma ${platform} nie jest jeszcze obsługiwana.`);
               platformFailCount++;
               continue;
           }
 
-          // Determine user ID for this platform (fallback when no specific accounts selected)
-          let platformUserId: string | null = null;
-          if (platform === 'facebook') {
-            platformUserId = facebookUserId;
-          } else if (platform === 'x') {
-            platformUserId = xUserId;
-          } else if (platform === 'instagram') {
-            platformUserId = instagramUserId;
-          } else if (platform === 'youtube') {
-            platformUserId = youtubeUserId;
-          } else if (platform === 'linkedin') {
-            platformUserId = linkedinUserId;
-          }
-
-          // Get selected accounts for this platform, or use empty array for fallback behavior
-          const accountsForPlatform = targetAccounts[platform] || [];
+          // Get selected accounts for this platform from target_accounts
+          let accountsForPlatform = targetAccounts[platform] || [];
           
-          // If no specific accounts selected, use legacy behavior (single account per platform)
+          // If no specific accounts selected, get ALL accounts for the campaign owner
           if (accountsForPlatform.length === 0) {
-            if (!platformUserId) {
-              console.error(`No user token found for platform: ${platform}`);
+            console.log(`No target_accounts for ${platform}, fetching all accounts for campaign owner ${campaignOwnerId}`);
+            
+            const tableName = getTokenTableName(platform);
+            if (tableName) {
+              const { data: ownerAccounts, error: accountsError } = await supabase
+                .from(tableName)
+                .select('id')
+                .eq('user_id', campaignOwnerId);
               
-              // Update post with error
-              await supabase
-                .from('campaign_posts')
-                .update({
-                  status: 'failed',
-                  error_message: `Brak połączonego konta ${platform === 'facebook' ? 'Facebook' : 'X'}. Połącz konto w ustawieniach platformy.`,
-                  error_code: 'NO_PLATFORM_TOKEN'
-                })
-                .eq('id', post.id);
-              
-              platformFailCount++;
-              continue;
+              if (accountsError) {
+                console.error(`Error fetching ${platform} accounts for owner:`, accountsError);
+              } else if (ownerAccounts && ownerAccounts.length > 0) {
+                accountsForPlatform = ownerAccounts.map(a => a.id);
+                console.log(`Found ${accountsForPlatform.length} ${platform} accounts for campaign owner`);
+              }
             }
-
+          }
+          
+          // If still no accounts, mark as failed
+          if (accountsForPlatform.length === 0) {
+            console.error(`No accounts found for platform ${platform} for user ${campaignOwnerId}`);
+            const platformName = getPlatformNamePL(platform);
+            platformErrors.push(`Brak połączonego konta ${platformName}. Połącz konto w ustawieniach.`);
+            platformFailCount++;
+            continue;
+          }
+          
+          // Multi-account publishing: iterate over accounts
+          console.log(`Publishing to ${accountsForPlatform.length} accounts on ${platform}`);
+          let accountSuccessCount = 0;
+          const accountErrors: string[] = [];
+          
+          for (const accountId of accountsForPlatform) {
+            console.log(`Publishing to account ${accountId} on ${platform}`);
+            
+            // Get the owner of THIS specific account (should be campaignOwnerId, but verify)
+            const tableName = getTokenTableName(platform);
+            const { data: accountData } = await supabase
+              .from(tableName)
+              .select('user_id')
+              .eq('id', accountId)
+              .single();
+            
+            const accountOwnerId = accountData?.user_id || campaignOwnerId;
+            
             // Get book image URL for the post
             const bookImageUrl = post.book?.image_url || null;
             
@@ -333,7 +354,8 @@ Deno.serve(async (req) => {
               body: { 
                 campaignPostId: post.id,
                 platform: platform,
-                userId: platformUserId,
+                userId: accountOwnerId, // Use the owner of THIS account
+                accountId: accountId,   // Specific account to publish to
                 imageUrl: bookImageUrl
               }
             });
@@ -342,100 +364,38 @@ Deno.serve(async (req) => {
             const hasInvokeError = !!publishError;
             const hasResponseError = data && data.success === false;
             const actualError = hasInvokeError || hasResponseError;
-            
+
             if (actualError) {
-              const errorMsg = data?.error || publishError?.message || 'Unknown error';
-              console.error(`Failed to publish campaign post ${post.id} to ${platform}:`, errorMsg);
+              const errorMsg = data?.message || data?.error || publishError?.message || 'Nieznany błąd';
+              console.error(`Failed to publish campaign post ${post.id} to ${platform} account ${accountId}:`, errorMsg);
               
-              // Check if it's a rate limit error - if so, the publish function already updated the status
+              // Check if it's a rate limit error
               const isRateLimitError = errorMsg?.includes('429') || 
                 errorMsg?.includes('Too Many Requests') ||
                 errorMsg?.includes('rate limit') ||
-                data?.error === 'rate_limit';
-              
-              // Check if it's a 403 Forbidden error (permissions issue)
-              const isForbiddenError = errorMsg?.includes('403') || 
-                errorMsg?.includes('Forbidden') ||
-                errorMsg?.includes('permission');
+                data?.error === 'rate_limit' ||
+                data?.errorCode === 'RATE_LIMITED';
               
               if (!isRateLimitError) {
-                // Provide clearer error message for common issues
-                let userFriendlyError = errorMsg;
-                if (isForbiddenError) {
-                  if (platform === 'x') {
-                    userFriendlyError = 'Błąd 403: Brak uprawnień do publikowania. Sprawdź w Developer Portal X, czy aplikacja ma uprawnienia "Read and Write", a następnie połącz konto ponownie.';
-                  } else if (platform === 'facebook') {
-                    userFriendlyError = 'Błąd 403: Brak uprawnień do publikowania na stronie Facebook. Odłącz i połącz ponownie konto Facebook, nadając wszystkie wymagane uprawnienia.';
-                  }
-                }
-                
-                // Save error message to campaign post
-                await supabase
-                  .from('campaign_posts')
-                  .update({
-                    status: 'failed',
-                    error_message: userFriendlyError,
-                    error_code: isForbiddenError ? 'FORBIDDEN' : 'PUBLISH_FAILED'
-                  })
-                  .eq('id', post.id);
-                
-                platformFailCount++;
+                accountErrors.push(`Konto ${accountId.substring(0, 8)}: ${errorMsg}`);
               }
+              // Continue to next account even if this one failed
             } else {
-              console.log(`Successfully published campaign post ${post.id} to ${platform}`);
-              platformSuccessCount++;
+              console.log(`Successfully published campaign post ${post.id} to ${platform} account ${accountId}`);
+              accountSuccessCount++;
             }
+          }
+          
+          // Consider platform successful if at least one account succeeded
+          if (accountSuccessCount > 0) {
+            platformSuccessCount++;
           } else {
-            // Multi-account publishing: iterate over selected accounts
-            console.log(`Publishing to ${accountsForPlatform.length} accounts on ${platform}`);
-            let accountSuccessCount = 0;
-            
-            for (const accountId of accountsForPlatform) {
-              console.log(`Publishing to account ${accountId} on ${platform}`);
-              
-              // Get book image URL for the post
-              const bookImageUrl = post.book?.image_url || null;
-              
-              const { data, error: publishError } = await supabase.functions.invoke(publishFunctionName, {
-                body: { 
-                  campaignPostId: post.id,
-                  platform: platform,
-                  userId: platformUserId, // Still need userId for service role context
-                  accountId: accountId,   // Specific account to publish to
-                  imageUrl: bookImageUrl
-                }
-              });
-
-              // Check for errors from both invoke error and response data
-              const hasInvokeError = !!publishError;
-              const hasResponseError = data && data.success === false;
-              const actualError = hasInvokeError || hasResponseError;
-
-              if (actualError) {
-                const errorMsg = data?.error || publishError?.message || 'Unknown error';
-                console.error(`Failed to publish campaign post ${post.id} to ${platform} account ${accountId}:`, errorMsg);
-                
-                // Check if it's a rate limit error
-                const isRateLimitError = errorMsg?.includes('429') || 
-                  errorMsg?.includes('Too Many Requests') ||
-                  errorMsg?.includes('rate limit') ||
-                  data?.error === 'rate_limit';
-                
-                if (!isRateLimitError) {
-                  console.error(`Account ${accountId} publish failed: ${errorMsg}`);
-                }
-                // Continue to next account even if this one failed
-              } else {
-                console.log(`Successfully published campaign post ${post.id} to ${platform} account ${accountId}`);
-                accountSuccessCount++;
-              }
-            }
-            
-            // Consider platform successful if at least one account succeeded
-            if (accountSuccessCount > 0) {
-              platformSuccessCount++;
+            platformFailCount++;
+            const platformName = getPlatformNamePL(platform);
+            if (accountErrors.length > 0) {
+              platformErrors.push(`${platformName}: ${accountErrors.join('; ')}`);
             } else {
-              platformFailCount++;
+              platformErrors.push(`${platformName}: Nie udało się opublikować na żadne konto.`);
             }
           }
         }
@@ -448,7 +408,9 @@ Deno.serve(async (req) => {
             .from('campaign_posts')
             .update({
               status: 'published',
-              published_at: new Date().toISOString()
+              published_at: new Date().toISOString(),
+              error_message: null, // Clear any previous error
+              error_code: null
             })
             .eq('id', post.id);
 
@@ -496,7 +458,7 @@ Deno.serve(async (req) => {
                   category: post.category || 'unknown',
                   topic_summary: post.text.substring(0, 150),
                   full_text: post.text,
-                  user_id: post.campaign?.user_id
+                  user_id: campaignOwnerId
                 });
 
               if (historyError) {
@@ -513,12 +475,17 @@ Deno.serve(async (req) => {
             success: true
           });
         } else if (platformFailCount > 0) {
-          // Only mark as failed if there were actual failures (not rate limits)
-          // Rate limit errors are already handled by the publish function
+          // Mark as failed with detailed error message
+          const errorMessage = platformErrors.length > 0 
+            ? platformErrors.join(' | ')
+            : `Nie udało się opublikować na ${platformFailCount} z ${platforms.length} platform.`;
+          
           const { error: updateError } = await supabase
             .from('campaign_posts')
             .update({
-              status: 'failed'
+              status: 'failed',
+              error_message: errorMessage,
+              error_code: 'PUBLISH_FAILED'
             })
             .eq('id', post.id);
 
@@ -532,7 +499,7 @@ Deno.serve(async (req) => {
             type: 'campaign_post',
             platforms: platforms,
             success: false,
-            error: `Failed to publish to ${platformFailCount} of ${platforms.length} platforms`
+            error: errorMessage
           });
         }
 
@@ -550,7 +517,8 @@ Deno.serve(async (req) => {
             .from('campaign_posts')
             .update({
               status: 'failed',
-              error_message: error.message
+              error_message: error.message || 'Wystąpił nieoczekiwany błąd podczas publikacji.',
+              error_code: 'UNEXPECTED_ERROR'
             })
             .eq('id', post.id);
           
