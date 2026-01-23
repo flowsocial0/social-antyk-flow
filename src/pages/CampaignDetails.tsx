@@ -201,7 +201,7 @@ const CampaignDetails = () => {
         .select(
           `
         *,
-        book:books(id, title, image_url, product_url)
+        book:books(id, title, image_url, storage_path, product_url)
       `,
         )
         .eq("campaign_id", id)
