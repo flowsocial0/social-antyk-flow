@@ -9,6 +9,7 @@ import { Footer } from "@/components/layout/Footer";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Badge } from "@/components/ui/badge";
 import { PlatformLimitsAdmin } from "@/components/admin/PlatformLimitsAdmin";
+import { AdminIdeas } from "@/components/admin/AdminIdeas";
 import type { User } from "@supabase/supabase-js";
 
 interface AdminStats {
@@ -341,6 +342,9 @@ const Admin = () => {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Admin Ideas */}
+            <AdminIdeas />
 
             {/* Platform Limits */}
             <PlatformLimitsAdmin />

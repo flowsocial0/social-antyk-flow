@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_ideas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          priority: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          priority?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          priority?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       book_campaign_texts: {
         Row: {
           book_id: string
@@ -279,6 +312,7 @@ export type Database = {
           campaign_id: string
           category: string
           created_at: string
+          custom_image_url: string | null
           day: number
           error_code: string | null
           error_message: string | null
@@ -299,6 +333,7 @@ export type Database = {
           campaign_id: string
           category: string
           created_at?: string
+          custom_image_url?: string | null
           day: number
           error_code?: string | null
           error_message?: string | null
@@ -319,6 +354,7 @@ export type Database = {
           campaign_id?: string
           category?: string
           created_at?: string
+          custom_image_url?: string | null
           day?: number
           error_code?: string | null
           error_message?: string | null

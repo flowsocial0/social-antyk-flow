@@ -29,10 +29,12 @@ type CampaignPost = {
   retry_count?: number | null;
   next_retry_at?: string | null;
   platforms?: any; // jsonb array of platforms
+  custom_image_url?: string | null;
   book?: {
     id: string;
     title: string;
     image_url: string | null;
+    storage_path: string | null;
     product_url: string | null;
   } | null;
 };
@@ -341,11 +343,34 @@ export const CampaignPostCard = ({ post, onSave, onRegenerate, onDelete, onUpdat
             </Collapsible>
           )}
 
+          {/* Post image preview - custom or from book */}
+          {(post.custom_image_url || post.book?.image_url || post.book?.storage_path) && (
+            <div className="mb-3">
+              <img
+                src={
+                  post.custom_image_url || 
+                  post.book?.image_url || 
+                  (post.book?.storage_path 
+                    ? `https://dmrfbokchkxjzslfzeps.supabase.co/storage/v1/object/public/ObrazkiKsiazek/${post.book.storage_path}`
+                    : undefined)
+                }
+                alt="Obrazek posta"
+                className="w-full max-w-[200px] h-auto object-cover rounded-lg border"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            </div>
+          )}
+
           {post.book && (
             <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-              {post.book.image_url && (
+              {(post.book.image_url || post.book.storage_path) && !post.custom_image_url && (
                 <img
-                  src={post.book.image_url}
+                  src={
+                    post.book.image_url || 
+                    `https://dmrfbokchkxjzslfzeps.supabase.co/storage/v1/object/public/ObrazkiKsiazek/${post.book.storage_path}`
+                  }
                   alt={post.book.title}
                   className="h-16 w-12 object-cover rounded"
                 />
