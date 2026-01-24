@@ -71,23 +71,6 @@ export function VoiceAssistant() {
               : "bg-muted/50"
           }`}
         />
-        
-        {/* Placeholder Avatar */}
-        <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-background shadow-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
-          <span className="inline-flex items-center text-4xl font-bold text-primary-foreground">
-            <img src="/Klemcia.jpg" alt="Klemcia" className="h-9 w-auto" />
-          </span>
-          
-          {/* Ikona głośnika gdy mówi */}
-          <div 
-            className={`absolute bottom-2 right-2 bg-primary text-primary-foreground p-1 rounded-full transition-opacity duration-200 ${
-              isSpeaking ? "opacity-100 animate-bounce" : "opacity-0"
-            }`}
-          >
-            <Volume2 className="w-4 h-4" />
-          </div>
-        </div>
-      </div>
 
       {/* Status */}
       <div className="text-center">
