@@ -145,7 +145,7 @@ const LandingPage = () => {
               Masz pytania? Porozmawiaj z naszym asystentem!
             </h3>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Nasz asystent głosowy AI odpowie na Twoje pytania o BookPromoter.
+              Chcesz dowiedzieć się więcej o Klemci?
               Wystarczy kliknąć mikrofon i zadać pytanie po polsku.
             </p>
           </div>
