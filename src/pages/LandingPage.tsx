@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { VoiceAssistant } from "@/components/landing/VoiceAssistant";
 import { 
   Calendar, 
   Share2, 
@@ -132,6 +133,24 @@ const LandingPage = () => {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Voice Assistant Section */}
+      <section className="py-20 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-10">
+            <h3 className="text-3xl font-bold text-foreground mb-4">
+              Masz pytania? Porozmawiaj z naszym asystentem!
+            </h3>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Nasz asystent głosowy AI odpowie na Twoje pytania o BookPromoter.
+              Wystarczy kliknąć mikrofon i zadać pytanie po polsku.
+            </p>
+          </div>
+          <div className="flex justify-center">
+            <VoiceAssistant />
           </div>
         </div>
       </section>
