@@ -73,13 +73,8 @@ export function VoiceAssistant() {
         />
         
         {/* Placeholder Avatar */}
-          <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-background shadow-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
-            <img 
-              src="/Klemcia.jpg" 
-              alt="Klemcia" 
-              className="h-24 w-auto object-contain"  // Zwiększone do h-24 (~96px), pasuje do diva 128px
-            />
-          </div>
+        <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-background shadow-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
+          <span className="text-4xl text-primary-foreground font-bold">AI</span>
           
           {/* Ikona głośnika gdy mówi */}
           <div 
@@ -116,7 +111,7 @@ export function VoiceAssistant() {
           }`}
         >
           <Mic className="w-5 h-5" />
-          {isConnecting ? "Łączenie..." : "Pogadaj z Klemcią"}
+          {isConnecting ? "Łączenie..." : "Zapytaj mnie o BookPromoter"}
         </Button>
         <Button
           onClick={stopConversation}
