@@ -77,11 +77,13 @@ export function VoiceAssistant() {
           <span className="text-4xl text-primary-foreground font-bold">AI</span>
           
           {/* Ikona głośnika gdy mówi */}
-          {isSpeaking && (
-            <div className="absolute bottom-2 right-2 bg-primary text-primary-foreground p-1 rounded-full animate-bounce">
-              <Volume2 className="w-4 h-4" />
-            </div>
-          )}
+          <div 
+            className={`absolute bottom-2 right-2 bg-primary text-primary-foreground p-1 rounded-full transition-opacity duration-200 ${
+              isSpeaking ? "opacity-100 animate-bounce" : "opacity-0"
+            }`}
+          >
+            <Volume2 className="w-4 h-4" />
+          </div>
         </div>
       </div>
 
@@ -98,28 +100,31 @@ export function VoiceAssistant() {
         </p>
       </div>
 
-      {/* Przycisk mikrofonu */}
-      {!isConnected ? (
+      {/* Przyciski - zawsze renderowane, widoczność przez CSS */}
+      <div className="relative">
         <Button
           onClick={startConversation}
-          disabled={isConnecting}
+          disabled={isConnecting || isConnected}
           size="lg"
-          className="gap-2 rounded-full px-8"
+          className={`gap-2 rounded-full px-8 transition-opacity duration-200 ${
+            isConnected ? "opacity-0 pointer-events-none absolute inset-0" : "opacity-100"
+          }`}
         >
           <Mic className="w-5 h-5" />
           {isConnecting ? "Łączenie..." : "Zapytaj mnie o BookPromoter"}
         </Button>
-      ) : (
         <Button
           onClick={stopConversation}
           variant="destructive"
           size="lg"
-          className="gap-2 rounded-full px-8"
+          className={`gap-2 rounded-full px-8 transition-opacity duration-200 ${
+            !isConnected ? "opacity-0 pointer-events-none absolute inset-0" : "opacity-100"
+          }`}
         >
           <MicOff className="w-5 h-5" />
           Zakończ rozmowę
         </Button>
-      )}
+      </div>
 
       <p className="text-xs text-muted-foreground max-w-xs text-center">
         Możesz zapytać o funkcje aplikacji, jak zacząć promować książki, 
