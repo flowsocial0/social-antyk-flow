@@ -77,7 +77,7 @@ export function VoiceAssistant() {
             <img 
               src="/Klemcia.jpg" 
               alt="Klemcia" 
-              className="h-15 w-auto object-contain"  // Zwiększone do h-24 (~96px), pasuje do diva 128px
+              className="h-12 w-auto object-contain"  // Zwiększone do h-24 (~96px), pasuje do diva 128px
             />
           </div>
           
