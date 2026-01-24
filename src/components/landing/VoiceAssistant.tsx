@@ -113,7 +113,7 @@ export function VoiceAssistant() {
           }`}
         >
           <Mic className="w-5 h-5" />
-          {isConnecting ? "Łączenie..." : "Zapytaj mnie o BookPromoter"}
+          {isConnecting ? "Łączenie..." : "Pogadaj z Klemcią"}
         </Button>
         <Button
           onClick={stopConversation}
