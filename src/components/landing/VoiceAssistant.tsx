@@ -71,6 +71,8 @@ export function VoiceAssistant() {
               : "bg-muted/50"
           }`}
         />
+        
+      </div>
 
       {/* Status */}
       <div className="text-center">
