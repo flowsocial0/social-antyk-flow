@@ -75,7 +75,7 @@ export function VoiceAssistant() {
         {/* Placeholder Avatar */}
         <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-background shadow-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
           <span className="inline-flex items-center text-4xl font-bold text-primary-foreground">
-            <img src="/Klemcia.jpg" alt="Klemcia" className="h-16 w-auto" />
+            <img src="/Klemcia.jpg" alt="Klemcia" className="h-20 w-auto" />
           </span>
           
           {/* Ikona głośnika gdy mówi */}
