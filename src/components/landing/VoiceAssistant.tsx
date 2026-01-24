@@ -102,31 +102,28 @@ export function VoiceAssistant() {
         </p>
       </div>
 
-      {/* Przyciski - zawsze renderowane, widoczność przez CSS */}
-      <div className="relative">
+      {/* Przyciski - jeden widoczny w danym momencie */}
+      {!isConnected ? (
         <Button
           onClick={startConversation}
-          disabled={isConnecting || isConnected}
+          disabled={isConnecting}
           size="lg"
-          className={`gap-2 rounded-full px-8 transition-opacity duration-200 ${
-            isConnected ? "opacity-0 pointer-events-none absolute inset-0" : "opacity-100"
-          }`}
+          className="gap-2 rounded-full px-8"
         >
           <Mic className="w-5 h-5" />
           {isConnecting ? "Łączenie..." : "Pogadaj z Klemcią"}
         </Button>
+      ) : (
         <Button
           onClick={stopConversation}
           variant="destructive"
           size="lg"
-          className={`gap-2 rounded-full px-8 transition-opacity duration-200 ${
-            !isConnected ? "opacity-0 pointer-events-none absolute inset-0" : "opacity-100"
-          }`}
+          className="gap-2 rounded-full px-8"
         >
           <MicOff className="w-5 h-5" />
           Zakończ rozmowę
         </Button>
-      </div>
+      )}
 
       <p className="text-xs text-muted-foreground max-w-xs text-center">
         Możesz zapytać o funkcje aplikacji, jak zacząć promować książki, 
