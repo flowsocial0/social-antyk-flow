@@ -190,28 +190,13 @@ export const CampaignSetup = ({
             <div className="flex-1">
               <Label htmlFor="useAI" className="flex items-center gap-2 cursor-pointer">
                 <Sparkles className="h-4 w-4 text-primary" />
-                <span className="font-medium">Użyj AI do generowania treści</span>
+                <span className="font-medium">Generuj posty z produktów z bazy + ciekawostki</span>
               </Label>
               <p className="text-xs text-muted-foreground mt-1">
                 {useAI ? "Grok AI wygeneruje unikalne, angażujące treści dla każdego posta" : "Posty zostaną utworzone z opisów książek z bazy danych"}
               </p>
             </div>
           </div>}
-        
-        {/* Regenerate Texts Checkbox */}
-        <div className="flex items-center space-x-3 mb-4 p-4 bg-amber-500/5 rounded-lg border border-amber-500/20">
-          <Checkbox id="regenerateTexts" checked={regenerateTexts} onCheckedChange={checked => setRegenerateTexts(checked === true)} />
-          <div className="flex-1">
-            <Label htmlFor="regenerateTexts" className="flex items-center gap-2 cursor-pointer">
-              <RefreshCw className="h-4 w-4 text-amber-500" />
-              <span className="font-medium">Użyj zapisanych postow z poprzednich kampanii
-            </span>
-            </Label>
-            <p className="text-xs text-muted-foreground mt-1">
-              {regenerateTexts ? "Nowe teksty zostaną wygenerowane dla wszystkich książek" : "Użyj tekstów z poprzednich kampanii (jeśli istnieją)"}
-            </p>
-          </div>
-        </div>
         
         {/* Random Content Generation */}
         <div className="space-y-3 mb-6 p-4 bg-purple-500/5 rounded-lg border border-purple-500/20">
@@ -231,7 +216,7 @@ export const CampaignSetup = ({
             <div className="flex-1">
               <Label htmlFor="useRandomContent" className="flex items-center gap-2 cursor-pointer">
                 <Shuffle className="h-4 w-4 text-purple-500" />
-                <span className="font-medium">Generuj losowe treści na określony temat</span>
+                <span className="font-medium">Generuj tylko ciekawostki</span>
               </Label>
               <p className="text-xs text-muted-foreground mt-1">
                 Posty ciekawostki będą generowane na podany temat zamiast na podstawie książek (AI włączone automatycznie)
@@ -243,6 +228,21 @@ export const CampaignSetup = ({
               <Label htmlFor="randomContentTopic" className="text-sm">Temat do generowania</Label>
               <Textarea id="randomContentTopic" value={randomContentTopic} onChange={e => setRandomContentTopic(e.target.value)} placeholder="np. Historia Polski XX wieku, Literatura romantyzmu, Powstanie Warszawskie..." className="mt-1 min-h-[80px]" />
             </div>}
+        </div>
+        
+        {/* Regenerate Texts Checkbox */}
+        <div className="flex items-center space-x-3 mb-4 p-4 bg-amber-500/5 rounded-lg border border-amber-500/20">
+          <Checkbox id="regenerateTexts" checked={regenerateTexts} onCheckedChange={checked => setRegenerateTexts(checked === true)} />
+          <div className="flex-1">
+            <Label htmlFor="regenerateTexts" className="flex items-center gap-2 cursor-pointer">
+              <RefreshCw className="h-4 w-4 text-amber-500" />
+              <span className="font-medium">Użyj zapisanych postow z poprzednich kampanii
+            </span>
+            </Label>
+            <p className="text-xs text-muted-foreground mt-1">
+              {regenerateTexts ? "Nowe teksty zostaną wygenerowane dla wszystkich książek" : "Użyj tekstów z poprzednich kampanii (jeśli istnieją)"}
+            </p>
+          </div>
         </div>
         
         <div className="space-y-6">
