@@ -4,8 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, X, Clock, Image, Loader2, ArrowRight, Calendar, Upload } from "lucide-react";
+import { Plus, X, Clock, Image, Loader2, ArrowRight, Calendar, Video, Trash2 } from "lucide-react";
 import { format, addDays } from "date-fns";
+import { pl } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { PlatformSelector } from "./PlatformSelector";
 import { AccountSelector } from "./AccountSelector";
@@ -17,14 +18,18 @@ interface SimplePost {
   id: string;
   text: string;
   time: string;
+  day: number;
   imageUrl?: string;
   imageFile?: File;
+  videoUrl?: string;
+  videoFile?: File;
 }
 
 export const SimpleCampaignSetup = () => {
   const navigate = useNavigate();
+  const [durationDays, setDurationDays] = useState(1);
   const [posts, setPosts] = useState<SimplePost[]>([
-    { id: crypto.randomUUID(), text: "", time: "10:00" },
+    { id: crypto.randomUUID(), text: "", time: "10:00", day: 1 },
   ]);
   const [startDate, setStartDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
   const [targetPlatforms, setTargetPlatforms] = useState<PlatformId[]>(["x"]);
@@ -43,25 +48,30 @@ export const SimpleCampaignSetup = () => {
     const { data: xData } = await (supabase as any).from("twitter_oauth_tokens").select("id").limit(1).maybeSingle();
     const { data: fbData } = await (supabase as any).from("facebook_oauth_tokens").select("id").limit(1).maybeSingle();
     const { data: tiktokData } = await (supabase as any).from("tiktok_oauth_tokens").select("id").limit(1).maybeSingle();
+    const { data: youtubeData } = await (supabase as any).from("youtube_oauth_tokens").select("id").limit(1).maybeSingle();
+    const { data: instagramData } = await (supabase as any).from("instagram_oauth_tokens").select("id").limit(1).maybeSingle();
 
     platforms.forEach((platform) => {
       if (platform.id === "x") connectionStatus[platform.id] = !!xData;
       else if (platform.id === "facebook") connectionStatus[platform.id] = !!fbData;
       else if (platform.id === "tiktok") connectionStatus[platform.id] = !!tiktokData;
+      else if (platform.id === "youtube") connectionStatus[platform.id] = !!youtubeData;
+      else if (platform.id === "instagram") connectionStatus[platform.id] = !!instagramData;
       else connectionStatus[platform.id] = false;
     });
 
     setConnectedPlatforms(connectionStatus as Record<PlatformId, boolean>);
   };
 
-  const addPost = () => {
-    const lastTime = posts[posts.length - 1]?.time || "10:00";
+  const addPost = (day: number) => {
+    const postsForDay = posts.filter(p => p.day === day);
+    const lastTime = postsForDay[postsForDay.length - 1]?.time || "10:00";
     const [hours] = lastTime.split(":").map(Number);
     const newHour = (hours + 2) % 24;
     
     setPosts([
       ...posts,
-      { id: crypto.randomUUID(), text: "", time: `${newHour.toString().padStart(2, "0")}:00` },
+      { id: crypto.randomUUID(), text: "", time: `${newHour.toString().padStart(2, "0")}:00`, day },
     ]);
   };
 
@@ -76,13 +86,52 @@ export const SimpleCampaignSetup = () => {
   };
 
   const handleImageUpload = async (postId: string, file: File) => {
-    // Create preview URL
     const previewUrl = URL.createObjectURL(file);
-    updatePost(postId, { imageUrl: previewUrl, imageFile: file });
+    updatePost(postId, { imageUrl: previewUrl, imageFile: file, videoUrl: undefined, videoFile: undefined });
+  };
+
+  const handleVideoUpload = async (postId: string, file: File) => {
+    // Validate file size (128MB max)
+    if (file.size > 128 * 1024 * 1024) {
+      toast.error("Plik wideo jest za duży (max 128MB)");
+      return;
+    }
+    const previewUrl = URL.createObjectURL(file);
+    updatePost(postId, { videoUrl: previewUrl, videoFile: file, imageUrl: undefined, imageFile: undefined });
+  };
+
+  const clearMedia = (postId: string) => {
+    updatePost(postId, { imageUrl: undefined, imageFile: undefined, videoUrl: undefined, videoFile: undefined });
+  };
+
+  const addDay = () => {
+    const newDay = durationDays + 1;
+    setDurationDays(newDay);
+    // Add a default post for the new day
+    const defaultTime = "10:00";
+    setPosts([
+      ...posts,
+      { id: crypto.randomUUID(), text: "", time: defaultTime, day: newDay },
+    ]);
+  };
+
+  const removeDay = (dayToRemove: number) => {
+    if (durationDays <= 1) return;
+    
+    // Remove all posts for this day
+    const updatedPosts = posts.filter(p => p.day !== dayToRemove);
+    
+    // Renumber days for posts after the removed day
+    const renumberedPosts = updatedPosts.map(p => ({
+      ...p,
+      day: p.day > dayToRemove ? p.day - 1 : p.day
+    }));
+    
+    setPosts(renumberedPosts);
+    setDurationDays(durationDays - 1);
   };
 
   const handleCreateCampaign = async () => {
-    // Validate
     const emptyPosts = posts.filter((p) => !p.text.trim());
     if (emptyPosts.length > 0) {
       toast.error("Wypełnij treść wszystkich postów");
@@ -95,11 +144,13 @@ export const SimpleCampaignSetup = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Nie zalogowany");
 
-      // Upload images if any
-      const postsWithUploadedImages: SimplePost[] = [];
+      // Upload images and videos
+      const postsWithUploadedMedia: SimplePost[] = [];
       for (const post of posts) {
         let uploadedImageUrl = post.imageUrl;
+        let uploadedVideoUrl = post.videoUrl;
         
+        // Upload image if present
         if (post.imageFile) {
           const fileName = `${user.id}/${Date.now()}_${post.imageFile.name}`;
           const { error: uploadError } = await supabase.storage
@@ -107,7 +158,8 @@ export const SimpleCampaignSetup = () => {
             .upload(fileName, post.imageFile);
 
           if (uploadError) {
-            console.error("Upload error:", uploadError);
+            console.error("Image upload error:", uploadError);
+            toast.error(`Błąd uploadu grafiki dla posta: ${uploadError.message}`);
           } else {
             const { data: { publicUrl } } = supabase.storage
               .from("ObrazkiKsiazek")
@@ -116,26 +168,44 @@ export const SimpleCampaignSetup = () => {
           }
         }
         
-        postsWithUploadedImages.push({ ...post, imageUrl: uploadedImageUrl });
+        // Upload video if present
+        if (post.videoFile) {
+          const fileName = `${user.id}/videos/${Date.now()}_${post.videoFile.name}`;
+          const { error: uploadError } = await supabase.storage
+            .from("ObrazkiKsiazek")
+            .upload(fileName, post.videoFile);
+
+          if (uploadError) {
+            console.error("Video upload error:", uploadError);
+            toast.error(`Błąd uploadu wideo dla posta: ${uploadError.message}`);
+          } else {
+            const { data: { publicUrl } } = supabase.storage
+              .from("ObrazkiKsiazek")
+              .getPublicUrl(fileName);
+            uploadedVideoUrl = publicUrl;
+          }
+        }
+        
+        postsWithUploadedMedia.push({ 
+          ...post, 
+          imageUrl: post.imageFile ? uploadedImageUrl : undefined,
+          videoUrl: post.videoFile ? uploadedVideoUrl : undefined
+        });
       }
 
       // Create campaign
       const campaignName = `Prosta kampania ${format(new Date(startDate), "dd.MM.yyyy")}`;
-      const sortedTimes = [...posts].sort((a, b) => {
-        const [aH, aM] = a.time.split(":").map(Number);
-        const [bH, bM] = b.time.split(":").map(Number);
-        return aH * 60 + aM - (bH * 60 + bM);
-      });
+      const allTimes = [...new Set(posts.map(p => p.time))].sort();
 
       const { data: campaign, error: campaignError } = await supabase
         .from("campaigns")
         .insert({
           name: campaignName,
           user_id: user.id,
-          duration_days: 1,
-          posts_per_day: posts.length,
+          duration_days: durationDays,
+          posts_per_day: Math.ceil(posts.length / durationDays),
           start_date: new Date(startDate).toISOString(),
-          posting_times: sortedTimes.map((p) => p.time),
+          posting_times: allTimes,
           target_platforms: targetPlatforms,
           selected_accounts: selectedAccounts,
           content_posts_count: 0,
@@ -147,15 +217,15 @@ export const SimpleCampaignSetup = () => {
 
       if (campaignError) throw campaignError;
 
-      // Create posts
-      const campaignPosts = postsWithUploadedImages.map((post, index) => {
+      // Create posts with proper scheduled dates based on day
+      const campaignPosts = postsWithUploadedMedia.map((post) => {
         const [hours, minutes] = post.time.split(":").map(Number);
-        const scheduledAt = new Date(startDate);
+        const scheduledAt = addDays(new Date(startDate), post.day - 1);
         scheduledAt.setHours(hours, minutes, 0, 0);
 
         return {
           campaign_id: campaign.id,
-          day: 1,
+          day: post.day,
           time: post.time,
           type: "sales",
           category: "Promocja",
@@ -164,7 +234,7 @@ export const SimpleCampaignSetup = () => {
           status: "scheduled",
           platforms: targetPlatforms,
           target_accounts: selectedAccounts,
-          custom_image_url: post.imageUrl || null,
+          custom_image_url: post.imageUrl || post.videoUrl || null,
         };
       });
 
@@ -183,101 +253,203 @@ export const SimpleCampaignSetup = () => {
 
   const canSubmit = posts.every((p) => p.text.trim()) && targetPlatforms.length > 0;
 
+  // Group posts by day
+  const postsByDay: Record<number, SimplePost[]> = {};
+  for (let day = 1; day <= durationDays; day++) {
+    postsByDay[day] = posts.filter(p => p.day === day);
+  }
+
   return (
     <div className="space-y-6">
       <Card className="p-6 bg-secondary/30">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Calendar className="h-5 w-5" />
-          Kiedy opublikować?
+          Kiedy rozpocząć kampanię?
         </h3>
-        <Input
-          type="date"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-          className="max-w-xs"
-        />
+        <div className="flex flex-wrap gap-4 items-end">
+          <div>
+            <Label className="text-sm text-muted-foreground mb-1 block">Data startu</Label>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-44"
+            />
+          </div>
+          <div>
+            <Label className="text-sm text-muted-foreground mb-1 block">Liczba dni</Label>
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-semibold">{durationDays}</span>
+              <Button variant="outline" size="sm" onClick={addDay} className="gap-1">
+                <Plus className="h-3 w-3" />
+                Dodaj dzień
+              </Button>
+            </div>
+          </div>
+        </div>
       </Card>
 
-      <Card className="p-6 bg-secondary/30">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Twoje posty</h3>
-          <Button variant="outline" size="sm" onClick={addPost} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Dodaj post
-          </Button>
-        </div>
-
-        <div className="space-y-4">
-          {posts.map((post, index) => (
-            <div key={post.id} className="p-4 border rounded-lg bg-background space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">Post #{index + 1}</span>
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="time"
-                    value={post.time}
-                    onChange={(e) => updatePost(post.id, { time: e.target.value })}
-                    className="w-28"
-                  />
-                  {posts.length > 1 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removePost(post.id)}
-                      className="h-8 w-8 p-0 text-destructive"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
+      {/* Posts grouped by day */}
+      {Array.from({ length: durationDays }, (_, i) => i + 1).map((day) => {
+        const dayPosts = postsByDay[day] || [];
+        const dayDate = addDays(new Date(startDate), day - 1);
+        
+        return (
+          <Card key={day} className="p-6 bg-secondary/30">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">
+                  Dzień {day} - {format(dayDate, "EEEE, d MMMM", { locale: pl })}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {dayPosts.length} post{dayPosts.length === 1 ? "" : dayPosts.length < 5 ? "y" : "ów"}
+                </p>
               </div>
-
-              <Textarea
-                placeholder="Wklej lub napisz treść posta..."
-                value={post.text}
-                onChange={(e) => updatePost(post.id, { text: e.target.value })}
-                rows={4}
-              />
-
-              <div className="flex items-center gap-3">
-                <Label className="flex items-center gap-2 cursor-pointer px-3 py-2 border rounded-lg hover:bg-muted/50 transition-colors">
-                  <Image className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">
-                    {post.imageUrl ? "Zmień grafikę" : "Dodaj grafikę"}
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleImageUpload(post.id, file);
-                    }}
-                  />
-                </Label>
-                {post.imageUrl && (
-                  <div className="flex items-center gap-2">
-                    <img
-                      src={post.imageUrl}
-                      alt="Podgląd"
-                      className="h-10 w-10 object-cover rounded"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => updatePost(post.id, { imageUrl: undefined, imageFile: undefined })}
-                      className="h-6 w-6 p-0 text-muted-foreground"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => addPost(day)} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Dodaj post
+                </Button>
+                {durationDays > 1 && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => removeDay(day)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 )}
               </div>
             </div>
-          ))}
-        </div>
-      </Card>
+
+            <div className="space-y-4">
+              {dayPosts.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Brak postów na ten dzień.{" "}
+                  <button 
+                    onClick={() => addPost(day)} 
+                    className="text-primary underline hover:no-underline"
+                  >
+                    Dodaj pierwszy post
+                  </button>
+                </div>
+              ) : (
+                dayPosts.map((post, index) => (
+                  <div key={post.id} className="p-4 border rounded-lg bg-background space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Post #{index + 1}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <Input
+                          type="time"
+                          value={post.time}
+                          onChange={(e) => updatePost(post.id, { time: e.target.value })}
+                          className="w-28"
+                        />
+                        {dayPosts.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removePost(post.id)}
+                            className="h-8 w-8 p-0 text-destructive"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <Textarea
+                      placeholder="Wklej lub napisz treść posta..."
+                      value={post.text}
+                      onChange={(e) => updatePost(post.id, { text: e.target.value })}
+                      rows={4}
+                    />
+
+                    {/* Media upload section */}
+                    <div className="flex flex-wrap items-center gap-3">
+                      {/* Image upload */}
+                      <Label className="flex items-center gap-2 cursor-pointer px-3 py-2 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <Image className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">
+                          {post.imageUrl ? "Zmień grafikę" : "Dodaj grafikę"}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleImageUpload(post.id, file);
+                          }}
+                        />
+                      </Label>
+
+                      {/* Video upload */}
+                      <Label className="flex items-center gap-2 cursor-pointer px-3 py-2 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <Video className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">
+                          {post.videoUrl ? "Zmień wideo" : "Dodaj wideo"}
+                        </span>
+                        <input
+                          type="file"
+                          accept="video/mp4,video/mov,video/webm"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleVideoUpload(post.id, file);
+                          }}
+                        />
+                      </Label>
+
+                      {/* Image preview */}
+                      {post.imageUrl && (
+                        <div className="flex items-center gap-2">
+                          <img
+                            src={post.imageUrl}
+                            alt="Podgląd"
+                            className="h-10 w-10 object-cover rounded"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => clearMedia(post.id)}
+                            className="h-6 w-6 p-0 text-muted-foreground"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* Video preview */}
+                      {post.videoUrl && (
+                        <div className="flex items-center gap-2">
+                          <video
+                            src={post.videoUrl}
+                            className="h-10 w-16 object-cover rounded"
+                          />
+                          <span className="text-xs text-muted-foreground">Wideo</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => clearMedia(post.id)}
+                            className="h-6 w-6 p-0 text-muted-foreground"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </Card>
+        );
+      })}
 
       <PlatformSelector
         selected={targetPlatforms}
@@ -294,9 +466,15 @@ export const SimpleCampaignSetup = () => {
       <Card className="p-6 bg-gradient-subtle border-primary/20">
         <h3 className="text-lg font-semibold mb-2">Podsumowanie</h3>
         <p className="text-muted-foreground">
-          <strong>{posts.length}</strong> post{posts.length === 1 ? "" : "ów"} zaplanowanych na{" "}
-          <strong>{format(new Date(startDate), "d MMMM yyyy")}</strong>
+          <strong>{posts.length}</strong> post{posts.length === 1 ? "" : posts.length < 5 ? "y" : "ów"} zaplanowanych na{" "}
+          <strong>{durationDays}</strong> dni{durationDays === 1 ? "" : durationDays < 5 ? "" : ""}, 
+          rozpoczynając od <strong>{format(new Date(startDate), "d MMMM yyyy", { locale: pl })}</strong>
         </p>
+        {posts.some(p => p.imageFile || p.videoFile) && (
+          <p className="text-sm text-muted-foreground mt-1">
+            📎 {posts.filter(p => p.imageFile).length} grafik, {posts.filter(p => p.videoFile).length} wideo do przesłania
+          </p>
+        )}
       </Card>
 
       <Button
