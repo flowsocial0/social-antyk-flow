@@ -142,7 +142,7 @@ const LandingPage = () => {
         <div className="container mx-auto px-4">
           <div className="text-center mb-10">
             <h3 className="text-3xl font-bold text-foreground mb-4">
-              Masz pytania? Porozmawiaj z Klemcią!
+              Masz pytania? Porozmawiaj z Klemcią:
             </h3>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Chcesz dowiedzieć się więcej o Klemci?
