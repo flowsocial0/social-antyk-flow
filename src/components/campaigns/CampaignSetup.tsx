@@ -240,7 +240,7 @@ export const CampaignSetup = ({
             </span>
             </Label>
             <p className="text-xs text-muted-foreground mt-1">
-              {regenerateTexts ? "Nowe teksty zostaną wygenerowane dla wszystkich książek" : "Użyj tekstów z poprzednich kampanii (jeśli istnieją)"}
+              {regenerateTexts ? "Nowe teksty zostaną wygenerowane tylko dla produktów, które jeszcze były w kampanii" : "Użyj tekstów z poprzednich kampanii (jeśli istnieją)"}
             </p>
           </div>
         </div>
