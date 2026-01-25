@@ -219,7 +219,7 @@ export const CampaignSetup = ({
                 <span className="font-medium">Generuj tylko ciekawostki</span>
               </Label>
               <p className="text-xs text-muted-foreground mt-1">
-                Posty ciekawostki będą generowane na podany temat zamiast na podstawie książek (AI włączone automatycznie)
+                Posty z ciekawostkami będą generowane na podany temat zamiast na podstawie produktów z bazy
               </p>
             </div>
           </div>
