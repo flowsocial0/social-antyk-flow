@@ -33,6 +33,7 @@ interface CampaignPost {
   scheduled_at: string;
   platforms?: string[];
   target_accounts?: Record<string, string[]>; // Platform -> Account IDs array
+  custom_image_url?: string; // Custom image/video URL from simple campaign
   campaign?: {
     id: string;
     user_id: string;
@@ -347,8 +348,13 @@ Deno.serve(async (req) => {
             
             const accountOwnerId = accountData?.user_id || campaignOwnerId;
             
-            // Get book image URL for the post
-            const bookImageUrl = post.book?.image_url || null;
+            // Priority: custom_image_url (from simple campaign) > book.image_url
+            const mediaUrl = post.custom_image_url || post.book?.image_url || null;
+            
+            // Detect if it's a video based on extension
+            const isVideo = mediaUrl ? /\.(mp4|mov|webm|avi|mkv|m4v)$/i.test(mediaUrl) : false;
+            
+            console.log(`Media for post ${post.id}: url=${mediaUrl ? 'present' : 'none'}, isVideo=${isVideo}`);
             
             const { data, error: publishError } = await supabase.functions.invoke(publishFunctionName, {
               body: { 
@@ -356,7 +362,8 @@ Deno.serve(async (req) => {
                 platform: platform,
                 userId: accountOwnerId, // Use the owner of THIS account
                 accountId: accountId,   // Specific account to publish to
-                imageUrl: bookImageUrl
+                imageUrl: isVideo ? null : mediaUrl,  // Only pass as imageUrl if it's not a video
+                videoUrl: isVideo ? mediaUrl : null   // Pass as videoUrl if it's a video
               }
             });
 

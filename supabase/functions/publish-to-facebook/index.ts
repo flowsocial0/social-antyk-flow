@@ -39,6 +39,7 @@ Deno.serve(async (req) => {
         bookId: string | undefined,
         campaignPostId: string | undefined,
         imageUrl: string | undefined,
+        videoUrl: string | undefined,
         testConnection: boolean | undefined,
         userIdFromBody: string | undefined,
         accountId: string | undefined; // Specific Facebook account to publish to
@@ -49,6 +50,7 @@ Deno.serve(async (req) => {
       bookId = body.bookId;
       campaignPostId = body.campaignPostId;
       imageUrl = body.imageUrl;
+      videoUrl = body.videoUrl;  // New: video URL parameter
       testConnection = body.testConnection;
       userIdFromBody = body.userId;
       accountId = body.accountId; // For multi-account support
@@ -56,7 +58,8 @@ Deno.serve(async (req) => {
         text: text ? 'present' : undefined, 
         bookId, 
         campaignPostId, 
-        imageUrl: imageUrl ? 'present' : undefined, 
+        imageUrl: imageUrl ? 'present' : undefined,
+        videoUrl: videoUrl ? 'present' : undefined,
         testConnection,
         userId: userIdFromBody ? 'present' : undefined,
         accountId: accountId || 'not specified (will use default)'
@@ -190,6 +193,7 @@ Deno.serve(async (req) => {
     let postText = text;
     let productUrl = '';
     let finalImageUrl = imageUrl || '';
+    let finalVideoUrl = videoUrl || '';
     let book: Book | null = null;
 
     // Helper function to validate and fix URL format
@@ -345,11 +349,26 @@ Deno.serve(async (req) => {
         type: campaignPost.type,
         text: campaignPost.text ? 'present' : 'missing',
         book_id: campaignPost.book_id,
-        book: campaignPost.book ? 'present' : 'missing'
+        book: campaignPost.book ? 'present' : 'missing',
+        custom_image_url: campaignPost.custom_image_url ? 'present' : 'missing'
       });
 
       postText = campaignPost.text;
       book = campaignPost.book;
+      
+      // Check for custom media from simple campaign mode
+      if (campaignPost.custom_image_url && !finalImageUrl && !finalVideoUrl) {
+        const mediaUrl = campaignPost.custom_image_url;
+        const isVideo = /\.(mp4|mov|webm|avi|mkv|m4v)$/i.test(mediaUrl);
+        
+        if (isVideo) {
+          finalVideoUrl = mediaUrl;
+          console.log('Using campaign post custom video:', finalVideoUrl);
+        } else {
+          finalImageUrl = mediaUrl;
+          console.log('Using campaign post custom image:', finalImageUrl);
+        }
+      }
 
       // For sales posts, append book link and get image
       if (campaignPost.type === 'sales' && book) {
@@ -361,7 +380,7 @@ Deno.serve(async (req) => {
         }
 
         // Get image URL from book if not provided
-        if (!finalImageUrl) {
+        if (!finalImageUrl && !finalVideoUrl) {
           if (book.image_url) {
             finalImageUrl = book.image_url;
             console.log('Using campaign book.image_url:', finalImageUrl);
@@ -413,11 +432,42 @@ Deno.serve(async (req) => {
     console.log('Post text length:', postText?.length);
     console.log('Product URL:', productUrl || 'none');
     console.log('Image URL:', finalImageUrl || 'none');
+    console.log('Video URL:', finalVideoUrl || 'none');
 
     // Publish to Facebook
     let fbPostId = null;
 
-    if (finalImageUrl) {
+    if (finalVideoUrl) {
+      // Video publishing to Facebook
+      console.log('=== Publishing video to Facebook ===');
+      
+      // Facebook requires video to be uploaded via the /videos endpoint
+      const videosUrl = `https://graph.facebook.com/v18.0/${page_id}/videos`;
+      const videoData = {
+        file_url: finalVideoUrl,
+        description: postText,
+        access_token: access_token,
+      };
+
+      console.log('Uploading video to Facebook...');
+      const videoResponse = await fetch(videosUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(videoData),
+      });
+
+      const videoResult = await videoResponse.json();
+      console.log('Video upload response:', { status: videoResponse.status, result: videoResult });
+
+      if (!videoResponse.ok || videoResult.error) {
+        console.error('Facebook video upload error:', videoResult);
+        throw new Error(videoResult.error?.message || 'Failed to publish video to Facebook');
+      }
+
+      fbPostId = videoResult.id;
+      console.log('Published video to Facebook, post ID:', fbPostId);
+
+    } else if (finalImageUrl) {
       // Two-step process: 1) Upload photo unpublished 2) Create feed post with attached media
       console.log('=== Publishing with image (two-step process) ===');
       
