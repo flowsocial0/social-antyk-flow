@@ -691,20 +691,23 @@ const CampaignDetails = () => {
             </div>
             <div className="flex flex-wrap gap-2">
               {campaign.selected_accounts && Object.keys(campaign.selected_accounts).length > 0 ? (
-                // Show selected accounts from new campaigns
-                Object.entries(campaign.selected_accounts as Record<string, string[]>).map(([platform, accountIds]) => {
-                  const platformConfig = getPlatformConfig(platform as PlatformId);
-                  const Icon = platformConfig?.icon;
-                  return (accountIds as string[]).map((accountId) => {
-                    const accountInfo = accountsMap[accountId];
-                    return (
-                      <Badge key={accountId} variant="secondary" className="gap-2 py-1.5 px-3">
-                        {Icon && <Icon className="h-3.5 w-3.5" />}
-                        <span>{accountInfo?.display_name || 'Ładowanie...'}</span>
-                      </Badge>
-                    );
-                  });
-                })
+                // Show only accounts that exist in accountsMap (verified to exist in DB)
+                Object.entries(campaign.selected_accounts as Record<string, string[]>)
+                  .flatMap(([platform, accountIds]) => {
+                    const platformConfig = getPlatformConfig(platform as PlatformId);
+                    const Icon = platformConfig?.icon;
+                    return (accountIds as string[])
+                      .filter((accountId) => accountsMap[accountId]) // Only show accounts that exist
+                      .map((accountId) => {
+                        const accountInfo = accountsMap[accountId];
+                        return (
+                          <Badge key={accountId} variant="secondary" className="gap-2 py-1.5 px-3">
+                            {Icon && <Icon className="h-3.5 w-3.5" />}
+                            <span>{accountInfo.display_name}</span>
+                          </Badge>
+                        );
+                      });
+                  })
               ) : (
                 // Fallback for older campaigns - show target platforms
                 (campaign.target_platforms as string[] || ['x']).map((platform: string) => {
@@ -717,6 +720,12 @@ const CampaignDetails = () => {
                     </Badge>
                   );
                 })
+              )}
+              {/* Show message if no accounts found */}
+              {campaign.selected_accounts && 
+                Object.keys(campaign.selected_accounts).length > 0 && 
+                Object.keys(accountsMap).length === 0 && (
+                  <span className="text-sm text-muted-foreground">Ładowanie kont...</span>
               )}
             </div>
           </div>
