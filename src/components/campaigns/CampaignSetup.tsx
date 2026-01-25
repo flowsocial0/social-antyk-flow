@@ -193,7 +193,7 @@ export const CampaignSetup = ({
                 <span className="font-medium">Generuj posty z produktów z bazy + ciekawostki</span>
               </Label>
               <p className="text-xs text-muted-foreground mt-1">
-                {useAI ? "Grok AI wygeneruje unikalne, angażujące treści dla każdego posta" : "Posty zostaną utworzone z opisów książek z bazy danych"}
+                {useAI ? "AI wygeneruje unikalne, angażujące treści dla każdego posta" : "Posty zostaną utworzone z opisów książek z bazy danych"}
               </p>
             </div>
           </div>}
