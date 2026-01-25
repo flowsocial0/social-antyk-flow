@@ -56,7 +56,7 @@ const PlatformInstagram = () => {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-amber-500">3.</span>
-                  <span>Konto Instagram musi być <strong>połączone z tą stroną Facebook</strong> w Meta Business Suite (Ustawienia → Konta → Instagram accounts → Dodaj)</span>
+                  <span>Konto Instagram musi być <strong>połączone z tą stroną Facebook</strong> w Meta Business Suite (Obrazek profilu (prawy górny róg) -> Ustawienia i prywatność -> Ustawienia -> Zobacz więcej w Centrum kont -> konta -> dodaj konta -> Instagram -> postępuj zgodnie z poleceniami)</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-amber-500">4.</span>
