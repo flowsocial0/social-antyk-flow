@@ -28,6 +28,11 @@ async function waitForContainer(containerId: string, accessToken: string, maxAtt
   return false;
 }
 
+// Check if URL is a video based on extension
+function isVideoUrl(url: string): boolean {
+  return /\.(mp4|mov|webm|avi|mkv|m4v)$/i.test(url);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -46,9 +51,10 @@ serve(async (req) => {
     let campaignPostId: string | undefined;
     let caption: string | undefined;
     let imageUrl: string | undefined;
+    let videoUrl: string | undefined;  // NEW: Support for video
     let testConnection: boolean | undefined;
     let userIdFromBody: string | undefined;
-    let accountId: string | undefined; // Specific Instagram account to publish to
+    let accountId: string | undefined;
 
     try {
       const body = await req.json();
@@ -57,16 +63,18 @@ serve(async (req) => {
       campaignPostId = body.campaignPostId;
       caption = body.caption || body.text;
       imageUrl = body.imageUrl;
+      videoUrl = body.videoUrl;  // NEW: Extract videoUrl from request
       testConnection = body.testConnection;
       userIdFromBody = body.userId;
-      accountId = body.accountId; // For multi-account support
+      accountId = body.accountId;
       
       console.log('Request body:', { 
         bookId, 
         contentId,
         campaignPostId,
         caption: caption ? 'present' : undefined,
-        imageUrl: imageUrl ? 'present' : undefined, 
+        imageUrl: imageUrl ? 'present' : undefined,
+        videoUrl: videoUrl ? 'present' : undefined,  // NEW: Log videoUrl
         testConnection,
         userId: userIdFromBody ? 'present' : undefined,
         accountId: accountId || 'not specified (will use default)'
@@ -107,7 +115,6 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Get Instagram token from database
-    // If accountId is provided, use that specific account; otherwise use default
     console.log('Fetching Instagram token for user:', userId, 'accountId:', accountId || 'default');
     
     let tokenQuery = supabase
@@ -116,10 +123,8 @@ serve(async (req) => {
       .eq('user_id', userId);
 
     if (accountId) {
-      // Use specific account
       tokenQuery = tokenQuery.eq('id', accountId);
     } else {
-      // Use default account or first available
       tokenQuery = tokenQuery.eq('is_default', true);
     }
 
@@ -161,7 +166,7 @@ serve(async (req) => {
     }
 
     // If it's just a connection test, return success
-    const isTest = Boolean(testConnection) || (!bookId && !contentId && !campaignPostId && !caption);
+    const isTest = Boolean(testConnection) || (!bookId && !contentId && !campaignPostId && !caption && !imageUrl && !videoUrl);
     console.log('Is test connection:', isTest);
     
     if (isTest) {
@@ -191,6 +196,7 @@ serve(async (req) => {
 
     let postCaption = caption || '';
     let finalImageUrl = imageUrl || '';
+    let finalVideoUrl = videoUrl || '';  // NEW: Track video URL
 
     // If bookId provided, get book data
     if (bookId) {
@@ -210,9 +216,10 @@ serve(async (req) => {
         title: book?.title, 
         image_url: book?.image_url ? 'present' : 'missing',
         storage_path: book?.storage_path ? 'present' : 'missing',
+        video_url: book?.video_url ? 'present' : 'missing',
       });
 
-      // Get AI text for Instagram (use ai_generated_text as fallback since we don't have ai_text_instagram yet)
+      // Get AI text for Instagram
       if (!postCaption) {
         postCaption = book.ai_generated_text || '';
         
@@ -226,11 +233,21 @@ serve(async (req) => {
         }
       }
 
-      // Get image URL
-      if (!finalImageUrl) {
-        if (book.image_url) {
-          finalImageUrl = book.image_url;
-          console.log('Using book.image_url:', finalImageUrl);
+      // Get media URL - check for video first
+      if (!finalVideoUrl && !finalImageUrl) {
+        // Check if book has video
+        if (book.video_url && isVideoUrl(book.video_url)) {
+          finalVideoUrl = book.video_url;
+          console.log('Using book.video_url:', finalVideoUrl);
+        } else if (book.image_url) {
+          // Check if image_url is actually a video
+          if (isVideoUrl(book.image_url)) {
+            finalVideoUrl = book.image_url;
+            console.log('Using book.image_url as video:', finalVideoUrl);
+          } else {
+            finalImageUrl = book.image_url;
+            console.log('Using book.image_url:', finalImageUrl);
+          }
         } else if (book.storage_path) {
           finalImageUrl = getStoragePublicUrl(book.storage_path);
           console.log('Using storage_path URL:', finalImageUrl);
@@ -254,19 +271,40 @@ serve(async (req) => {
 
       postCaption = campaignPost.text;
       
-      // Get image from book if available
-      if (campaignPost.book && !finalImageUrl) {
-        if (campaignPost.book.image_url) {
-          finalImageUrl = campaignPost.book.image_url;
+      // Check custom_image_url first (from simple campaign)
+      if (campaignPost.custom_image_url) {
+        if (isVideoUrl(campaignPost.custom_image_url)) {
+          finalVideoUrl = campaignPost.custom_image_url;
+          console.log('Using custom_image_url as video:', finalVideoUrl);
+        } else if (!finalImageUrl) {
+          finalImageUrl = campaignPost.custom_image_url;
+          console.log('Using custom_image_url as image:', finalImageUrl);
+        }
+      }
+      
+      // Get media from book if not already set
+      if (campaignPost.book && !finalVideoUrl && !finalImageUrl) {
+        if (campaignPost.book.video_url && isVideoUrl(campaignPost.book.video_url)) {
+          finalVideoUrl = campaignPost.book.video_url;
+        } else if (campaignPost.book.image_url) {
+          if (isVideoUrl(campaignPost.book.image_url)) {
+            finalVideoUrl = campaignPost.book.image_url;
+          } else {
+            finalImageUrl = campaignPost.book.image_url;
+          }
         } else if (campaignPost.book.storage_path) {
           finalImageUrl = getStoragePublicUrl(campaignPost.book.storage_path);
         }
       }
     }
 
-    // Instagram REQUIRES an image
-    if (!finalImageUrl) {
-      throw new Error('Instagram wymaga obrazu. Posty tylko tekstowe nie są obsługiwane. Dodaj obraz do książki.');
+    // Determine if we're posting video or image
+    const isVideoPost = Boolean(finalVideoUrl);
+    console.log('Post type:', isVideoPost ? 'VIDEO (Reel)' : 'IMAGE');
+
+    // Instagram REQUIRES either image or video
+    if (!finalImageUrl && !finalVideoUrl) {
+      throw new Error('Instagram wymaga obrazu lub wideo. Posty tylko tekstowe nie są obsługiwane.');
     }
 
     // Fetch AI suffix from user_settings
@@ -291,47 +329,95 @@ serve(async (req) => {
 
     console.log('=== Final Publishing Data ===');
     console.log('Caption length:', postCaption?.length);
-    console.log('Image URL:', finalImageUrl);
+    console.log('Image URL:', finalImageUrl || 'none');
+    console.log('Video URL:', finalVideoUrl || 'none');
+    console.log('Is video post:', isVideoPost);
 
-    // Step 1: Create media container
-    console.log('Creating media container...');
-    const containerParams = new URLSearchParams({
-      image_url: finalImageUrl,
-      access_token: access_token,
-    });
+    let containerId: string;
 
-    if (postCaption) {
-      containerParams.set('caption', postCaption);
-    }
+    if (isVideoPost) {
+      // VIDEO PUBLISHING (Reels)
+      console.log('Creating video (Reel) container...');
+      const containerParams = new URLSearchParams({
+        video_url: finalVideoUrl,
+        media_type: 'REELS',
+        access_token: access_token,
+      });
 
-    const containerResponse = await fetch(
-      `https://graph.facebook.com/v21.0/${instagram_account_id}/media`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: containerParams.toString(),
+      if (postCaption) {
+        containerParams.set('caption', postCaption);
       }
-    );
 
-    const containerData = await containerResponse.json();
+      // Enable sharing to Feed as well
+      containerParams.set('share_to_feed', 'true');
 
-    if (containerData.error) {
-      console.error('Error creating container:', containerData.error);
-      throw new Error(containerData.error.message || 'Nie udało się utworzyć kontenera mediów');
+      const containerResponse = await fetch(
+        `https://graph.facebook.com/v21.0/${instagram_account_id}/media`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: containerParams.toString(),
+        }
+      );
+
+      const containerData = await containerResponse.json();
+
+      if (containerData.error) {
+        console.error('Error creating video container:', containerData.error);
+        throw new Error(containerData.error.message || 'Nie udało się utworzyć kontenera wideo');
+      }
+
+      containerId = containerData.id;
+      console.log('Created video container:', containerId);
+
+      // Wait for video container - videos take longer to process
+      console.log('Waiting for video container to be ready (this may take up to 2 minutes)...');
+      const isReady = await waitForContainer(containerId, access_token, 60); // 60 attempts = ~2 minutes
+      
+      if (!isReady) {
+        throw new Error('Przetwarzanie wideo przekroczyło limit czasu. Spróbuj mniejszy plik wideo.');
+      }
+    } else {
+      // IMAGE PUBLISHING
+      console.log('Creating image container...');
+      const containerParams = new URLSearchParams({
+        image_url: finalImageUrl,
+        access_token: access_token,
+      });
+
+      if (postCaption) {
+        containerParams.set('caption', postCaption);
+      }
+
+      const containerResponse = await fetch(
+        `https://graph.facebook.com/v21.0/${instagram_account_id}/media`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: containerParams.toString(),
+        }
+      );
+
+      const containerData = await containerResponse.json();
+
+      if (containerData.error) {
+        console.error('Error creating image container:', containerData.error);
+        throw new Error(containerData.error.message || 'Nie udało się utworzyć kontenera mediów');
+      }
+
+      containerId = containerData.id;
+      console.log('Created image container:', containerId);
+
+      // Wait for image container to be ready
+      console.log('Waiting for image container to be ready...');
+      const isReady = await waitForContainer(containerId, access_token);
+      
+      if (!isReady) {
+        throw new Error('Przetwarzanie obrazu przekroczyło limit czasu');
+      }
     }
 
-    const containerId = containerData.id;
-    console.log('Created container:', containerId);
-
-    // Step 2: Wait for container to be ready
-    console.log('Waiting for container to be ready...');
-    const isReady = await waitForContainer(containerId, access_token);
-    
-    if (!isReady) {
-      throw new Error('Przetwarzanie kontenera przekroczyło limit czasu');
-    }
-
-    // Step 3: Publish the container
+    // Publish the container
     console.log('Publishing container...');
     const publishResponse = await fetch(
       `https://graph.facebook.com/v21.0/${instagram_account_id}/media_publish`,
@@ -353,7 +439,7 @@ serve(async (req) => {
     }
 
     const mediaId = publishData.id;
-    console.log('Published successfully! Media ID:', mediaId);
+    console.log('Published successfully! Media ID:', mediaId, 'Type:', isVideoPost ? 'Reel' : 'Image');
 
     // Update book_platform_content if contentId provided
     if (contentId) {
@@ -383,7 +469,8 @@ serve(async (req) => {
         success: true,
         mediaId,
         postId: mediaId,
-        message: 'Pomyślnie opublikowano na Instagram',
+        mediaType: isVideoPost ? 'reel' : 'image',
+        message: `Pomyślnie opublikowano ${isVideoPost ? 'Reel' : 'post'} na Instagram`,
         results: [{ success: true, platform: 'instagram', postId: mediaId }]
       }),
       {
