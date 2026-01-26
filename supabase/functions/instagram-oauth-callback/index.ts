@@ -136,6 +136,16 @@ serve(async (req) => {
 
     if (pages.length === 0) {
       console.log('No Facebook pages found - user may not be admin of any page');
+      
+      // Check if business_management was granted
+      const hasBusinessManagement = grantedPermissions.includes('business_management');
+      console.log('Has business_management for Instagram:', hasBusinessManagement);
+      
+      if (!hasBusinessManagement) {
+        console.log('Missing business_management permission - required for Business Portfolio pages');
+        return Response.redirect(`${FRONTEND_URL}/settings/social-accounts?instagram=error&message=no_business_management`, 302);
+      }
+      
       return Response.redirect(`${FRONTEND_URL}/settings/social-accounts?instagram=error&message=no_pages_found`, 302);
     }
 
