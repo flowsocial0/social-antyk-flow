@@ -1,117 +1,49 @@
 
-# Plan: Naprawienie błędu "Nie znaleziono stron Facebook" dla stron z Business Portfolio
+# Plan: Usunięcie nieprawidłowego scope `pages_manage_metadata`
 
-## Diagnoza problemu
+## Problem
 
-Zbadałem logi Edge Functions i znalazłem przyczynę:
+Komunikat od Facebooka mówi:
+> **Invalid Scopes: pages_manage_metadata**. This message is only shown to developers.
 
-```
-Full pages response: {"data":[]}
-Granted permissions: ["pages_show_list", "pages_read_engagement", "pages_manage_posts", ...]
-```
+Scope `pages_manage_metadata` nie jest poprawnym uprawnieniem Facebook Login i powinien zostać usunięty. Facebook i tak go ignoruje dla zwykłych użytkowników, ale dla deweloperów wyświetla ten mylący komunikat.
 
-Facebook API zwraca pustą listę stron, mimo że wszystkie uprawnienia są nadane.
+## Rozwiązanie
 
-**Przyczyna**: Od 2023 roku Meta wymaga dodatkowego uprawnienia `business_management` dla stron zarządzanych przez **Facebook Business Portfolio** (Meta Business Suite). Twoja strona "Profesjonalna strona" jest powiązana z Business Portfolio, dlatego nie pojawia się w API.
+### Zmiana w pliku `supabase/functions/facebook-oauth-start/index.ts`
 
-Strona "Glowaccy" działa, ponieważ prawdopodobnie jest stroną osobistą (nie powiązaną z Business Portfolio).
+Usunięcie `pages_manage_metadata` z listy scope'ów:
 
----
-
-## Plan naprawy
-
-### Krok 1: Dodanie uprawnienia `business_management` do Facebook OAuth
-
-**Plik**: `supabase/functions/facebook-oauth-start/index.ts`
-
-Dodanie `business_management` i `pages_manage_metadata` do listy scope'ów:
-
+**Przed (linia 44-51):**
 ```typescript
 const scopes = [
   'public_profile',
   'pages_show_list',
   'pages_manage_posts',
   'pages_read_engagement',
-  'pages_manage_metadata',
-  'business_management'  // NOWE - wymagane dla stron z Business Portfolio
+  'pages_manage_metadata',  // ← USUNĄĆ - nieprawidłowy scope
+  'business_management'
 ].join(',');
 ```
 
-### Krok 2: Dodanie uprawnienia `business_management` do Instagram OAuth
-
-**Plik**: `supabase/functions/instagram-oauth-start/index.ts`
-
-Dodanie `business_management` i `pages_manage_posts` do listy scope'ów:
-
+**Po:**
 ```typescript
 const scopes = [
   'public_profile',
   'pages_show_list',
+  'pages_manage_posts',
   'pages_read_engagement',
-  'pages_manage_posts',        // NOWE - potrzebne do publikacji
-  'instagram_basic',
-  'instagram_content_publish',
-  'business_management'        // NOWE - wymagane dla stron z Business Portfolio
+  'business_management'
 ].join(',');
 ```
 
-### Krok 3: Ulepszone logowanie diagnostyczne w callback
+### Deploy
 
-**Plik**: `supabase/functions/facebook-oauth-callback/index.ts`
+Ponowny deploy Edge Function `facebook-oauth-start`.
 
-Dodanie sprawdzenia czy `business_management` zostało nadane i lepszego komunikatu błędu:
+## Wynik
 
-```typescript
-// Sprawdź czy business_management jest nadane
-const hasBusinessManagement = grantedPermissions.includes('business_management');
-console.log('Has business_management:', hasBusinessManagement);
-
-if (!pagesData.data || pagesData.data.length === 0) {
-  // Bardziej precyzyjny komunikat błędu
-  let errorMessage = 'Nie znaleziono żadnych stron Facebook.';
-  if (!hasBusinessManagement) {
-    errorMessage += ' Jeśli Twoje strony są zarządzane przez Meta Business Suite, upewnij się, że zaakceptowałeś uprawnienie "business_management".';
-  }
-  // ...
-}
-```
-
-### Krok 4: Deploy Edge Functions
-
-Po zmianach, automatyczny deploy:
-- `facebook-oauth-start`
-- `facebook-oauth-callback`
-- `instagram-oauth-start`
-- `instagram-oauth-callback`
-
----
-
-## Ważna uwaga: Facebook App Review
-
-Uprawnienie `business_management` wymaga przejścia procesu **Facebook App Review** aby działać dla użytkowników innych niż deweloperzy/testerzy aplikacji.
-
-**Tymczasowe obejście** (bez App Review):
-1. Wejdź w ustawienia aplikacji Facebook: https://developers.facebook.com/apps/
-2. Dodaj siebie jako testera/dewelopera aplikacji
-3. Jako tester/deweloper będziesz mógł używać wszystkich uprawnień
-
-**Aby działało dla wszystkich użytkowników**, konieczne jest:
-1. Przejście App Review dla `business_management`
-2. Lub odłączenie strony z Business Portfolio (ale to nie jest praktyczne rozwiązanie)
-
----
-
-## Podsumowanie zmian
-
-| Plik | Zmiana |
-|------|--------|
-| `supabase/functions/facebook-oauth-start/index.ts` | Dodanie `business_management` do scope |
-| `supabase/functions/instagram-oauth-start/index.ts` | Dodanie `business_management` i `pages_manage_posts` do scope |
-| `supabase/functions/facebook-oauth-callback/index.ts` | Lepsze logowanie i komunikaty błędów |
-| `supabase/functions/instagram-oauth-callback/index.ts` | Lepsze logowanie błędów |
-
-Po implementacji będziesz musiał:
-1. Ponownie połączyć konto Facebook (kliknąć "Połącz Facebook")
-2. Facebook pokaże nowe okno z prośbą o dodatkowe uprawnienia `business_management`
-3. Zaakceptować wszystkie uprawnienia
-4. Teraz strony z Business Portfolio powinny się pojawić
+Po tej zmianie:
+- Komunikat "Invalid Scopes" przestanie się pojawiać
+- OAuth flow dla Facebooka będzie czyste, bez ostrzeżeń
+- Wszystkie potrzebne uprawnienia do publikacji na stronach pozostaną (pages_manage_posts, pages_read_engagement, business_management)
