@@ -144,13 +144,28 @@ Deno.serve(async (req) => {
       const permissionsData = await permissionsResponse.json();
       console.log('Granted permissions:', JSON.stringify(permissionsData));
       
-      throw new Error(
-        'Nie znaleziono żadnych stron Facebook, do których masz uprawnienia administratora. ' +
-        'Upewnij się, że: 1) Jesteś administratorem lub redaktorem przynajmniej jednej strony Facebook (nie profilu osobistego), ' +
+      // Parse granted permissions to provide better error message
+      const grantedPermissions = (permissionsData.data || [])
+        .filter((p: any) => p.status === 'granted')
+        .map((p: any) => p.permission);
+      console.log('Granted permission names:', grantedPermissions);
+      
+      const hasBusinessManagement = grantedPermissions.includes('business_management');
+      console.log('Has business_management:', hasBusinessManagement);
+      
+      let errorMessage = 'Nie znaleziono żadnych stron Facebook, do których masz uprawnienia administratora. ';
+      
+      if (!hasBusinessManagement) {
+        errorMessage += 'WAŻNE: Jeśli Twoje strony są zarządzane przez Meta Business Suite (Business Portfolio), ' +
+          'musisz zaakceptować uprawnienie "business_management" podczas połączenia. ';
+      }
+      
+      errorMessage += 'Upewnij się, że: 1) Jesteś administratorem lub redaktorem przynajmniej jednej strony Facebook, ' +
         '2) Strona jest aktywna i opublikowana, ' +
-        '3) W poprzednim kroku zaakceptowałeś uprawnienia do zarządzania stronami (pages_show_list, pages_manage_posts). ' +
-        'Jeśli problem się powtarza, spróbuj usunąć aplikację z ustawień Facebooka i połączyć się ponownie.'
-      );
+        '3) Zaakceptowałeś WSZYSTKIE uprawnienia w oknie Facebook. ' +
+        'Spróbuj usunąć aplikację z ustawień Facebooka i połączyć się ponownie.';
+      
+      throw new Error(errorMessage);
     }
 
     const pages = pagesData.data;

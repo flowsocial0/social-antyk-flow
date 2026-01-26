@@ -40,12 +40,14 @@ Deno.serve(async (req) => {
 
     // Scopes for publishing to pages
     // Note: pages_manage_posts and pages_read_engagement require Facebook app review
+    // business_management is required for pages managed via Business Portfolio (Meta Business Suite)
     const scopes = [
       'public_profile',
       'pages_show_list',
       'pages_manage_posts',
       'pages_read_engagement',
-      'pages_manage_metadata'
+      'pages_manage_metadata',
+      'business_management'
     ].join(',');
 
     // Build Facebook OAuth URL

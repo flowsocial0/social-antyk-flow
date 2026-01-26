@@ -31,12 +31,15 @@ serve(async (req) => {
 
     // Instagram uses Facebook OAuth with extended permissions
     // Scopes needed for Instagram Business Account access
+    // business_management is required for pages managed via Business Portfolio (Meta Business Suite)
     const scopes = [
       'public_profile',
       'pages_show_list',
       'pages_read_engagement',
+      'pages_manage_posts',
       'instagram_basic',
-      'instagram_content_publish'
+      'instagram_content_publish',
+      'business_management'
     ].join(',');
 
     // Build Facebook OAuth URL with Instagram permissions
