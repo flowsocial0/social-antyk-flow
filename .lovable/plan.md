@@ -1,49 +1,148 @@
 
-# Plan: Usunięcie nieprawidłowego scope `pages_manage_metadata`
+# Plan: Naprawienie błędów publikacji Facebook - Blob URL i uprawnienia
 
-## Problem
+## Zdiagnozowane problemy
 
-Komunikat od Facebooka mówi:
-> **Invalid Scopes: pages_manage_metadata**. This message is only shown to developers.
+### Problem 1: Blob URL zamiast publicznego URL
+**Przyczyna**: W `SimpleCampaignSetup.tsx` gdy upload do Storage się nie powiedzie, system wciąż zapisuje lokalny blob URL (`blob:https://...`) zamiast `null`. Facebook nie może pobrać obrazu z blob URL i zwraca błąd `(#100) url should represent a valid URL`.
 
-Scope `pages_manage_metadata` nie jest poprawnym uprawnieniem Facebook Login i powinien zostać usunięty. Facebook i tak go ignoruje dla zwykłych użytkowników, ale dla deweloperów wyświetla ten mylący komunikat.
-
-## Rozwiązanie
-
-### Zmiana w pliku `supabase/functions/facebook-oauth-start/index.ts`
-
-Usunięcie `pages_manage_metadata` z listy scope'ów:
-
-**Przed (linia 44-51):**
+**Lokalizacja błędu** (linie 189-193):
 ```typescript
-const scopes = [
-  'public_profile',
-  'pages_show_list',
-  'pages_manage_posts',
-  'pages_read_engagement',
-  'pages_manage_metadata',  // ← USUNĄĆ - nieprawidłowy scope
-  'business_management'
-].join(',');
+postsWithUploadedMedia.push({ 
+  ...post, 
+  imageUrl: post.imageFile ? uploadedImageUrl : undefined, // ← uploadedImageUrl może być blob URL!
+  videoUrl: post.videoFile ? uploadedVideoUrl : undefined
+});
 ```
 
-**Po:**
+### Problem 2: Stary token Facebook (konto m@ag.da)
+Token został utworzony 21 stycznia - **przed** dodaniem nowych scope'ów (`business_management`). Dlatego Facebook zwraca błąd o brakujących uprawnieniach.
+
+**Rozwiązanie**: Użytkownik m@ag.da musi odłączyć i ponownie połączyć konto Facebook.
+
+---
+
+## Planowane zmiany
+
+### Krok 1: Naprawienie logiki uploadu w SimpleCampaignSetup.tsx
+
+**Plik**: `src/components/campaigns/SimpleCampaignSetup.tsx`
+
+Zmiana logiki tak, aby przy błędzie uploadu ustawiać `undefined` zamiast blob URL:
+
 ```typescript
-const scopes = [
-  'public_profile',
-  'pages_show_list',
-  'pages_manage_posts',
-  'pages_read_engagement',
-  'business_management'
-].join(',');
+// Upload images and videos
+const postsWithUploadedMedia: SimplePost[] = [];
+for (const post of posts) {
+  let uploadedImageUrl: string | undefined = undefined;
+  let uploadedVideoUrl: string | undefined = undefined;
+  
+  // Upload image if present
+  if (post.imageFile) {
+    const fileName = `${user.id}/${Date.now()}_${post.imageFile.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from("ObrazkiKsiazek")
+      .upload(fileName, post.imageFile);
+
+    if (uploadError) {
+      console.error("Image upload error:", uploadError);
+      toast.error(`Błąd uploadu grafiki dla posta: ${uploadError.message}`);
+      // uploadedImageUrl pozostaje undefined
+    } else {
+      const { data: { publicUrl } } = supabase.storage
+        .from("ObrazkiKsiazek")
+        .getPublicUrl(fileName);
+      uploadedImageUrl = publicUrl;
+    }
+  }
+  
+  // Upload video if present
+  if (post.videoFile) {
+    const fileName = `${user.id}/videos/${Date.now()}_${post.videoFile.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from("ObrazkiKsiazek")
+      .upload(fileName, post.videoFile);
+
+    if (uploadError) {
+      console.error("Video upload error:", uploadError);
+      toast.error(`Błąd uploadu wideo dla posta: ${uploadError.message}`);
+      // uploadedVideoUrl pozostaje undefined
+    } else {
+      const { data: { publicUrl } } = supabase.storage
+        .from("ObrazkiKsiazek")
+        .getPublicUrl(fileName);
+      uploadedVideoUrl = publicUrl;
+    }
+  }
+  
+  postsWithUploadedMedia.push({ 
+    ...post, 
+    imageUrl: uploadedImageUrl,  // Zawsze publiczny URL lub undefined
+    videoUrl: uploadedVideoUrl   // Zawsze publiczny URL lub undefined
+  });
+}
 ```
 
-### Deploy
+### Krok 2: Dodanie walidacji URL w Edge Function
 
-Ponowny deploy Edge Function `facebook-oauth-start`.
+**Plik**: `supabase/functions/publish-to-facebook/index.ts`
 
-## Wynik
+Dodanie sprawdzenia czy URL nie jest blob URL przed wysłaniem do Facebooka:
 
-Po tej zmianie:
-- Komunikat "Invalid Scopes" przestanie się pojawiać
-- OAuth flow dla Facebooka będzie czyste, bez ostrzeżeń
-- Wszystkie potrzebne uprawnienia do publikacji na stronach pozostaną (pages_manage_posts, pages_read_engagement, business_management)
+```typescript
+// Validate that URL is not a blob URL
+const validateMediaUrl = (url: string): string | undefined => {
+  if (!url) return undefined;
+  if (url.startsWith('blob:')) {
+    console.warn('Invalid blob URL detected, skipping:', url.substring(0, 50));
+    return undefined;
+  }
+  return url;
+};
+
+// Before publishing, validate URLs:
+finalImageUrl = validateMediaUrl(finalImageUrl) || '';
+finalVideoUrl = validateMediaUrl(finalVideoUrl) || '';
+```
+
+### Krok 3: Poprawiony komunikat błędu
+
+Dodanie lepszego komunikatu błędu gdy brak obrazu/wideo:
+
+```typescript
+if (!postText && !finalImageUrl && !finalVideoUrl) {
+  return new Response(
+    JSON.stringify({ 
+      success: false, 
+      message: 'Post musi zawierać tekst lub prawidłowy obraz/wideo. Upewnij się, że media zostały poprawnie załadowane.',
+      errorCode: 'NO_CONTENT'
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+  );
+}
+```
+
+---
+
+## Wymagane działania użytkownika
+
+### Dla m@ag.da:
+1. Przejdź do **Ustawienia → Konta społecznościowe**
+2. Kliknij **Odłącz** przy koncie Facebook "Trener umiejętności wychowawczych"
+3. Kliknij **Połącz Facebook** ponownie
+4. Zaakceptuj **wszystkie uprawnienia** (w tym nowe `business_management`)
+
+### Dla nieudanej kampanii:
+Po połączeniu konta kliknij **"Wyślij ponownie"** przy nieudanym poście. Jeśli obraz nie został prawidłowo załadowany, utwórz nową kampanię.
+
+---
+
+## Podsumowanie zmian
+
+| Element | Zmiana |
+|---------|--------|
+| `SimpleCampaignSetup.tsx` | Inicjalizacja `uploadedImageUrl`/`uploadedVideoUrl` jako `undefined`, nie blob URL |
+| `publish-to-facebook` | Walidacja URL przed wysłaniem do API Facebook |
+| Komunikat błędu | Lepszy komunikat gdy brak prawidłowego media |
+
+Po tych zmianach blob URL nigdy nie trafi do bazy danych ani do Facebooka.
