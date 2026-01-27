@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Edit2, Save, X, Clock, CheckCircle2, AlertCircle, BookOpen, RefreshCw, Trash2, Calendar, RotateCcw, Info } from "lucide-react";
+import { Edit2, Save, X, Clock, CheckCircle2, AlertCircle, BookOpen, RefreshCw, Trash2, Calendar, RotateCcw, Info, Video, FileVideo } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -290,7 +290,7 @@ export const CampaignPostCard = ({ post, onSave, onRegenerate, onDelete, onUpdat
           <p className="text-sm whitespace-pre-wrap">{post.text}</p>
           
           {/* Error message display - collapsible */}
-          {(post.status === 'rate_limited' || post.status === 'failed' || (post.status === 'scheduled' && post.retry_count)) && (
+          {(post.status === 'rate_limited' || post.status === 'failed' || (post.status === 'scheduled' && (post.retry_count ?? 0) > 0)) && (
             <Collapsible open={isErrorExpanded} onOpenChange={setIsErrorExpanded}>
               <div className={`rounded-lg border ${
                 post.status === 'rate_limited' 
@@ -343,25 +343,72 @@ export const CampaignPostCard = ({ post, onSave, onRegenerate, onDelete, onUpdat
             </Collapsible>
           )}
 
-          {/* Post image preview - custom or from book */}
-          {(post.custom_image_url || post.book?.image_url || post.book?.storage_path) && (
-            <div className="mb-3">
-              <img
-                src={
-                  post.custom_image_url || 
-                  post.book?.image_url || 
-                  (post.book?.storage_path 
-                    ? `https://dmrfbokchkxjzslfzeps.supabase.co/storage/v1/object/public/ObrazkiKsiazek/${post.book.storage_path}`
-                    : undefined)
-                }
-                alt="Obrazek posta"
-                className="w-full max-w-[200px] h-auto object-cover rounded-lg border"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            </div>
-          )}
+          {/* Post media preview - custom or from book */}
+          {(() => {
+            const mediaUrl = post.custom_image_url || post.book?.image_url || 
+              (post.book?.storage_path 
+                ? `https://dmrfbokchkxjzslfzeps.supabase.co/storage/v1/object/public/ObrazkiKsiazek/${post.book.storage_path}`
+                : null);
+            
+            if (!mediaUrl) return null;
+            
+            // Check if it's a video based on extension
+            const isVideo = /\.(mp4|mov|webm|avi|mkv|m4v)$/i.test(mediaUrl);
+            
+            // Extract filename for display
+            const getFileName = (url: string) => {
+              try {
+                const decoded = decodeURIComponent(url);
+                const parts = decoded.split('/');
+                return parts[parts.length - 1] || 'Wideo';
+              } catch {
+                return 'Wideo';
+              }
+            };
+            
+            if (isVideo) {
+              return (
+                <div className="mb-3 flex items-center gap-3 p-3 bg-muted/30 rounded-lg border max-w-[300px]">
+                  <div className="relative flex-shrink-0">
+                    <video
+                      src={mediaUrl}
+                      className="h-16 w-24 object-cover rounded"
+                      muted
+                      preload="metadata"
+                      onError={(e) => {
+                        (e.target as HTMLVideoElement).style.display = 'none';
+                      }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded">
+                      <Video className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1 text-sm font-medium text-foreground">
+                      <FileVideo className="h-4 w-4 text-primary flex-shrink-0" />
+                      <span>Wideo</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate" title={getFileName(mediaUrl)}>
+                      {getFileName(mediaUrl)}
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+            
+            return (
+              <div className="mb-3">
+                <img
+                  src={mediaUrl}
+                  alt="Obrazek posta"
+                  className="w-full max-w-[200px] h-auto object-cover rounded-lg border"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+            );
+          })()}
 
           {post.book && (
             <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
