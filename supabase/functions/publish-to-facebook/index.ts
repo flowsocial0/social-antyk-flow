@@ -428,11 +428,41 @@ Deno.serve(async (req) => {
       postText += `\n\n${aiSuffix}`;
     }
 
+    // Validate media URLs - reject blob URLs that cannot be accessed by Facebook
+    const validateMediaUrl = (url: string): string => {
+      if (!url) return '';
+      if (url.startsWith('blob:')) {
+        console.warn('Invalid blob URL detected, skipping:', url.substring(0, 50));
+        return '';
+      }
+      // Also validate data: URLs which are also not accessible
+      if (url.startsWith('data:')) {
+        console.warn('Invalid data URL detected, skipping');
+        return '';
+      }
+      return url;
+    };
+
+    finalImageUrl = validateMediaUrl(finalImageUrl);
+    finalVideoUrl = validateMediaUrl(finalVideoUrl);
+
     console.log('=== Final Publishing Data ===');
     console.log('Post text length:', postText?.length);
     console.log('Product URL:', productUrl || 'none');
     console.log('Image URL:', finalImageUrl || 'none');
     console.log('Video URL:', finalVideoUrl || 'none');
+
+    // Check if we have any content to publish
+    if (!postText && !finalImageUrl && !finalVideoUrl) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: 'Post musi zawierać tekst lub prawidłowy obraz/wideo. Upewnij się, że media zostały poprawnie załadowane.',
+          errorCode: 'NO_CONTENT'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
 
     // Publish to Facebook
     let fbPostId = null;

@@ -147,8 +147,9 @@ export const SimpleCampaignSetup = () => {
       // Upload images and videos
       const postsWithUploadedMedia: SimplePost[] = [];
       for (const post of posts) {
-        let uploadedImageUrl = post.imageUrl;
-        let uploadedVideoUrl = post.videoUrl;
+        // Initialize as undefined - only set to public URL after successful upload
+        let uploadedImageUrl: string | undefined = undefined;
+        let uploadedVideoUrl: string | undefined = undefined;
         
         // Upload image if present
         if (post.imageFile) {
@@ -160,6 +161,7 @@ export const SimpleCampaignSetup = () => {
           if (uploadError) {
             console.error("Image upload error:", uploadError);
             toast.error(`Błąd uploadu grafiki dla posta: ${uploadError.message}`);
+            // uploadedImageUrl remains undefined - never store blob URL
           } else {
             const { data: { publicUrl } } = supabase.storage
               .from("ObrazkiKsiazek")
@@ -178,6 +180,7 @@ export const SimpleCampaignSetup = () => {
           if (uploadError) {
             console.error("Video upload error:", uploadError);
             toast.error(`Błąd uploadu wideo dla posta: ${uploadError.message}`);
+            // uploadedVideoUrl remains undefined - never store blob URL
           } else {
             const { data: { publicUrl } } = supabase.storage
               .from("ObrazkiKsiazek")
@@ -188,8 +191,8 @@ export const SimpleCampaignSetup = () => {
         
         postsWithUploadedMedia.push({ 
           ...post, 
-          imageUrl: post.imageFile ? uploadedImageUrl : undefined,
-          videoUrl: post.videoFile ? uploadedVideoUrl : undefined
+          imageUrl: uploadedImageUrl,  // Always public URL or undefined, never blob URL
+          videoUrl: uploadedVideoUrl   // Always public URL or undefined, never blob URL
         });
       }
 
