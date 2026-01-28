@@ -159,7 +159,8 @@ Deno.serve(async (req) => {
     console.log("Request token stored successfully");
 
     // Build authorization URL
-    const authUrl = `https://api.twitter.com/oauth/authenticate?oauth_token=${oauth_token}`;
+    // Use /oauth/authorize with force_login=true to always show login form (enables multi-account)
+    const authUrl = `https://api.twitter.com/oauth/authorize?oauth_token=${oauth_token}&force_login=true`;
     console.log("Authorization URL:", authUrl);
 
     console.log("=== OAuth 1.0a start completed successfully ===");

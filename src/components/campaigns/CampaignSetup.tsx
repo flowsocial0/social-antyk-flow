@@ -47,29 +47,30 @@ export const CampaignSetup = ({
     const platforms = getAllPlatforms();
     const connectionStatus: Record<string, boolean> = {};
 
-    // Check X connection
-    const {
-      data: xData
-    } = await (supabase as any).from('twitter_oauth_tokens').select('id').limit(1).maybeSingle();
-
-    // Check Facebook connection
-    const {
-      data: fbData
-    } = await (supabase as any).from('facebook_oauth_tokens').select('id').limit(1).maybeSingle();
-
-    // Check TikTok connection
-    const {
-      data: tiktokData
-    } = await (supabase as any).from('tiktok_oauth_tokens').select('id').limit(1).maybeSingle();
+    // Check all platform connections in parallel
+    const [xResult, fbResult, tiktokResult, ytResult, igResult, linkedinResult] = await Promise.all([
+      (supabase as any).from('twitter_oauth1_tokens').select('id').limit(1).maybeSingle(),
+      (supabase as any).from('facebook_oauth_tokens').select('id').limit(1).maybeSingle(),
+      (supabase as any).from('tiktok_oauth_tokens').select('id').limit(1).maybeSingle(),
+      (supabase as any).from('youtube_oauth_tokens').select('id').limit(1).maybeSingle(),
+      (supabase as any).from('instagram_oauth_tokens').select('id').limit(1).maybeSingle(),
+      (supabase as any).from('linkedin_oauth_tokens').select('id').limit(1).maybeSingle(),
+    ]);
 
     // Set connection status for all platforms
     platforms.forEach(platform => {
       if (platform.id === 'x') {
-        connectionStatus[platform.id] = !!xData;
+        connectionStatus[platform.id] = !!xResult.data;
       } else if (platform.id === 'facebook') {
-        connectionStatus[platform.id] = !!fbData;
+        connectionStatus[platform.id] = !!fbResult.data;
       } else if (platform.id === 'tiktok') {
-        connectionStatus[platform.id] = !!tiktokData;
+        connectionStatus[platform.id] = !!tiktokResult.data;
+      } else if (platform.id === 'youtube') {
+        connectionStatus[platform.id] = !!ytResult.data;
+      } else if (platform.id === 'instagram') {
+        connectionStatus[platform.id] = !!igResult.data;
+      } else if (platform.id === 'linkedin') {
+        connectionStatus[platform.id] = !!linkedinResult.data;
       } else {
         // For other platforms, mark as not connected
         connectionStatus[platform.id] = false;

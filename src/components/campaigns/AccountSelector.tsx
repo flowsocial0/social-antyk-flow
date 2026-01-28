@@ -54,12 +54,13 @@ export const AccountSelector = ({ selectedPlatforms, selectedAccounts, onChange 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    const [xResult, fbResult, igResult, tiktokResult, ytResult] = await Promise.all([
+    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult] = await Promise.all([
       supabase.from('twitter_oauth1_tokens').select('id, screen_name, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('facebook_oauth_tokens').select('id, page_name, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('instagram_oauth_tokens').select('id, instagram_username, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('tiktok_oauth_tokens').select('id, open_id, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('youtube_oauth_tokens').select('id, channel_title, account_name, is_default').eq('user_id', session.user.id),
+      (supabase as any).from('linkedin_oauth_tokens').select('id, display_name, account_name, is_default').eq('user_id', session.user.id),
     ]);
 
     const newAccounts: Record<string, AccountOption[]> = {
@@ -86,6 +87,11 @@ export const AccountSelector = ({ selectedPlatforms, selectedAccounts, onChange 
       youtube: (ytResult.data || []).map((a: any) => ({
         id: a.id,
         display_name: a.channel_title || a.account_name || 'Kanał YouTube',
+        is_default: a.is_default ?? false,
+      })),
+      linkedin: (linkedinResult.data || []).map((a: any) => ({
+        id: a.id,
+        display_name: a.display_name || a.account_name || 'Profil LinkedIn',
         is_default: a.is_default ?? false,
       })),
     };

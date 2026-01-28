@@ -125,6 +125,12 @@ serve(async (req) => {
       return await generateCampaignStructure(body, GROK_API_KEY);
     } else if (action === "generate_posts") {
       return await generatePostsContent(body, GROK_API_KEY);
+    } else if (action === "generate_posts_batch") {
+      return await generatePostsBatched(body, GROK_API_KEY);
+    } else if (action === "get_generation_progress") {
+      return await getGenerationProgress(body);
+    } else if (action === "cleanup_generation") {
+      return await cleanupGeneration(body);
     } else {
       // Legacy action for simple campaign dialog
       return await generateSimpleCampaign(body, GROK_API_KEY);
@@ -1026,7 +1032,414 @@ Zwróć TYLKO tablicę JSON z postami w formacie:
     } else {
       throw new Error("Could not extract valid JSON from Grok response");
     }
+}
+
+// ==================== BATCH GENERATION FUNCTIONS ====================
+
+async function getGenerationProgress(body: any) {
+  const { progressId } = body;
+  
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  
+  const { data, error } = await supabase
+    .from('campaign_generation_progress')
+    .select('*')
+    .eq('id', progressId)
+    .maybeSingle();
+  
+  if (error) {
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
+  
+  return new Response(
+    JSON.stringify({ success: true, progress: data }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+async function cleanupGeneration(body: any) {
+  const { progressId } = body;
+  
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  
+  await supabase
+    .from('campaign_generation_progress')
+    .delete()
+    .eq('id', progressId);
+  
+  return new Response(
+    JSON.stringify({ success: true }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+async function generatePostsBatched(body: any, apiKey: string) {
+  const { 
+    progressId,
+    batchIndex = 0, 
+    batchSize = 10,
+    // Initial config (only needed for first batch)
+    structure,
+    targetPlatforms,
+    selectedBooks,
+    cachedTexts,
+    regenerateTexts,
+    useRandomContent,
+    randomContentTopic,
+    userId
+  } = body;
+
+  console.log(`=== generatePostsBatched START (batch ${batchIndex}) ===`);
+  
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  let progress: any = null;
+  let currentProgressId = progressId;
+
+  // If no progressId, this is the first batch - create progress record
+  if (!currentProgressId && batchIndex === 0) {
+    console.log("First batch - creating progress record");
+    
+    const { data: newProgress, error: createError } = await supabase
+      .from('campaign_generation_progress')
+      .insert({
+        user_id: userId,
+        total_posts: structure.length,
+        generated_posts: 0,
+        structure: structure,
+        posts: [],
+        config: {
+          targetPlatforms,
+          selectedBooks,
+          cachedTexts: cachedTexts || null,
+          regenerateTexts,
+          useRandomContent,
+          randomContentTopic
+        },
+        status: 'in_progress'
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      console.error("Error creating progress:", createError);
+      return new Response(
+        JSON.stringify({ success: false, error: createError.message }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    progress = newProgress;
+    currentProgressId = newProgress.id;
+    console.log("Created progress record:", currentProgressId);
+  } else {
+    // Fetch existing progress
+    const { data: existingProgress, error: fetchError } = await supabase
+      .from('campaign_generation_progress')
+      .select('*')
+      .eq('id', currentProgressId)
+      .single();
+
+    if (fetchError || !existingProgress) {
+      console.error("Error fetching progress:", fetchError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Progress record not found' }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    progress = existingProgress;
+  }
+
+  // Extract data from progress
+  const fullStructure = progress.structure as any[];
+  const existingPosts = (progress.posts || []) as any[];
+  const config = progress.config as any;
+  const totalPosts = progress.total_posts;
+
+  // Calculate which posts to generate in this batch
+  const startIdx = batchIndex * batchSize;
+  const endIdx = Math.min(startIdx + batchSize, totalPosts);
+  
+  if (startIdx >= totalPosts) {
+    // All posts already generated
+    console.log("All posts already generated, returning completion");
+    return new Response(
+      JSON.stringify({
+        success: true,
+        progressId: currentProgressId,
+        completed: totalPosts,
+        total: totalPosts,
+        hasMore: false,
+        posts: existingPosts
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  console.log(`Generating posts ${startIdx + 1} to ${endIdx} of ${totalPosts}`);
+
+  // Get batch of structure items to process
+  const batchStructure = fullStructure.slice(startIdx, endIdx);
+
+  // Prepare context for generation (simplified version of generatePostsContent logic)
+  const hasFacebook = config.targetPlatforms?.some((p: any) => p.id === 'facebook' || p === 'facebook');
+  const hasX = config.targetPlatforms?.some((p: any) => p.id === 'x' || p === 'x');
+  const maxTextLength = hasFacebook && !hasX ? 1800 : 240;
+
+  // Fetch default website URL
+  let defaultWebsiteUrl = "https://sklep.antyk.org.pl";
+  if (userId) {
+    const { data: userSettings } = await supabase
+      .from('user_settings')
+      .select('default_website_url')
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    if (userSettings?.default_website_url) {
+      defaultWebsiteUrl = userSettings.default_website_url;
+    }
+  }
+
+  // Fetch books if needed
+  let availableBooks: any[] = [];
+  if (config.selectedBooks && config.selectedBooks.length > 0) {
+    const { data: books } = await supabase
+      .from("books")
+      .select("id, title, description, sale_price, product_url, author")
+      .in("id", config.selectedBooks);
+    
+    if (books) {
+      availableBooks = books.sort((a: any, b: any) => {
+        if (a.sale_price !== b.sale_price) {
+          if (a.sale_price === null) return 1;
+          if (b.sale_price === null) return -1;
+          return b.sale_price - a.sale_price;
+        }
+        return 0;
+      });
+    }
+  }
+
+  // Generate posts for this batch
+  const batchPosts: any[] = [];
+  
+  try {
+    for (const item of batchStructure) {
+      let text = "";
+      let bookId = null;
+      let fromCache = false;
+
+      // Determine book for this post position
+      const salesPostsBeforeThis = fullStructure.slice(0, item.position - 1).filter((s: any) => s.type === 'sales').length;
+      const bookIndex = salesPostsBeforeThis % Math.max(1, availableBooks.length);
+      const book = availableBooks[bookIndex] || null;
+
+      if (item.category === "sales" && book) {
+        bookId = book.id;
+        
+        // Check cache first
+        const primaryPlatform = hasFacebook && !hasX ? 'facebook' : 'x';
+        const cacheKey = `${primaryPlatform}_sales`;
+        
+        if (!config.regenerateTexts && config.cachedTexts?.[book.id]?.[cacheKey]) {
+          text = config.cachedTexts[book.id][cacheKey];
+          fromCache = true;
+          console.log(`Using cached text for book ${book.id}`);
+        } else {
+          // Generate sales post
+          const bookUrl = book.product_url || defaultWebsiteUrl;
+          const prompt = hasFacebook && !hasX
+            ? `Stwórz bogaty post promocyjny (do ${maxTextLength} znaków) o:
+Tytuł: ${book.title}
+${book.author ? `Autor: ${book.author}` : ""}
+${book.description ? `Opis: ${book.description}` : ""}
+${book.sale_price ? `Cena: ${book.sale_price} zł` : ""}
+Link: ${bookUrl}
+
+NIE używaj placeholderów []. Kończyć się linkiem: ${bookUrl}`
+            : `Stwórz krótki post (max 240 znaków z linkiem) o:
+Tytuł: ${book.title}
+${book.author ? `Autor: ${book.author}` : ""}
+${book.sale_price ? `Cena: ${book.sale_price} zł` : ""}
+Link: ${bookUrl}
+
+NIE używaj placeholderów []. Kończyć się linkiem: ${bookUrl}`;
+
+          text = await callGrokAPI(apiKey, prompt, hasFacebook && !hasX);
+          text = sanitizeGeneratedText(text, book, defaultWebsiteUrl);
+        }
+      } else if (item.type === "content" && item.category === "trivia") {
+        // Find nearest book for trivia context
+        const nearestBook = book || (availableBooks.length > 0 ? availableBooks[0] : null);
+        
+        if (nearestBook) {
+          bookId = nearestBook.id;
+          
+          // Check cache
+          const primaryPlatform = hasFacebook && !hasX ? 'facebook' : 'x';
+          const cacheKey = `${primaryPlatform}_content`;
+          
+          if (!config.regenerateTexts && config.cachedTexts?.[nearestBook.id]?.[cacheKey]) {
+            text = config.cachedTexts[nearestBook.id][cacheKey];
+            fromCache = true;
+          }
+        }
+        
+        if (!text) {
+          // Generate trivia
+          const triviaUrl = nearestBook?.product_url || defaultWebsiteUrl;
+          let prompt: string;
+          
+          if (config.useRandomContent && config.randomContentTopic) {
+            prompt = `Stwórz fascynującą ciekawostkę na temat: ${config.randomContentTopic}
+NIE używaj placeholderów []. Zakończ linkiem: ${defaultWebsiteUrl}
+${hasFacebook && !hasX ? `Max ${maxTextLength} znaków.` : 'Max 240 znaków z linkiem.'}`;
+          } else if (nearestBook) {
+            prompt = `Stwórz ciekawostkę związaną z tematyką: ${nearestBook.title}
+${nearestBook.description ? `Kontekst: ${nearestBook.description}` : ""}
+NIE wspominaj tytułu. NIE używaj placeholderów []. Zakończ linkiem: ${triviaUrl}
+${hasFacebook && !hasX ? `Max ${maxTextLength} znaków.` : 'Max 240 znaków z linkiem.'}`;
+          } else {
+            prompt = `Stwórz krótką ciekawostkę o książkach lub historii Polski.
+NIE używaj placeholderów []. Zakończ linkiem: ${defaultWebsiteUrl}
+${hasFacebook && !hasX ? `Max ${maxTextLength} znaków.` : 'Max 240 znaków z linkiem.'}`;
+          }
+
+          text = await callGrokAPI(apiKey, prompt, hasFacebook && !hasX);
+          text = sanitizeGeneratedText(text, nearestBook, defaultWebsiteUrl);
+        }
+      }
+
+      batchPosts.push({
+        position: item.position,
+        type: item.type,
+        category: item.category,
+        text: text,
+        bookId: bookId,
+        fromCache: fromCache
+      });
+
+      // Small delay between posts in batch
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+  } catch (error: any) {
+    console.error("Error in batch generation:", error);
+    
+    // Update progress with error
+    await supabase
+      .from('campaign_generation_progress')
+      .update({ status: 'error', error_message: error.message })
+      .eq('id', currentProgressId);
+
+    // Handle rate limit
+    if (error?.isRateLimit || error?.message?.includes('429')) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          errorCode: "RATE_LIMIT",
+          error: "Przekroczono limit API Grok. Spróbuj ponownie za kilka minut.",
+          progressId: currentProgressId
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ success: false, error: error.message, progressId: currentProgressId }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Append new posts to existing posts
+  const updatedPosts = [...existingPosts, ...batchPosts];
+  const newGeneratedCount = updatedPosts.length;
+  const hasMore = newGeneratedCount < totalPosts;
+
+  // Update progress in database
+  const { error: updateError } = await supabase
+    .from('campaign_generation_progress')
+    .update({
+      posts: updatedPosts,
+      generated_posts: newGeneratedCount,
+      status: hasMore ? 'in_progress' : 'completed'
+    })
+    .eq('id', currentProgressId);
+
+  if (updateError) {
+    console.error("Error updating progress:", updateError);
+  }
+
+  console.log(`Batch ${batchIndex} complete: ${newGeneratedCount}/${totalPosts} posts generated`);
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      progressId: currentProgressId,
+      completed: newGeneratedCount,
+      total: totalPosts,
+      hasMore: hasMore,
+      nextBatchIndex: hasMore ? batchIndex + 1 : null,
+      posts: hasMore ? null : updatedPosts // Only return all posts when complete
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+// Helper function to call Grok API
+async function callGrokAPI(apiKey: string, prompt: string, isLongForm: boolean): Promise<string> {
+  const response = await fetch("https://api.x.ai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "grok-4-fast-reasoning",
+      messages: [
+        {
+          role: "system",
+          content: `Jesteś ekspertem od content marketingu dla księgarni patriotycznej. Piszesz ${isLongForm ? 'bogate' : 'krótkie'} posty po polsku.
+
+ZASADY:
+1. TYLKO po polsku
+2. NIGDY nie używaj placeholderów []
+3. Używaj TYLKO podanych danych
+4. Post musi być gotowy do publikacji`,
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.8,
+      max_tokens: isLongForm ? 600 : 300,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Grok API error:", response.status, errorText);
+    
+    if (response.status === 429) {
+      throw { isRateLimit: true, message: "Rate limit exceeded" };
+    }
+    if (response.status === 401 || response.status === 403) {
+      throw { isAuthError: true, message: "Authentication error" };
+    }
+    
+    throw new Error(`Grok API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.choices[0].message.content.trim();
+}
 
   return new Response(
     JSON.stringify({
