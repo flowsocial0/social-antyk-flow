@@ -306,6 +306,48 @@ export type Database = {
           },
         ]
       }
+      campaign_generation_progress: {
+        Row: {
+          config: Json | null
+          created_at: string | null
+          error_message: string | null
+          generated_posts: number | null
+          id: string
+          posts: Json | null
+          status: string | null
+          structure: Json | null
+          total_posts: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          config?: Json | null
+          created_at?: string | null
+          error_message?: string | null
+          generated_posts?: number | null
+          id?: string
+          posts?: Json | null
+          status?: string | null
+          structure?: Json | null
+          total_posts: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          config?: Json | null
+          created_at?: string | null
+          error_message?: string | null
+          generated_posts?: number | null
+          id?: string
+          posts?: Json | null
+          status?: string | null
+          structure?: Json | null
+          total_posts?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       campaign_posts: {
         Row: {
           book_id: string | null

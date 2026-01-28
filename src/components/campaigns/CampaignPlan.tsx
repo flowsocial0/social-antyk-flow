@@ -102,7 +102,6 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
       if (!config.regenerateTexts && config.selectedBooks && config.selectedBooks.length > 0) {
         console.log("Fetching ALL cached texts from book_campaign_texts...");
         
-        // Fetch ALL cached texts (table is small) - avoid .in() with large arrays
         const { data: cached, error: cacheError } = await supabase
           .from('book_campaign_texts')
           .select('*');
@@ -112,7 +111,6 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
         } else if (cached && cached.length > 0) {
           console.log(`Total cached texts in database: ${cached.length}`);
           
-          // Filter to only selected books on client side
           const selectedBooksSet = new Set(config.selectedBooks);
           cached
             .filter((item: any) => selectedBooksSet.has(item.book_id))
@@ -120,16 +118,10 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
               if (!cachedTexts[item.book_id]) {
                 cachedTexts[item.book_id] = {};
               }
-              // Key: platform_type (e.g., "x_sales", "facebook_content")
               cachedTexts[item.book_id][`${item.platform}_${item.post_type}`] = item.text;
             });
           console.log(`Found cached texts for ${Object.keys(cachedTexts).length} selected books`);
-          console.log("CachedTexts book IDs:", Object.keys(cachedTexts).slice(0, 10).join(", ") + (Object.keys(cachedTexts).length > 10 ? "..." : ""));
-        } else {
-          console.log("No cached texts found in database");
         }
-      } else {
-        console.log("Skipping cache fetch - regenerateTexts:", config.regenerateTexts);
       }
       
       // Generate campaign structure
@@ -150,7 +142,6 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
 
       if (structureResponse.error) throw structureResponse.error;
       
-      // Check for API-level errors (rate limit, auth issues)
       if (structureResponse.data?.success === false) {
         throw new Error(structureResponse.data.error || 'Błąd API podczas generowania struktury');
       }
@@ -158,51 +149,65 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
       const structure = structureResponse.data.structure;
       console.log("Structure generated:", structure);
 
-      // Generate content for each post
-      console.log("Generating post content...");
-      console.log("Passing cachedTexts to edge function, keys count:", Object.keys(cachedTexts).length);
-      console.log("useRandomContent:", config.useRandomContent);
-      console.log("randomContentTopic:", config.randomContentTopic);
-      
       // Get current user ID for user_settings lookup
       const { data: { user } } = await supabase.auth.getUser();
-      
-      const contentResponse = await supabase.functions.invoke('generate-campaign', {
-        body: {
-          action: 'generate_posts',
+
+      let generatedPosts: any[];
+
+      // Use batched generation for large campaigns (>60 posts)
+      const BATCH_THRESHOLD = 60;
+      const useBatchMode = totalPosts > BATCH_THRESHOLD;
+
+      if (useBatchMode) {
+        console.log(`Large campaign (${totalPosts} posts) - using batch mode`);
+        generatedPosts = await generateWithBatches(
           structure,
-          targetPlatforms: config.targetPlatforms,
-          selectedBooks: config.selectedBooks,
-          cachedTexts: Object.keys(cachedTexts).length > 0 ? cachedTexts : null,
-          regenerateTexts: config.regenerateTexts || false,
-          useRandomContent: config.useRandomContent || false,
-          randomContentTopic: config.randomContentTopic || '',
-          userId: user?.id
-        }
-      });
+          cachedTexts,
+          user?.id,
+          (completed, total) => {
+            // Update progress
+            const progress = (completed / total) * 100;
+            setStageProgress(progress);
+          }
+        );
+      } else {
+        // Use single-call generation for smaller campaigns
+        console.log(`Small campaign (${totalPosts} posts) - using single call`);
+        
+        const contentResponse = await supabase.functions.invoke('generate-campaign', {
+          body: {
+            action: 'generate_posts',
+            structure,
+            targetPlatforms: config.targetPlatforms,
+            selectedBooks: config.selectedBooks,
+            cachedTexts: Object.keys(cachedTexts).length > 0 ? cachedTexts : null,
+            regenerateTexts: config.regenerateTexts || false,
+            useRandomContent: config.useRandomContent || false,
+            randomContentTopic: config.randomContentTopic || '',
+            userId: user?.id
+          }
+        });
 
-      // Check for edge function errors (including WORKER_LIMIT)
-      if (contentResponse.error) {
-        // Parse error code from response
-        const errorCode = contentResponse.error?.code || contentResponse.error?.message || '';
-        if (errorCode.includes('WORKER_LIMIT') || String(contentResponse.error).includes('compute resources')) {
-          throw new Error('WORKER_LIMIT: Serwer wyczerpał zasoby. Zmniejsz liczbę postów.');
+        if (contentResponse.error) {
+          const errorCode = contentResponse.error?.code || contentResponse.error?.message || '';
+          if (errorCode.includes('WORKER_LIMIT') || String(contentResponse.error).includes('compute resources')) {
+            throw new Error('WORKER_LIMIT: Serwer wyczerpał zasoby. Zmniejsz liczbę postów.');
+          }
+          throw contentResponse.error;
         }
-        throw contentResponse.error;
-      }
-      
-      // Check for API-level errors (rate limit, auth issues)
-      if (contentResponse.data?.success === false) {
-        const errorCode = contentResponse.data.errorCode || '';
-        throw new Error(`${errorCode}: ${contentResponse.data.error || 'Błąd API podczas generowania treści'}`);
-      }
-      
-      // Check if response has the expected data
-      if (!contentResponse.data?.posts) {
-        throw new Error('WORKER_LIMIT: Serwer nie zwrócił danych. Zmniejsz liczbę postów lub spróbuj ponownie.');
+        
+        if (contentResponse.data?.success === false) {
+          const errorCode = contentResponse.data.errorCode || '';
+          throw new Error(`${errorCode}: ${contentResponse.data.error || 'Błąd API podczas generowania treści'}`);
+        }
+        
+        if (!contentResponse.data?.posts) {
+          throw new Error('WORKER_LIMIT: Serwer nie zwrócił danych. Zmniejsz liczbę postów lub spróbuj ponownie.');
+        }
+
+        generatedPosts = contentResponse.data.posts;
       }
 
-      const generatedPosts = contentResponse.data.posts;
       console.log("Posts generated:", generatedPosts.length);
 
       // Schedule posts
@@ -215,11 +220,9 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
     } catch (error: any) {
       console.error('Error generating campaign:', error);
       
-      // Parse error for better messages
       let errorTitle = 'Błąd generowania kampanii';
       let errorDescription = error.message || 'Nieznany błąd';
       
-      // Check for specific error codes
       if (error.message?.includes('WORKER_LIMIT') || error.message?.includes('compute resources')) {
         errorTitle = 'Zbyt duża kampania';
         errorDescription = 'Serwer nie ma wystarczających zasobów do wygenerowania tak dużej kampanii. Zmniejsz liczbę postów (maks. 60) lub spróbuj ponownie.';
@@ -245,6 +248,92 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
       setIsGenerating(false);
       setGenerationStage('idle');
       setStageProgress(0);
+    }
+  };
+
+  // Batched generation for large campaigns
+  const generateWithBatches = async (
+    structure: any[],
+    cachedTexts: Record<string, Record<string, string>>,
+    userId: string | undefined,
+    onProgress: (completed: number, total: number) => void
+  ): Promise<any[]> => {
+    const BATCH_SIZE = 10;
+    let progressId: string | null = null;
+    let batchIndex = 0;
+    let allPosts: any[] = [];
+    let hasMore = true;
+
+    try {
+      while (hasMore) {
+        console.log(`Generating batch ${batchIndex}...`);
+        
+        const response = await supabase.functions.invoke('generate-campaign', {
+          body: {
+            action: 'generate_posts_batch',
+            progressId,
+            batchIndex,
+            batchSize: BATCH_SIZE,
+            // Only send full config on first batch
+            ...(batchIndex === 0 ? {
+              structure,
+              targetPlatforms: config.targetPlatforms,
+              selectedBooks: config.selectedBooks,
+              cachedTexts: Object.keys(cachedTexts).length > 0 ? cachedTexts : null,
+              regenerateTexts: config.regenerateTexts || false,
+              useRandomContent: config.useRandomContent || false,
+              randomContentTopic: config.randomContentTopic || '',
+              userId
+            } : {})
+          }
+        });
+
+        if (response.error) {
+          throw response.error;
+        }
+
+        if (response.data?.success === false) {
+          throw new Error(response.data.error || 'Błąd generowania partii');
+        }
+
+        // Update progressId from first response
+        if (!progressId && response.data?.progressId) {
+          progressId = response.data.progressId;
+        }
+
+        // Update progress
+        onProgress(response.data.completed, response.data.total);
+
+        hasMore = response.data.hasMore;
+        batchIndex++;
+
+        // If complete, get all posts
+        if (!hasMore && response.data.posts) {
+          allPosts = response.data.posts;
+        }
+
+        // Small delay between batches to prevent overwhelming the server
+        if (hasMore) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+
+      // Cleanup progress record
+      if (progressId) {
+        await supabase.functions.invoke('generate-campaign', {
+          body: { action: 'cleanup_generation', progressId }
+        });
+      }
+
+      return allPosts;
+    } catch (error) {
+      // Cleanup on error
+      if (progressId) {
+        await supabase.functions.invoke('generate-campaign', {
+          body: { action: 'cleanup_generation', progressId }
+        });
+      }
+      throw error;
     }
   };
 
