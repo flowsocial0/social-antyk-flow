@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
 
     // Get request body
     const body = await req.json();
-    const { text, imageUrl, userId: userIdFromBody, accountId, bookId, contentId } = body;
+    const { text, imageUrl, userId: userIdFromBody, accountId, bookId, contentId, testConnection } = body;
 
     // Determine userId - from body (auto-publish) or from JWT (direct user call)
     let userId: string | null = null;
@@ -52,15 +52,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log('Publish request:', {
-      textLength: text?.length || 0,
-      hasImage: !!imageUrl,
-      userId: userId ? 'present' : 'missing',
-      accountId: accountId || 'not specified',
-      bookId: bookId || 'not specified',
-      contentId: contentId || 'not specified'
-    });
-
     if (!userId) {
       return new Response(
         JSON.stringify({ 
@@ -70,6 +61,70 @@ Deno.serve(async (req) => {
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
+    }
+
+    // Handle test connection request
+    if (testConnection) {
+      console.log('Testing LinkedIn connection...');
+      
+      // Get all LinkedIn tokens for user
+      const { data: tokens, error: tokensError } = await supabase
+        .from('linkedin_oauth_tokens')
+        .select('id, display_name, linkedin_id, expires_at, access_token')
+        .eq('user_id', userId);
+      
+      if (tokensError || !tokens || tokens.length === 0) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            connected: false,
+            message: 'Brak połączonych kont LinkedIn'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
+      
+      // Test first token by calling LinkedIn userinfo endpoint
+      const testToken = tokens[0];
+      try {
+        const testResponse = await fetch('https://api.linkedin.com/v2/userinfo', {
+          headers: { 'Authorization': `Bearer ${testToken.access_token}` }
+        });
+        
+        if (testResponse.ok) {
+          const userData = await testResponse.json();
+          return new Response(
+            JSON.stringify({
+              success: true,
+              connected: true,
+              accountCount: tokens.length,
+              name: userData.name || testToken.display_name,
+              accounts: tokens.map((t: any) => ({ id: t.id, name: t.display_name }))
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+          );
+        } else {
+          // Token expired or invalid
+          return new Response(
+            JSON.stringify({
+              success: false,
+              connected: false,
+              message: 'Token LinkedIn wygasł. Połącz konto ponownie.',
+              expired: true
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+          );
+        }
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            connected: false,
+            message: 'Błąd podczas testowania połączenia z LinkedIn'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
     }
 
     // Determine post text and image
@@ -148,25 +203,21 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get LinkedIn token for user - require explicit accountId
-    if (!accountId) {
-      console.error('No accountId provided - required for multi-account publish');
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'Brak ID konta LinkedIn. Wybierz konto do publikacji.',
-          errorCode: 'NO_ACCOUNT_ID'
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-      );
-    }
-
-    const { data: tokenData, error: tokenError } = await supabase
+    // Get LinkedIn token for user - with fallback if no accountId provided
+    let tokenQuery = supabase
       .from('linkedin_oauth_tokens')
       .select('*')
-      .eq('user_id', userId)
-      .eq('id', accountId)
-      .maybeSingle();
+      .eq('user_id', userId);
+
+    if (accountId) {
+      tokenQuery = tokenQuery.eq('id', accountId);
+    } else {
+      // Fallback: get first account (or default if exists)
+      tokenQuery = tokenQuery.order('is_default', { ascending: false }).limit(1);
+      console.log('No accountId provided, using fallback to first/default account');
+    }
+
+    const { data: tokenData, error: tokenError } = await tokenQuery.maybeSingle();
 
     if (tokenError || !tokenData) {
       console.error('No LinkedIn token found:', tokenError);
