@@ -1032,6 +1032,16 @@ Zwróć TYLKO tablicę JSON z postami w formacie:
     } else {
       throw new Error("Could not extract valid JSON from Grok response");
     }
+  }
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      posts,
+      count: posts.length,
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
 }
 
 // ==================== BATCH GENERATION FUNCTIONS ====================
@@ -1439,14 +1449,4 @@ ZASADY:
 
   const data = await response.json();
   return data.choices[0].message.content.trim();
-}
-
-  return new Response(
-    JSON.stringify({
-      success: true,
-      posts,
-      count: posts.length,
-    }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-  );
 }

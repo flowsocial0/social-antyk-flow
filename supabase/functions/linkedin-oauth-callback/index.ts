@@ -93,6 +93,10 @@ Deno.serve(async (req) => {
       },
       body: tokenBody.toString(),
     });
+    
+    console.log('LinkedIn token response status:', tokenResponse.status);
+    console.log('LinkedIn token response headers:', Object.fromEntries(tokenResponse.headers.entries()));
+    
     const tokenData = await tokenResponse.json();
 
     if (!tokenResponse.ok || tokenData.error) {

@@ -141,6 +141,20 @@ Deno.serve(async (req) => {
     const state = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
     console.log("Generated state:", state);
 
+    // Clean up expired request tokens for this user
+    console.log("Cleaning up expired request tokens...");
+    const { error: cleanupError } = await supabase
+      .from('twitter_oauth1_requests')
+      .delete()
+      .eq('user_id', user.id)
+      .lt('expires_at', new Date().toISOString());
+
+    if (cleanupError) {
+      console.warn('Failed to cleanup expired tokens:', cleanupError);
+    } else {
+      console.log('Expired tokens cleaned up');
+    }
+
     // Store request token in database
     console.log("Storing request token in database...");
     const { error: insertError } = await supabase
