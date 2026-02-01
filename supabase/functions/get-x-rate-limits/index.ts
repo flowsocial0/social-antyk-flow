@@ -5,8 +5,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Daily limit for X Free tier
-const X_FREE_TIER_DAILY_LIMIT = 17;
+// App-level daily limit for X Free tier
+const X_APP_DAILY_LIMIT = 1500;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -33,140 +33,84 @@ Deno.serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const userId = user.id;
-    console.log('Fetching X rate limits for user:', userId);
+    console.log('Fetching X app rate limits');
 
     const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get user's X accounts
-    const { data: xAccounts, error: accountsError } = await supabaseClient
-      .from('twitter_oauth1_tokens')
-      .select('id, screen_name, account_name')
-      .eq('user_id', userId);
+    // Get app-level rate limit from platform_rate_limits table
+    // This tracks the shared application limit
+    const { data: appRateLimit, error: appLimitError } = await supabaseClient
+      .from('platform_rate_limits')
+      .select('*')
+      .eq('platform', 'x')
+      .eq('limit_type', 'app_daily')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (accountsError) {
-      console.error('Error fetching X accounts:', accountsError);
-      throw accountsError;
+    if (appLimitError) {
+      console.error('Error fetching app rate limit:', appLimitError);
     }
 
-    if (!xAccounts || xAccounts.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          success: true,
-          accounts: [],
-          message: 'No X accounts connected'
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const accountIds = xAccounts.map(a => a.id);
+    // Calculate remaining from actual publications in last 24h if no API data
     const now = new Date();
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-    // Get actual publications from last 24h for each account
-    const { data: dailyPublications, error: pubError } = await supabaseClient
+    // Count all X publications across all users in last 24h
+    const { count: totalPublications, error: countError } = await supabaseClient
       .from('x_daily_publications')
-      .select('account_id, published_at')
-      .in('account_id', accountIds)
+      .select('*', { count: 'exact', head: true })
       .gte('published_at', twentyFourHoursAgo.toISOString());
 
-    if (pubError) {
-      console.error('Error fetching daily publications:', pubError);
+    if (countError) {
+      console.error('Error counting publications:', countError);
     }
 
-    // Group publications by account
-    const publicationsByAccount: Record<string, { count: number; oldestTime: Date | null }> = {};
-    for (const accountId of accountIds) {
-      publicationsByAccount[accountId] = { count: 0, oldestTime: null };
-    }
-
-    if (dailyPublications) {
-      for (const pub of dailyPublications) {
-        if (!publicationsByAccount[pub.account_id]) {
-          publicationsByAccount[pub.account_id] = { count: 0, oldestTime: null };
-        }
-        publicationsByAccount[pub.account_id].count++;
-        
-        const pubTime = new Date(pub.published_at);
-        if (!publicationsByAccount[pub.account_id].oldestTime || 
-            pubTime < publicationsByAccount[pub.account_id].oldestTime!) {
-          publicationsByAccount[pub.account_id].oldestTime = pubTime;
-        }
-      }
-    }
-
-    // Get old API rate limits (for backwards compatibility, but less useful now)
-    const { data: rateLimits, error: limitsError } = await supabaseClient
-      .from('x_rate_limits')
-      .select('*')
-      .in('account_id', accountIds);
-
-    if (limitsError) {
-      console.error('Error fetching rate limits:', limitsError);
-    }
-
-    // Combine account info with rate limits and daily publication counts
-    const accountsWithLimits = xAccounts.map(account => {
-      const limits = rateLimits?.filter(rl => rl.account_id === account.id) || [];
-      const tweetsLimit = limits.find(l => l.endpoint === 'tweets');
-      const dailyPubs = publicationsByAccount[account.id] || { count: 0, oldestTime: null };
-      
-      // Calculate remaining based on actual publications, not API headers
-      const publishedToday = dailyPubs.count;
-      const remaining = Math.max(0, X_FREE_TIER_DAILY_LIMIT - publishedToday);
-      const isLimited = remaining === 0;
-      
-      // Calculate reset time - 24h after oldest publication in window
-      let resetAt: string | null = null;
-      let minutesUntilReset: number | null = null;
-      
-      if (isLimited && dailyPubs.oldestTime) {
-        const resetTime = new Date(dailyPubs.oldestTime.getTime() + 24 * 60 * 60 * 1000);
-        resetAt = resetTime.toISOString();
-        minutesUntilReset = Math.max(0, Math.ceil((resetTime.getTime() - now.getTime()) / 60000));
-      }
-
-      return {
-        id: account.id,
-        screen_name: account.screen_name,
-        account_name: account.account_name,
-        tweets: {
-          limit_max: X_FREE_TIER_DAILY_LIMIT,
-          remaining: remaining,
-          published_today: publishedToday,
-          reset_at: resetAt,
-          is_limited: isLimited,
-          minutes_until_reset: minutesUntilReset,
-          updated_at: now.toISOString(),
-          // Keep old API values for reference
-          api_remaining: tweetsLimit?.remaining,
-          api_reset_at: tweetsLimit?.reset_at
-        }
-      };
-    });
-
-    // Calculate aggregate info
-    const anyLimited = accountsWithLimits.some(a => a.tweets.is_limited);
-    const totalRemaining = accountsWithLimits.reduce((sum, a) => sum + a.tweets.remaining, 0);
-    const totalPublished = accountsWithLimits.reduce((sum, a) => sum + a.tweets.published_today, 0);
+    const published24h = totalPublications || 0;
     
-    const nextReset = accountsWithLimits
-      .filter(a => a.tweets.reset_at)
-      .map(a => new Date(a.tweets.reset_at!))
-      .sort((a, b) => a.getTime() - b.getTime())[0];
+    // Use API data if available and recent, otherwise calculate from publications
+    let remaining = X_APP_DAILY_LIMIT - published24h;
+    let resetAt: string | null = null;
+
+    if (appRateLimit && appRateLimit.remaining !== null) {
+      // Use API-reported limit if it's recent (within 1 hour)
+      const lastCheck = appRateLimit.last_api_check ? new Date(appRateLimit.last_api_check) : null;
+      const isRecent = lastCheck && (now.getTime() - lastCheck.getTime() < 60 * 60 * 1000);
+      
+      if (isRecent) {
+        remaining = appRateLimit.remaining;
+        resetAt = appRateLimit.reset_at;
+        console.log('Using API-reported limit:', remaining);
+      }
+    }
+
+    // If no reset time from API, estimate based on oldest publication
+    if (!resetAt && published24h > 0) {
+      const { data: oldestPub } = await supabaseClient
+        .from('x_daily_publications')
+        .select('published_at')
+        .gte('published_at', twentyFourHoursAgo.toISOString())
+        .order('published_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      
+      if (oldestPub) {
+        const resetTime = new Date(new Date(oldestPub.published_at).getTime() + 24 * 60 * 60 * 1000);
+        resetAt = resetTime.toISOString();
+      }
+    }
+
+    const isLimited = remaining <= 0;
 
     return new Response(
       JSON.stringify({
         success: true,
-        accounts: accountsWithLimits,
-        summary: {
-          total_accounts: accountsWithLimits.length,
-          any_limited: anyLimited,
-          total_remaining: totalRemaining,
-          total_published_today: totalPublished,
-          daily_limit: X_FREE_TIER_DAILY_LIMIT,
-          next_reset: nextReset?.toISOString() || null
+        appLimit: {
+          remaining: Math.max(0, remaining),
+          limit: X_APP_DAILY_LIMIT,
+          reset_at: resetAt,
+          is_limited: isLimited,
+          published_24h: published24h,
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

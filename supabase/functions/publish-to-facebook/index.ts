@@ -471,10 +471,15 @@ Deno.serve(async (req) => {
       // Video publishing to Facebook
       console.log('=== Publishing video to Facebook ===');
       
+      // Encode video URL to handle special characters
+      const encodedVideoUrl = encodeURI(finalVideoUrl);
+      console.log('Original video URL:', finalVideoUrl);
+      console.log('Encoded video URL:', encodedVideoUrl);
+      
       // Facebook requires video to be uploaded via the /videos endpoint
       const videosUrl = `https://graph.facebook.com/v18.0/${page_id}/videos`;
       const videoData = {
-        file_url: finalVideoUrl,
+        file_url: encodedVideoUrl,
         description: postText,
         access_token: access_token,
       };

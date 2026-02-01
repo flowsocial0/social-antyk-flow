@@ -709,17 +709,21 @@ const CampaignDetails = () => {
                       });
                   })
               ) : (
-                // Fallback for older campaigns - show target platforms
-                (campaign.target_platforms as string[] || ['x']).map((platform: string) => {
-                  const platformConfig = getPlatformConfig(platform as PlatformId);
-                  const Icon = platformConfig?.icon;
-                  return (
-                    <Badge key={platform} variant="secondary" className="gap-2 py-1.5 px-3">
-                      {Icon && <Icon className="h-3.5 w-3.5" />}
-                      <span>{platformConfig?.name || platform} (domyślne konto)</span>
-                    </Badge>
-                  );
-                })
+                // Fallback for older campaigns - show target platforms only if they exist
+                (campaign.target_platforms as string[] || []).length > 0 ? (
+                  (campaign.target_platforms as string[]).map((platform: string) => {
+                    const platformConfig = getPlatformConfig(platform as PlatformId);
+                    const Icon = platformConfig?.icon;
+                    return (
+                      <Badge key={platform} variant="secondary" className="gap-2 py-1.5 px-3">
+                        {Icon && <Icon className="h-3.5 w-3.5" />}
+                        <span>{platformConfig?.name || platform} (domyślne konto)</span>
+                      </Badge>
+                    );
+                  })
+                ) : (
+                  <span className="text-sm text-muted-foreground">Brak wybranych platform</span>
+                )
               )}
               {/* Show message if no accounts found */}
               {campaign.selected_accounts && 
@@ -895,6 +899,7 @@ const CampaignDetails = () => {
             book_id: p.book_id,
             platforms: p.platforms || campaign.target_platforms || ["x"],
             target_accounts: p.target_accounts as Record<string, string[]> || {},
+            custom_image_url: p.custom_image_url || null,
           }))}
         />
       )}

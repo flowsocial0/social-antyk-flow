@@ -175,9 +175,26 @@ export const SimpleCampaignSetup = () => {
           }
         }
         
-        // Upload video if present
+        // Upload video if present - sanitize filename
         if (post.videoFile) {
-          const fileName = `${user.id}/videos/${Date.now()}_${post.videoFile.name}`;
+          // Sanitize filename: remove Polish chars, spaces, and special chars
+          const sanitizeFileName = (name: string): string => {
+            return name
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .replace(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g, (c: string) => {
+                const map: Record<string, string> = {
+                  'ą':'a','ć':'c','ę':'e','ł':'l','ń':'n','ó':'o','ś':'s','ź':'z','ż':'z',
+                  'Ą':'A','Ć':'C','Ę':'E','Ł':'L','Ń':'N','Ó':'O','Ś':'S','Ź':'Z','Ż':'Z'
+                };
+                return map[c] || c;
+              })
+              .replace(/\s+/g, '_')
+              .replace(/[^a-zA-Z0-9._-]/g, '');
+          };
+          
+          const sanitizedName = sanitizeFileName(post.videoFile.name);
+          const fileName = `${user.id}/videos/${Date.now()}_${sanitizedName}`;
           const { error: uploadError } = await supabase.storage
             .from("ObrazkiKsiazek")
             .upload(fileName, post.videoFile);

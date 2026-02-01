@@ -48,6 +48,7 @@ interface ResumeCampaignDialogProps {
     book_id: string | null;
     platforms: string[];
     target_accounts?: Record<string, string[]>;
+    custom_image_url?: string | null;
   }>;
 }
 
@@ -135,6 +136,7 @@ export const ResumeCampaignDialog = ({
               status: 'scheduled',
               platforms: originalPost.platforms || campaign.target_platforms,
               target_accounts: postTargetAccounts,
+              custom_image_url: originalPost.custom_image_url || null,
             });
 
           if (postError) throw postError;
