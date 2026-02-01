@@ -2,9 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Twitter, Facebook, Instagram, Youtube, Linkedin, Clock } from "lucide-react";
+import { Loader2, Twitter, Facebook, Instagram, Youtube, Linkedin, Clock, Video } from "lucide-react";
 import { format } from "date-fns";
 import { pl } from "date-fns/locale";
+
+const isVideoUrl = (url: string | null | undefined): boolean => {
+  if (!url) return false;
+  return /\.(mp4|mov|webm|avi|mkv|m4v)$/i.test(url);
+};
 
 const platformIcons = {
   x: Twitter,
@@ -99,38 +104,51 @@ export const ScheduleCalendar = () => {
                   const Icon = platformIcons[post.platform as keyof typeof platformIcons] || Clock;
                   const colorClass = platformColors[post.platform as keyof typeof platformColors] || "bg-muted";
                   
-                  return (
-                    <div
-                      key={post.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-4 flex-1">
-                        <img
-                          src={post.book.image_url}
-                          alt={post.book.title}
-                          className="w-12 h-16 object-cover rounded"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Badge variant="outline" className={colorClass}>
-                              <Icon className="h-3 w-3 mr-1" />
-                              {post.platform}
-                            </Badge>
-                            <span className="text-sm text-muted-foreground">
-                              {post.book.code}
-                            </span>
+                    const mediaUrl = post.book?.image_url;
+                    const isVideo = isVideoUrl(mediaUrl);
+                    
+                    return (
+                      <div
+                        key={post.id}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-4 flex-1">
+                          {isVideo ? (
+                            <div className="relative w-12 h-16 bg-black/50 rounded flex items-center justify-center">
+                              <Video className="h-6 w-6 text-white" />
+                            </div>
+                          ) : mediaUrl ? (
+                            <img
+                              src={mediaUrl}
+                              alt={post.book?.title}
+                              className="w-12 h-16 object-cover rounded"
+                            />
+                          ) : (
+                            <div className="w-12 h-16 bg-muted rounded flex items-center justify-center">
+                              <Clock className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge variant="outline" className={colorClass}>
+                                <Icon className="h-3 w-3 mr-1" />
+                                {post.platform}
+                              </Badge>
+                              <span className="text-sm text-muted-foreground">
+                                {post.book?.code}
+                              </span>
+                            </div>
+                            <p className="font-medium text-sm line-clamp-1">
+                              {post.book?.title}
+                            </p>
                           </div>
-                          <p className="font-medium text-sm line-clamp-1">
-                            {post.book.title}
-                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          {format(new Date(post.scheduled_publish_at), "HH:mm")}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        {format(new Date(post.scheduled_publish_at), "HH:mm")}
-                      </div>
-                    </div>
-                  );
+                    );
                 })}
               </div>
             </CardContent>

@@ -10,6 +10,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { Badge } from "@/components/ui/badge";
 import { PlatformLimitsAdmin } from "@/components/admin/PlatformLimitsAdmin";
 import { AdminIdeas } from "@/components/admin/AdminIdeas";
+import { AdminDefaultSettings } from "@/components/admin/AdminDefaultSettings";
 import type { User } from "@supabase/supabase-js";
 
 interface AdminStats {
@@ -345,6 +346,9 @@ const Admin = () => {
 
             {/* Admin Ideas */}
             <AdminIdeas />
+
+            {/* Default User Settings */}
+            <AdminDefaultSettings />
 
             {/* Platform Limits */}
             <PlatformLimitsAdmin />

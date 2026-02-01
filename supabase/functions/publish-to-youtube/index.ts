@@ -192,8 +192,26 @@ Deno.serve(async (req) => {
       throw new Error('Video URL is required. Please upload a video for this book.');
     }
 
+    // Generate title fallback if missing
     if (!title) {
-      throw new Error('Title is required');
+      // Fallback 1: Use first line of description
+      if (description) {
+        title = description.split('\n')[0].substring(0, 100);
+      }
+      // Fallback 2: Extract from video filename
+      if (!title && videoUrl) {
+        try {
+          const decoded = decodeURIComponent(videoUrl.split('/').pop() || '');
+          title = decoded.replace(/\.[^.]+$/, '').replace(/_/g, ' ').substring(0, 100);
+        } catch {
+          // ignore
+        }
+      }
+      // Fallback 3: Generic title
+      if (!title) {
+        title = `Publikacja ${new Date().toLocaleDateString('pl-PL')}`;
+      }
+      console.log('[YouTube] Generated fallback title:', title);
     }
 
     if (!userId) {

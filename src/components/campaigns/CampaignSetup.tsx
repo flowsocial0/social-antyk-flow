@@ -231,20 +231,21 @@ export const CampaignSetup = ({
             </div>}
         </div>
         
-        {/* Regenerate Texts Checkbox */}
-        <div className="flex items-center space-x-3 mb-4 p-4 bg-amber-500/5 rounded-lg border border-amber-500/20">
-          <Checkbox id="regenerateTexts" checked={regenerateTexts} onCheckedChange={checked => setRegenerateTexts(checked === true)} />
-          <div className="flex-1">
-            <Label htmlFor="regenerateTexts" className="flex items-center gap-2 cursor-pointer">
-              <RefreshCw className="h-4 w-4 text-amber-500" />
-              <span className="font-medium">Użyj zapisanych postow z poprzednich kampanii
-            </span>
-            </Label>
-            <p className="text-xs text-muted-foreground mt-1">
-              {regenerateTexts ? "Nowe teksty zostaną wygenerowane tylko dla produktów, które jeszcze były w kampanii" : "Użyj tekstów z poprzednich kampanii (jeśli istnieją)"}
-            </p>
+        {/* Regenerate Texts Checkbox - hidden when using random content */}
+        {!useRandomContent && (
+          <div className="flex items-center space-x-3 mb-4 p-4 bg-amber-500/5 rounded-lg border border-amber-500/20">
+            <Checkbox id="regenerateTexts" checked={regenerateTexts} onCheckedChange={checked => setRegenerateTexts(checked === true)} />
+            <div className="flex-1">
+              <Label htmlFor="regenerateTexts" className="flex items-center gap-2 cursor-pointer">
+                <RefreshCw className="h-4 w-4 text-amber-500" />
+                <span className="font-medium">Użyj zapisanych postów z poprzednich kampanii</span>
+              </Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                {regenerateTexts ? "Nowe teksty zostaną wygenerowane tylko dla produktów, które jeszcze nie były w kampanii" : "Użyj tekstów z poprzednich kampanii (jeśli istnieją)"}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
         
         <div className="space-y-6">
           {/* Duration */}
@@ -277,16 +278,16 @@ export const CampaignSetup = ({
             <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="max-w-xs" />
           </div>
 
-          {/* Content/Sales Ratio Slider */}
+          {/* Content/Sales Ratio Slider - left=sales, right=trivia */}
           {!useRandomContent ? <div className="space-y-4">
               <Label className="flex items-center gap-2">
                 <Percent className="h-4 w-4" />
-                Proporcja postów ciekawostek vs sprzedażowych
+                Proporcja postów sprzedażowych vs ciekawostek
               </Label>
               <div className="flex items-center gap-4">
-                <span className="text-sm text-muted-foreground w-24">Ciekawostki: {contentRatio}%</span>
-                <Slider value={[contentRatio]} onValueChange={value => setContentRatio(value[0])} min={0} max={100} step={5} className="flex-1 max-w-md" />
                 <span className="text-sm text-muted-foreground w-28">Sprzedaż: {100 - contentRatio}%</span>
+                <Slider value={[contentRatio]} onValueChange={value => setContentRatio(value[0])} min={0} max={100} step={5} className="flex-1 max-w-md" />
+                <span className="text-sm text-muted-foreground w-24">Ciekawostki: {contentRatio}%</span>
               </div>
               <p className="text-xs text-muted-foreground">
                 {contentRatio === 0 && "Tylko posty sprzedażowe - bezpośrednia promocja książek"}
