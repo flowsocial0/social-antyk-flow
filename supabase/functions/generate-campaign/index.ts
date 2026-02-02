@@ -447,7 +447,8 @@ async function generatePostsContent(body: any, apiKey: string) {
       const { data: batchBooks, error: batchError } = await supabase
         .from("books")
         .select("id, title, description, sale_price, product_url, campaign_post_count, author")
-        .in("id", batch);
+        .in("id", batch)
+        .eq("user_id", userId);
       
       if (batchError) {
         console.error(`Error fetching books batch ${i / fetchBatchSize}:`, batchError);
@@ -1226,7 +1227,8 @@ async function generatePostsBatched(body: any, apiKey: string) {
     const { data: books } = await supabase
       .from("books")
       .select("id, title, description, sale_price, product_url, author")
-      .in("id", config.selectedBooks);
+      .in("id", config.selectedBooks)
+      .eq("user_id", userId);
     
     if (books) {
       availableBooks = books.sort((a: any, b: any) => {

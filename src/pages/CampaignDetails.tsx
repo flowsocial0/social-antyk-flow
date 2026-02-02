@@ -20,6 +20,9 @@ import {
   Pause,
   Copy,
   Users,
+  Image as ImageIcon,
+  Video,
+  X,
 } from "lucide-react";
 import { CampaignPostCard } from "@/components/campaigns/CampaignPostCard";
 import { ResumeCampaignDialog } from "@/components/campaigns/ResumeCampaignDialog";
@@ -54,6 +57,19 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getPlatformConfig, PlatformId } from "@/config/platforms";
 
+// Helper function to sanitize filenames for storage
+const sanitizeFileName = (name: string): string => {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g, c => ({
+      'ą':'a','ć':'c','ę':'e','ł':'l','ń':'n','ó':'o','ś':'s','ź':'z','ż':'z',
+      'Ą':'A','Ć':'C','Ę':'E','Ł':'L','Ń':'N','Ó':'O','Ś':'S','Ź':'Z','Ż':'Z'
+    })[c] || c)
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9._-]/g, '');
+};
+
 interface AccountInfo {
   id: string;
   display_name: string;
@@ -78,6 +94,26 @@ const CampaignDetails = () => {
     category: "trivia",
     text: "",
   });
+  const [newPostMediaFile, setNewPostMediaFile] = useState<File | null>(null);
+  const [newPostMediaPreview, setNewPostMediaPreview] = useState<string>('');
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+
+  const handleNewPostMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setNewPostMediaFile(file);
+      const previewUrl = URL.createObjectURL(file);
+      setNewPostMediaPreview(previewUrl);
+    }
+  };
+
+  const clearNewPostMedia = () => {
+    if (newPostMediaPreview) {
+      URL.revokeObjectURL(newPostMediaPreview);
+    }
+    setNewPostMediaFile(null);
+    setNewPostMediaPreview('');
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -320,7 +356,32 @@ const CampaignDetails = () => {
 
   const addPostMutation = useMutation({
     mutationFn: async () => {
-      if (!campaign) throw new Error("Kampania nie została załadowana");
+      if (!campaign || !user) throw new Error("Kampania nie została załadowana");
+
+      setIsUploadingMedia(true);
+      let mediaUrl: string | null = null;
+
+      // Upload media if present
+      if (newPostMediaFile) {
+        const isVideo = newPostMediaFile.type.startsWith('video/');
+        const folder = isVideo ? 'videos' : 'images';
+        const fileName = `${user.id}/${folder}/${Date.now()}_${sanitizeFileName(newPostMediaFile.name)}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('ObrazkiKsiazek')
+          .upload(fileName, newPostMediaFile, { upsert: true });
+        
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          throw new Error('Błąd podczas przesyłania pliku');
+        }
+        
+        const { data: publicUrlData } = supabase.storage
+          .from('ObrazkiKsiazek')
+          .getPublicUrl(fileName);
+        
+        mediaUrl = publicUrlData.publicUrl;
+      }
 
       // Calculate scheduled_at based on campaign start date, day and time
       const startDate = new Date(campaign.start_date);
@@ -339,6 +400,7 @@ const CampaignDetails = () => {
         scheduled_at: scheduledDate.toISOString(),
         status: "scheduled",
         platforms: campaign.target_platforms || ["x"],
+        custom_image_url: mediaUrl,
       });
 
       if (error) throw error;
@@ -347,6 +409,7 @@ const CampaignDetails = () => {
       queryClient.invalidateQueries({ queryKey: ["campaign-posts", id] });
       toast.success("Post został dodany");
       setIsAddingPost(false);
+      clearNewPostMedia();
       setNewPost({
         day: 1,
         time: "09:00",
@@ -354,9 +417,29 @@ const CampaignDetails = () => {
         category: "trivia",
         text: "",
       });
+      setIsUploadingMedia(false);
     },
     onError: () => {
       toast.error("Błąd podczas dodawania posta");
+      setIsUploadingMedia(false);
+    },
+  });
+
+  const updatePostMediaMutation = useMutation({
+    mutationFn: async ({ postId, mediaUrl }: { postId: string; mediaUrl: string | null }) => {
+      const { error } = await (supabase as any)
+        .from("campaign_posts")
+        .update({ custom_image_url: mediaUrl } as any)
+        .eq("id", postId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaign-posts", id] });
+      toast.success("Media posta zostały zaktualizowane");
+    },
+    onError: () => {
+      toast.error("Błąd podczas aktualizacji mediów");
     },
   });
 
@@ -813,11 +896,70 @@ const CampaignDetails = () => {
                     <Label htmlFor="text">Treść posta</Label>
                     <Textarea
                       id="text"
-                      rows={8}
+                      rows={6}
                       value={newPost.text}
                       onChange={(e) => setNewPost({ ...newPost, text: e.target.value })}
                       placeholder="Wpisz treść posta..."
                     />
+                  </div>
+                  
+                  {/* Media upload section */}
+                  <div className="space-y-2">
+                    <Label>Media (opcjonalne)</Label>
+                    {newPostMediaPreview ? (
+                      <div className="relative inline-block">
+                        {newPostMediaFile?.type.startsWith('video/') ? (
+                          <div className="relative">
+                            <video
+                              src={newPostMediaPreview}
+                              className="max-h-32 rounded-lg border"
+                              muted
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg">
+                              <Video className="h-8 w-8 text-white" />
+                            </div>
+                          </div>
+                        ) : (
+                          <img
+                            src={newPostMediaPreview}
+                            alt="Podgląd"
+                            className="max-h-32 rounded-lg border object-cover"
+                          />
+                        )}
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute -top-2 -right-2 h-6 w-6"
+                          onClick={clearNewPostMedia}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-3">
+                        <Label className="flex items-center gap-2 cursor-pointer px-3 py-2 border rounded-lg hover:bg-muted/50 transition-colors">
+                          <ImageIcon className="h-4 w-4" />
+                          <span className="text-sm">Dodaj grafikę</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleNewPostMediaChange}
+                          />
+                        </Label>
+                        <Label className="flex items-center gap-2 cursor-pointer px-3 py-2 border rounded-lg hover:bg-muted/50 transition-colors">
+                          <Video className="h-4 w-4" />
+                          <span className="text-sm">Dodaj wideo</span>
+                          <input
+                            type="file"
+                            accept="video/*"
+                            className="hidden"
+                            onChange={handleNewPostMediaChange}
+                          />
+                        </Label>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <DialogFooter>
@@ -826,9 +968,9 @@ const CampaignDetails = () => {
                   </Button>
                   <Button
                     onClick={() => addPostMutation.mutate()}
-                    disabled={!newPost.text.trim() || addPostMutation.isPending}
+                    disabled={!newPost.text.trim() || addPostMutation.isPending || isUploadingMedia}
                   >
-                    Dodaj post
+                    {isUploadingMedia ? "Przesyłanie..." : addPostMutation.isPending ? "Dodawanie..." : "Dodaj post"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -850,6 +992,7 @@ const CampaignDetails = () => {
                     <CampaignPostCard
                       key={post.id}
                       post={post}
+                      userId={user?.id}
                       onSave={async (postId, text) => {
                         await updatePostMutation.mutateAsync({ postId, text });
                       }}
@@ -864,6 +1007,9 @@ const CampaignDetails = () => {
                       }}
                       onRetry={async (postId) => {
                         await retryPostMutation.mutateAsync(postId);
+                      }}
+                      onUpdateMedia={async (postId, mediaUrl) => {
+                        await updatePostMediaMutation.mutateAsync({ postId, mediaUrl });
                       }}
                     />
                   ))}

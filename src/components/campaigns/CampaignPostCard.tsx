@@ -4,7 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Edit2, Save, X, Clock, CheckCircle2, AlertCircle, BookOpen, RefreshCw, Trash2, Calendar, RotateCcw, Info, Video, FileVideo } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Edit2, Save, X, Clock, CheckCircle2, AlertCircle, BookOpen, RefreshCw, Trash2, Calendar, RotateCcw, Info, Video, FileVideo, Image as ImageIcon, Upload } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -13,6 +14,21 @@ import {
 import { format } from "date-fns";
 import { pl } from "date-fns/locale";
 import { PlatformBadge } from "./PlatformBadge";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+// Helper function to sanitize filenames for storage
+const sanitizeFileName = (name: string): string => {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g, c => ({
+      'ą':'a','ć':'c','ę':'e','ł':'l','ń':'n','ó':'o','ś':'s','ź':'z','ż':'z',
+      'Ą':'A','Ć':'C','Ę':'E','Ł':'L','Ń':'N','Ó':'O','Ś':'S','Ź':'Z','Ż':'Z'
+    })[c] || c)
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9._-]/g, '');
+};
 
 type CampaignPost = {
   id: string;
@@ -41,15 +57,17 @@ type CampaignPost = {
 
 type CampaignPostCardProps = {
   post: CampaignPost;
+  userId?: string;
   onSave?: (postId: string, newText: string) => Promise<void>;
   onRegenerate?: (postId: string) => Promise<void>;
   onDelete?: (postId: string) => Promise<void>;
   onUpdateSchedule?: (postId: string, newScheduledAt: string) => Promise<void>;
   onRetry?: (postId: string) => Promise<void>;
+  onUpdateMedia?: (postId: string, mediaUrl: string | null) => Promise<void>;
   readOnly?: boolean;
 };
 
-export const CampaignPostCard = ({ post, onSave, onRegenerate, onDelete, onUpdateSchedule, onRetry, readOnly = false }: CampaignPostCardProps) => {
+export const CampaignPostCard = ({ post, userId, onSave, onRegenerate, onDelete, onUpdateSchedule, onRetry, onUpdateMedia, readOnly = false }: CampaignPostCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingSchedule, setIsEditingSchedule] = useState(false);
   const [editedText, setEditedText] = useState(post.text);
@@ -61,6 +79,9 @@ export const CampaignPostCard = ({ post, onSave, onRegenerate, onDelete, onUpdat
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isErrorExpanded, setIsErrorExpanded] = useState(false);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [pendingMediaFile, setPendingMediaFile] = useState<File | null>(null);
+  const [pendingMediaPreview, setPendingMediaPreview] = useState<string>('');
 
   const handleSave = async () => {
     if (!onSave) return;
@@ -131,6 +152,70 @@ export const CampaignPostCard = ({ post, onSave, onRegenerate, onDelete, onUpdat
       console.error("Error retrying post:", error);
     } finally {
       setIsRetrying(false);
+    }
+  };
+
+  const handleMediaFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPendingMediaFile(file);
+      const previewUrl = URL.createObjectURL(file);
+      setPendingMediaPreview(previewUrl);
+    }
+  };
+
+  const clearPendingMedia = () => {
+    if (pendingMediaPreview) {
+      URL.revokeObjectURL(pendingMediaPreview);
+    }
+    setPendingMediaFile(null);
+    setPendingMediaPreview('');
+  };
+
+  const handleUploadMedia = async () => {
+    if (!pendingMediaFile || !userId || !onUpdateMedia) return;
+    
+    setIsUploadingMedia(true);
+    try {
+      const isVideo = pendingMediaFile.type.startsWith('video/');
+      const folder = isVideo ? 'videos' : 'images';
+      const fileName = `${userId}/${folder}/${Date.now()}_${sanitizeFileName(pendingMediaFile.name)}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('ObrazkiKsiazek')
+        .upload(fileName, pendingMediaFile, { upsert: true });
+      
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        toast.error('Błąd podczas przesyłania pliku');
+        return;
+      }
+      
+      const { data: publicUrlData } = supabase.storage
+        .from('ObrazkiKsiazek')
+        .getPublicUrl(fileName);
+      
+      await onUpdateMedia(post.id, publicUrlData.publicUrl);
+      clearPendingMedia();
+      toast.success('Media zostały zaktualizowane');
+    } catch (error) {
+      console.error('Error uploading media:', error);
+      toast.error('Błąd podczas przesyłania pliku');
+    } finally {
+      setIsUploadingMedia(false);
+    }
+  };
+
+  const handleRemoveMedia = async () => {
+    if (!onUpdateMedia) return;
+    if (!confirm('Czy na pewno chcesz usunąć media z tego posta?')) return;
+    
+    try {
+      await onUpdateMedia(post.id, null);
+      toast.success('Media zostały usunięte');
+    } catch (error) {
+      console.error('Error removing media:', error);
+      toast.error('Błąd podczas usuwania mediów');
     }
   };
 
@@ -442,40 +527,129 @@ export const CampaignPostCard = ({ post, onSave, onRegenerate, onDelete, onUpdat
           )}
 
           {!readOnly && post.status === 'scheduled' && (
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setIsEditing(true)}
-                className="gap-1"
-              >
-                <Edit2 className="h-3 w-3" />
-                Edytuj
-              </Button>
-              {onRegenerate && (
+            <div className="space-y-3">
+              {/* Media upload/change section */}
+              {onUpdateMedia && userId && (
+                <div className="p-3 bg-muted/30 rounded-lg border space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Media posta</Label>
+                    {post.custom_image_url && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleRemoveMedia}
+                        className="gap-1 text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Usuń media
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {pendingMediaPreview ? (
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        {pendingMediaFile?.type.startsWith('video/') ? (
+                          <div className="relative">
+                            <video
+                              src={pendingMediaPreview}
+                              className="h-16 w-24 object-cover rounded"
+                              muted
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded">
+                              <Video className="h-5 w-5 text-white" />
+                            </div>
+                          </div>
+                        ) : (
+                          <img
+                            src={pendingMediaPreview}
+                            alt="Podgląd"
+                            className="h-16 w-auto rounded object-cover"
+                          />
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={handleUploadMedia}
+                          disabled={isUploadingMedia}
+                          className="gap-1"
+                        >
+                          <Upload className="h-3 w-3" />
+                          {isUploadingMedia ? 'Przesyłanie...' : 'Zapisz'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={clearPendingMedia}
+                          disabled={isUploadingMedia}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Label className="flex items-center gap-2 cursor-pointer px-3 py-2 border rounded-lg hover:bg-muted/50 transition-colors text-sm">
+                        <ImageIcon className="h-4 w-4" />
+                        {post.custom_image_url ? 'Zmień grafikę' : 'Dodaj grafikę'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleMediaFileChange}
+                        />
+                      </Label>
+                      <Label className="flex items-center gap-2 cursor-pointer px-3 py-2 border rounded-lg hover:bg-muted/50 transition-colors text-sm">
+                        <Video className="h-4 w-4" />
+                        {post.custom_image_url ? 'Zmień wideo' : 'Dodaj wideo'}
+                        <input
+                          type="file"
+                          accept="video/*"
+                          className="hidden"
+                          onChange={handleMediaFileChange}
+                        />
+                      </Label>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              <div className="flex gap-2 flex-wrap">
                 <Button
                   size="sm"
-                  variant="outline"
-                  onClick={handleRegenerate}
-                  disabled={isRegenerating}
+                  variant="ghost"
+                  onClick={() => setIsEditing(true)}
                   className="gap-1"
                 >
-                  <RefreshCw className={`h-3 w-3 ${isRegenerating ? 'animate-spin' : ''}`} />
-                  Regeneruj AI
+                  <Edit2 className="h-3 w-3" />
+                  Edytuj tekst
                 </Button>
-              )}
-              {onDelete && (
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  className="gap-1"
-                >
-                  <Trash2 className="h-3 w-3" />
-                  Usuń
-                </Button>
-              )}
+                {onRegenerate && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleRegenerate}
+                    disabled={isRegenerating}
+                    className="gap-1"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${isRegenerating ? 'animate-spin' : ''}`} />
+                    Regeneruj AI
+                  </Button>
+                )}
+                {onDelete && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="gap-1"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    Usuń
+                  </Button>
+                )}
+              </div>
             </div>
           )}
           
