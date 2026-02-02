@@ -135,6 +135,32 @@ export const AccountSelector = ({ selectedPlatforms, selectedAccounts, onChange 
     return null;
   }
 
+  // Show message if there are selected platforms with no accounts connected
+  const platformsWithNoAccounts = selectedPlatforms.filter(
+    platform => !accounts[platform] || accounts[platform].length === 0
+  );
+
+  if (platformsWithAccounts.length === 0 && platformsWithNoAccounts.length > 0) {
+    return (
+      <Card className="p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Users className="h-5 w-5 text-primary" />
+          <h3 className="text-lg font-semibold">Wybór kont do publikacji</h3>
+        </div>
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Wybrane platformy ({platformsWithNoAccounts.map(p => getPlatformConfig(p)?.name || p).join(', ')}) nie mają połączonych kont.
+            <br />
+            <a href="/settings/social-accounts" className="underline font-medium">
+              Połącz konta w ustawieniach
+            </a>
+          </AlertDescription>
+        </Alert>
+      </Card>
+    );
+  }
+
   if (platformsWithAccounts.length === 0) {
     return null;
   }
