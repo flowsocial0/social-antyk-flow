@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
 
     // Get request body
     const body = await req.json();
-    const { text, imageUrl, userId: userIdFromBody, accountId, bookId, contentId, testConnection } = body;
+    const { text, imageUrl, userId: userIdFromBody, accountId, bookId, contentId, testConnection, campaignPostId } = body;
 
     // Determine userId - from body (auto-publish) or from JWT (direct user call)
     let userId: string | null = null;
@@ -130,6 +130,60 @@ Deno.serve(async (req) => {
     // Determine post text and image
     let postText = text;
     let finalImageUrl = imageUrl;
+
+    // Handle campaign post publishing (from auto-publish-books)
+    if (campaignPostId) {
+      console.log('Publishing campaign post:', campaignPostId);
+      
+      const { data: campaignPost, error: postError } = await supabase
+        .from('campaign_posts')
+        .select('text, custom_image_url, book_id')
+        .eq('id', campaignPostId)
+        .single();
+      
+      if (postError || !campaignPost) {
+        console.error('Campaign post fetch error:', postError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            message: 'Nie znaleziono posta kampanii',
+            errorCode: 'POST_NOT_FOUND'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
+
+      // Use campaign post text
+      postText = campaignPost.text;
+      
+      // Use custom_image_url from campaign post if available
+      if (campaignPost.custom_image_url) {
+        finalImageUrl = campaignPost.custom_image_url;
+      }
+      
+      // If post has book_id, get book image as fallback
+      if (!finalImageUrl && campaignPost.book_id) {
+        const { data: bookData } = await supabase
+          .from('books')
+          .select('image_url, storage_path')
+          .eq('id', campaignPost.book_id)
+          .single();
+        
+        if (bookData) {
+          if (bookData.storage_path) {
+            finalImageUrl = `${SUPABASE_URL}/storage/v1/object/public/ObrazkiKsiazek/${bookData.storage_path}`;
+          } else if (bookData.image_url) {
+            finalImageUrl = bookData.image_url;
+          }
+        }
+      }
+
+      console.log('Campaign post data loaded:', {
+        hasText: !!postText,
+        textLength: postText?.length || 0,
+        hasImage: !!finalImageUrl
+      });
+    }
 
     // If bookId is provided, fetch book data and use AI text
     if (bookId) {

@@ -36,9 +36,9 @@ const TermsOfService = () => {
               </p>
               <p className="text-center text-sm text-muted-foreground mt-4">
                 Niniejszy dokument stanowi Regulamin (Terms of Service) aplikacji{" "}
-                <strong>Social Auto Flow</strong> dostępnej pod adresem{" "}
-                <a href="https://social-auto-flow.netlify.app" className="text-primary hover:underline">
-                  social-auto-flow.netlify.app
+                <strong>SocialAutoFlow</strong> dostępnej pod adresem{" "}
+                <a href="https://socialautoflow.pl" className="text-primary hover:underline">
+                  socialautoflow.pl
                 </a>
               </p>
               <p className="text-center text-muted-foreground mt-4">
@@ -51,8 +51,8 @@ const TermsOfService = () => {
                 <h2 className="text-2xl font-semibold text-foreground">1. Postanowienia ogólne</h2>
                 <p className="text-muted-foreground">
                   Niniejszy Regulamin (Terms of Service) określa zasady korzystania z aplikacji{" "}
-                  <strong>Social Auto Flow</strong> (dalej: "Serwis" lub "Aplikacja"), 
-                  dostępnej pod adresem https://social-auto-flow.netlify.app, która umożliwia automatyzację publikacji treści 
+                  <strong>SocialAutoFlow</strong> (dalej: "Serwis" lub "Aplikacja"), 
+                  dostępnej pod adresem https://socialautoflow.pl, która umożliwia automatyzację publikacji treści 
                   w mediach społecznościowych.
                 </p>
                 <p className="text-muted-foreground">
@@ -63,7 +63,7 @@ const TermsOfService = () => {
               <section>
                 <h2 className="text-2xl font-semibold text-foreground">2. Definicje</h2>
                 <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li><strong>Serwis/Aplikacja</strong> - platforma Social Auto Flow dostępna pod adresem social-auto-flow.netlify.app</li>
+                  <li><strong>Serwis/Aplikacja</strong> - platforma SocialAutoFlow dostępna pod adresem socialautoflow.pl</li>
                   <li><strong>Użytkownik</strong> - osoba fizyczna, prawna lub jednostka organizacyjna korzystająca z Serwisu</li>
                   <li><strong>Konto</strong> - indywidualne konto Użytkownika w Serwisie</li>
                   <li><strong>Platforma społecznościowa</strong> - zewnętrzny serwis (Facebook, X/Twitter, TikTok, Instagram, LinkedIn itp.)</li>
@@ -240,7 +240,7 @@ const TermsOfService = () => {
                     <strong>Księgarnia Antyk</strong>
                   </p>
                   <p className="text-muted-foreground">Email: flowsocial0@gmail.com</p>
-                  <p className="text-muted-foreground">Strona: social-auto-flow.netlify.app</p>
+                  <p className="text-muted-foreground">Strona: socialautoflow.pl</p>
                 </div>
               </section>
             </CardContent>
