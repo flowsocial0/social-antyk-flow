@@ -28,24 +28,39 @@ export const AccountSelector = ({ selectedPlatforms, selectedAccounts, onChange 
     loadAccounts();
   }, []);
 
-  // Auto-select default accounts when platforms change
+  // Auto-select default accounts when platforms change, and remove accounts for deselected platforms
   useEffect(() => {
     if (loading) return;
     
-    const newSelectedAccounts: Record<string, string[]> = { ...selectedAccounts };
+    const newSelectedAccounts: Record<string, string[]> = {};
     let changed = false;
     
+    // Only keep accounts for selected platforms
     selectedPlatforms.forEach(platform => {
       const platformAccounts = accounts[platform] || [];
-      if (platformAccounts.length > 0 && (!newSelectedAccounts[platform] || newSelectedAccounts[platform].length === 0)) {
-        // Auto-select default account or first account
-        const defaultAccount = platformAccounts.find(a => a.is_default);
-        newSelectedAccounts[platform] = [defaultAccount?.id || platformAccounts[0].id];
-        changed = true;
+      const currentSelection = selectedAccounts[platform];
+      
+      if (platformAccounts.length > 0) {
+        if (currentSelection && currentSelection.length > 0) {
+          // Keep existing selection for this platform
+          newSelectedAccounts[platform] = currentSelection;
+        } else {
+          // Auto-select default account or first account
+          const defaultAccount = platformAccounts.find(a => a.is_default);
+          newSelectedAccounts[platform] = [defaultAccount?.id || platformAccounts[0].id];
+          changed = true;
+        }
       }
     });
     
-    if (changed) {
+    // Check if any platforms were removed (accounts exist for platforms not in selectedPlatforms)
+    Object.keys(selectedAccounts).forEach(platform => {
+      if (!selectedPlatforms.includes(platform as PlatformId)) {
+        changed = true; // Platform was deselected, will be removed
+      }
+    });
+    
+    if (changed || Object.keys(newSelectedAccounts).length !== Object.keys(selectedAccounts).length) {
       onChange(newSelectedAccounts as Record<PlatformId, string[]>);
     }
   }, [selectedPlatforms, accounts, loading]);

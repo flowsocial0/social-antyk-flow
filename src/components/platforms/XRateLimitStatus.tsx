@@ -20,7 +20,7 @@ interface RateLimitsResponse {
 }
 
 // App-level daily limit for X Free tier (shared across all users)
-const APP_DAILY_LIMIT = 1500;
+const APP_DAILY_LIMIT = 15;
 
 export function XRateLimitStatus() {
   const { data, isLoading, error, refetch, isFetching } = useQuery<RateLimitsResponse>({
@@ -188,7 +188,7 @@ export function XRateLimitStatus() {
           <p className="flex items-start gap-1">
             <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
             <span>
-              Limit X Free tier: {APP_DAILY_LIMIT} publikacji/24h dla całej aplikacji.
+              Limit X Free tier: {APP_DAILY_LIMIT} publikacji/dzień dla całej aplikacji.
               Wszystkie konta użytkowników współdzielą ten limit.
             </span>
           </p>

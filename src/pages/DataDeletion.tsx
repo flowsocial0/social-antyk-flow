@@ -68,7 +68,7 @@ const DataDeletion = () => {
             </div>
             <h1 className="text-3xl font-bold mb-2">Usuwanie danych użytkownika</h1>
             <p className="text-muted-foreground">
-              Social Auto Flow szanuje Twoją prywatność i daje Ci pełną kontrolę nad Twoimi danymi
+              SocialAutoFlow szanuje Twoją prywatność i daje Ci pełną kontrolę nad Twoimi danymi
             </p>
           </div>
 
@@ -163,10 +163,10 @@ const DataDeletion = () => {
             {/* Additional links */}
             <div className="flex flex-wrap gap-4 justify-center pt-4">
               <Link to="/privacy" className="text-primary hover:underline text-sm">
-                Polityka Prywatności Social Auto Flow
+                Polityka Prywatności SocialAutoFlow
               </Link>
               <Link to="/terms" className="text-primary hover:underline text-sm">
-                Regulamin Social Auto Flow
+                Regulamin SocialAutoFlow
               </Link>
             </div>
           </div>

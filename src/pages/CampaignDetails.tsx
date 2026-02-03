@@ -774,8 +774,15 @@ const CampaignDetails = () => {
             </div>
             <div className="flex flex-wrap gap-2">
               {campaign.selected_accounts && Object.keys(campaign.selected_accounts).length > 0 ? (
-                // Show only accounts that exist in accountsMap (verified to exist in DB)
+                // Show only accounts that:
+                // 1. Exist in accountsMap (verified to exist in DB)
+                // 2. Their platform is in target_platforms (if target_platforms exists)
                 Object.entries(campaign.selected_accounts as Record<string, string[]>)
+                  .filter(([platform]) => {
+                    // Only show platforms that are actually selected for this campaign
+                    const targetPlatforms = campaign.target_platforms as string[] | null;
+                    return !targetPlatforms || targetPlatforms.length === 0 || targetPlatforms.includes(platform);
+                  })
                   .flatMap(([platform, accountIds]) => {
                     const platformConfig = getPlatformConfig(platform as PlatformId);
                     const Icon = platformConfig?.icon;
