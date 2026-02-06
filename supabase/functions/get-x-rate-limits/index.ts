@@ -96,8 +96,16 @@ Deno.serve(async (req) => {
       
       if (oldestPub) {
         const resetTime = new Date(new Date(oldestPub.published_at).getTime() + 24 * 60 * 60 * 1000);
-        resetAt = resetTime.toISOString();
+        // Only set resetAt if it's in the future
+        if (resetTime.getTime() > now.getTime()) {
+          resetAt = resetTime.toISOString();
+        }
       }
+    }
+    
+    // Validate resetAt is not in the past
+    if (resetAt && new Date(resetAt).getTime() <= now.getTime()) {
+      resetAt = null;
     }
 
     const isLimited = remaining <= 0;

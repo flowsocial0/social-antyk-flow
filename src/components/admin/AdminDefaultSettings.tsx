@@ -11,8 +11,15 @@ interface DefaultSettings {
   ai_suffix_x: string;
   ai_suffix_facebook: string;
   ai_suffix_instagram: string;
+  ai_suffix_linkedin: string;
   ai_suffix_tiktok: string;
   ai_suffix_youtube: string;
+  default_hashtags_x: string;
+  default_hashtags_facebook: string;
+  default_hashtags_instagram: string;
+  default_hashtags_linkedin: string;
+  default_hashtags_tiktok: string;
+  default_hashtags_youtube: string;
   default_website_url: string;
 }
 
@@ -20,8 +27,15 @@ const emptySettings: DefaultSettings = {
   ai_suffix_x: "(ai)",
   ai_suffix_facebook: "",
   ai_suffix_instagram: "",
+  ai_suffix_linkedin: "",
   ai_suffix_tiktok: "",
   ai_suffix_youtube: "",
+  default_hashtags_x: "",
+  default_hashtags_facebook: "",
+  default_hashtags_instagram: "",
+  default_hashtags_linkedin: "",
+  default_hashtags_tiktok: "",
+  default_hashtags_youtube: "",
   default_website_url: "",
 };
 
@@ -47,13 +61,21 @@ export const AdminDefaultSettings = () => {
       }
 
       if (data?.setting_value) {
+        const v = data.setting_value;
         setSettings({
-          ai_suffix_x: data.setting_value.ai_suffix_x ?? "(ai)",
-          ai_suffix_facebook: data.setting_value.ai_suffix_facebook ?? "",
-          ai_suffix_instagram: data.setting_value.ai_suffix_instagram ?? "",
-          ai_suffix_tiktok: data.setting_value.ai_suffix_tiktok ?? "",
-          ai_suffix_youtube: data.setting_value.ai_suffix_youtube ?? "",
-          default_website_url: data.setting_value.default_website_url ?? "",
+          ai_suffix_x: v.ai_suffix_x ?? "(ai)",
+          ai_suffix_facebook: v.ai_suffix_facebook ?? "",
+          ai_suffix_instagram: v.ai_suffix_instagram ?? "",
+          ai_suffix_linkedin: v.ai_suffix_linkedin ?? "",
+          ai_suffix_tiktok: v.ai_suffix_tiktok ?? "",
+          ai_suffix_youtube: v.ai_suffix_youtube ?? "",
+          default_hashtags_x: v.default_hashtags_x ?? "",
+          default_hashtags_facebook: v.default_hashtags_facebook ?? "",
+          default_hashtags_instagram: v.default_hashtags_instagram ?? "",
+          default_hashtags_linkedin: v.default_hashtags_linkedin ?? "",
+          default_hashtags_tiktok: v.default_hashtags_tiktok ?? "",
+          default_hashtags_youtube: v.default_hashtags_youtube ?? "",
+          default_website_url: v.default_website_url ?? "",
         });
       }
     } catch (err) {
@@ -101,6 +123,10 @@ export const AdminDefaultSettings = () => {
     );
   }
 
+  const updateField = (field: keyof DefaultSettings, value: string) => {
+    setSettings(prev => ({ ...prev, [field]: value }));
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -113,64 +139,67 @@ export const AdminDefaultSettings = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* AI Suffixes */}
         <div className="space-y-4">
           <h4 className="font-medium text-sm">Sufiksy AI (dodawane do postów)</h4>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="ai_suffix_x">X (Twitter)</Label>
-              <Input
-                id="ai_suffix_x"
-                value={settings.ai_suffix_x}
-                onChange={(e) => setSettings({ ...settings, ai_suffix_x: e.target.value })}
-                placeholder="np. (ai)"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ai_suffix_facebook">Facebook</Label>
-              <Input
-                id="ai_suffix_facebook"
-                value={settings.ai_suffix_facebook}
-                onChange={(e) => setSettings({ ...settings, ai_suffix_facebook: e.target.value })}
-                placeholder="np. (ai)"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ai_suffix_instagram">Instagram</Label>
-              <Input
-                id="ai_suffix_instagram"
-                value={settings.ai_suffix_instagram}
-                onChange={(e) => setSettings({ ...settings, ai_suffix_instagram: e.target.value })}
-                placeholder="np. (ai)"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ai_suffix_tiktok">TikTok</Label>
-              <Input
-                id="ai_suffix_tiktok"
-                value={settings.ai_suffix_tiktok}
-                onChange={(e) => setSettings({ ...settings, ai_suffix_tiktok: e.target.value })}
-                placeholder="np. (ai)"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ai_suffix_youtube">YouTube</Label>
-              <Input
-                id="ai_suffix_youtube"
-                value={settings.ai_suffix_youtube}
-                onChange={(e) => setSettings({ ...settings, ai_suffix_youtube: e.target.value })}
-                placeholder="np. (ai)"
-              />
-            </div>
+            {([
+              ["ai_suffix_x", "X (Twitter)"],
+              ["ai_suffix_facebook", "Facebook"],
+              ["ai_suffix_instagram", "Instagram"],
+              ["ai_suffix_linkedin", "LinkedIn"],
+              ["ai_suffix_tiktok", "TikTok"],
+              ["ai_suffix_youtube", "YouTube"],
+            ] as const).map(([key, label]) => (
+              <div key={key} className="space-y-2">
+                <Label htmlFor={key}>{label}</Label>
+                <Input
+                  id={key}
+                  value={settings[key]}
+                  onChange={(e) => updateField(key, e.target.value)}
+                  placeholder="np. (ai)"
+                />
+              </div>
+            ))}
           </div>
         </div>
 
+        {/* Default Hashtags */}
+        <div className="space-y-4">
+          <h4 className="font-medium text-sm">Domyślne hashtagi (dodawane do postów)</h4>
+          <p className="text-xs text-muted-foreground">
+            Hashtagi dodawane automatycznie do postów. Użytkownik może je nadpisać w swoich ustawieniach.
+          </p>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {([
+              ["default_hashtags_x", "X (Twitter)"],
+              ["default_hashtags_facebook", "Facebook"],
+              ["default_hashtags_instagram", "Instagram"],
+              ["default_hashtags_linkedin", "LinkedIn"],
+              ["default_hashtags_tiktok", "TikTok"],
+              ["default_hashtags_youtube", "YouTube"],
+            ] as const).map(([key, label]) => (
+              <div key={key} className="space-y-2">
+                <Label htmlFor={key}>{label}</Label>
+                <Input
+                  id={key}
+                  value={settings[key]}
+                  onChange={(e) => updateField(key, e.target.value)}
+                  placeholder="np. #książki #antykwariat"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Default URL */}
         <div className="space-y-2">
           <Label htmlFor="default_website_url">Domyślny URL strony</Label>
           <Input
             id="default_website_url"
             type="url"
             value={settings.default_website_url}
-            onChange={(e) => setSettings({ ...settings, default_website_url: e.target.value })}
+            onChange={(e) => updateField("default_website_url", e.target.value)}
             placeholder="https://sklep.antyk.org.pl"
           />
           <p className="text-xs text-muted-foreground">
