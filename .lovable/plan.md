@@ -1,359 +1,304 @@
 
-# Plan naprawy - 6 zgłoszonych problemów
+# Plan naprawy - 9 zglosszonych problemow
 
-## Przegląd problemów
+## Przegld problemow
 
-| Nr | Problem | Priorytet | Złożoność |
+| Nr | Problem | Priorytet | Zlozonosc |
 |----|---------|-----------|-----------|
-| 1 | Instagram: zmiana informacji o wymaganiach połączenia | Niski | Niska |
-| 2 | LinkedIn: publikowanie działa ręcznie ale nie z kampanii | Wysoki | Średnia |
-| 3 | Legal pages: zmiana nazwy/adresu dla TikTok review | Średni | Niska |
-| 4 | X: błąd przy publikowaniu z kampanii (non-2xx status) | Wysoki | Niska |
-| 5 | X: zmiana limitu na 15 postów/dzień z realtime tracking | Średni | Średnia |
-| 6 | X zawsze pokazuje się w "Konta do publikacji" | Średni | Średnia |
+| 2 | Limity X: 15/dzien, wspoldzielone dla calej aplikacji | Sredni | Niska |
+| 3 | LinkedIn kampania: "brak tekstu" mimo dodania tekstu | Wysoki | Srednia |
+| 4 | LinkedIn kampania: brak konta w "Konta do publikacji" | Wysoki | Niska |
+| 5 | Edycja daty posta: tytul dnia sie nie zmienia | Niski | Niska |
+| 6 | LinkedIn: konto widoczne na liscie kampanii, ale nie w szczegolach | Wysoki | Niska |
+| 7 | X: blad "non-2xx status code" przy publikowaniu | Wysoki | Srednia |
+| 8 | Instagram: dziwne hashtagi #ksiazki #antykwariat | Sredni | Niska |
+| 9 | LinkedIn video: "opublikowalo" ale nie widac na LinkedIn | Wysoki | Srednia |
 
 ---
 
-## Problem 1: Instagram - zmiana informacji o wymaganiach
+## Problem 2: Limity X - 15/dzien, wspoldzielone
 
 ### Diagnoza
-Obecna instrukcja w `PlatformInstagram.tsx` (linie 48-59) jest zbyt skomplikowana. Użytkownik chce prostszą wersję.
-
-### Zmiany
-**Plik: `src/pages/platforms/PlatformInstagram.tsx`**
-
-Zmiana punktu 3 (linie 57-59):
-
-Było:
-```
-Konto Instagram musi być połączone z tą stroną Facebook w Meta Business Suite 
-(obrazek profilu - prawy górny róg → Ustawienia i prywatność → ...)
-```
-
-Będzie:
-```
-W Meta Business Suite → Connect Instagram (pod głównym banerem) - 
-można utworzyć konto z linka połączenia w Meta Business Suite
-```
-
----
-
-## Problem 2: LinkedIn - błąd "Brak tekstu do publikacji" z kampanii
-
-### Diagnoza
-Analiza bazy danych pokazuje krytyczny problem:
-- **platforms**: `['linkedin']` 
-- **target_accounts**: `{x: ['757aa522-...']}`
-
-Kampania jest ustawiona na LinkedIn, ale konta wybrane są dla X! To oznacza, że `auto-publish-books` szuka kont LinkedIn w `target_accounts['linkedin']`, ale tam jest puste.
-
-Ponadto, funkcja `publish-to-linkedin` nie obsługuje parametru `campaignPostId` - szuka tylko `text` lub `bookId`.
+Limit jest juz ustawiony na 15 w kodzie (`X_FREE_TIER_DAILY_LIMIT = 15`, `X_APP_DAILY_LIMIT = 15`, `APP_DAILY_LIMIT = 15`). Ale `checkDailyPublicationLimit` liczy publikacje per konto (`account_id`), a nie per cala aplikacja. Trzeba zmienic na globalny count.
 
 ### Zmiany
 
-**Plik 1: `supabase/functions/publish-to-linkedin/index.ts`**
-
-Dodanie obsługi `campaignPostId` (podobnie jak w `publish-to-x`):
+**Plik: `supabase/functions/publish-to-x/index.ts`**
+- Funkcja `checkDailyPublicationLimit` (linie 231-282): usunac filtr `.eq('account_id', accountId)` i liczyc WSZYSTKIE publikacje w ostatnich 24h
+- Zmienic sygnature: nie wymaga `accountId`, liczy globalnie
 
 ```typescript
-// Po linii 28 - rozszerzenie body:
-const { text, imageUrl, userId: userIdFromBody, accountId, bookId, contentId, testConnection, campaignPostId } = body;
+async function checkDailyPublicationLimit(
+  supabaseClient: any
+): Promise<{ canPublish: boolean; publishedToday: number; resetAt: Date }> {
+  const now = new Date();
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  
+  // Count ALL X publications across ALL users in last 24 hours
+  const { count, error } = await supabaseClient
+    .from('x_daily_publications')
+    .select('*', { count: 'exact', head: true })
+    .gte('published_at', twentyFourHoursAgo.toISOString());
+  // NO .eq('account_id', ...) - count globally
+  
+  const publishedToday = count || 0;
+  const canPublish = publishedToday < X_FREE_TIER_DAILY_LIMIT;
+  // ... rest same
+}
+```
 
-// Po linii 128 (po testConnection) - dodanie obsługi campaignPostId:
-// Handle campaign post publishing
-if (campaignPostId) {
-  console.log('Publishing campaign post:', campaignPostId);
-  
-  const { data: campaignPost, error: postError } = await supabase
-    .from('campaign_posts')
-    .select('*')
-    .eq('id', campaignPostId)
-    .single();
-  
-  if (postError || !campaignPost) {
-    return new Response(
-      JSON.stringify({ 
-        success: false, 
-        message: 'Nie znaleziono posta kampanii',
-        errorCode: 'POST_NOT_FOUND'
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    );
-  }
-  
-  // Use campaign post text
-  postText = campaignPost.text;
-  
-  // Use custom_image_url from campaign if available
-  if (campaignPost.custom_image_url) {
-    finalImageUrl = campaignPost.custom_image_url;
-  }
-  
-  // If post has book_id, get book image as fallback
-  if (!finalImageUrl && campaignPost.book_id) {
-    const { data: bookData } = await supabase
-      .from('books')
-      .select('image_url, storage_path')
-      .eq('id', campaignPost.book_id)
-      .single();
-    
-    if (bookData) {
-      if (bookData.storage_path) {
-        finalImageUrl = `${SUPABASE_URL}/storage/v1/object/public/ObrazkiKsiazek/${bookData.storage_path}`;
-      } else if (bookData.image_url) {
-        finalImageUrl = bookData.image_url;
-      }
-    }
-  }
-  
-  console.log('Campaign post data loaded:', {
-    hasText: !!postText,
-    textLength: postText?.length || 0,
-    hasImage: !!finalImageUrl
+- Zaktualizowac wszystkie wywolania `checkDailyPublicationLimit` w pliku (linie ~1018, ~1342) - usunac argument `xAccountId`
+
+---
+
+## Problem 3: LinkedIn kampania - "brak tekstu do publikacji"
+
+### Diagnoza
+Sprawdzilem baze danych - nowe kampanie LinkedIn maja poprawne mapowanie (`linkedin: [...]`). Problem polega na tym, ze `publish-to-linkedin` juz obsluguje `campaignPostId` (linie 135-186), ale moze byc problem z kolejnoscia warunkow. Jesli `campaignPostId` i `bookId` sa oba podane, sekcja `bookId` (linie 188-246) nadpisuje tekst. Ponadto auto-publish-books moze przekazywac `bookId` obok `campaignPostId`.
+
+### Zmiany
+
+**Plik: `supabase/functions/publish-to-linkedin/index.ts`**
+- Dodac warunek `if (bookId && !campaignPostId)` zamiast `if (bookId)` na linii 189 - zeby sekcja bookId nie nadpisywala tekstu z kampanii
+- Dodac lepsze logowanie bledow
+
+```typescript
+// Linia 189 - zmiana warunku:
+if (bookId && !campaignPostId) {
+  // ... existing bookId logic
+}
+```
+
+---
+
+## Problem 4 i 6: LinkedIn - brak konta w szczegolach kampanii
+
+### Diagnoza
+W `CampaignDetails.tsx` funkcja `loadAccountsInfo` (linie 140-227) laduje konta X, Facebook, Instagram, TikTok, YouTube - ale **brakuje LinkedIn**! To dlatego konta LinkedIn nie wyswietlaja sie w sekcji "Konta do publikacji".
+
+### Zmiany
+
+**Plik: `src/pages/CampaignDetails.tsx`**
+- Dodac sekcje ladowania kont LinkedIn po YouTube (po linii 224):
+
+```typescript
+// Load LinkedIn accounts
+if (selectedAccounts.linkedin?.length) {
+  const { data } = await (supabase as any)
+    .from('linkedin_oauth_tokens')
+    .select('id, display_name, account_name')
+    .in('id', selectedAccounts.linkedin);
+  data?.forEach((a: any) => {
+    newAccountsMap[a.id] = {
+      id: a.id,
+      display_name: a.display_name || a.account_name || 'Profil LinkedIn',
+      platform: 'linkedin'
+    };
   });
 }
 ```
 
-**Plik 2: Upewnić się, że CampaignBuilder/SimpleCampaignSetup zapisuje konta dla właściwej platformy**
-
-Sprawdzić logikę zapisu `selected_accounts` i `target_accounts` - musi mapować platformę na jej konta, nie zawsze na X.
-
 ---
 
-## Problem 3: Legal pages - zmiana nazwy dla TikTok review
+## Problem 5: Edycja daty posta - tytul dnia sie nie zmienia
 
 ### Diagnoza
-Strony `/terms`, `/privacy` i `/data-deletion` zawierają starą nazwę domeny `social-auto-flow.netlify.app` zamiast `socialautoflow.pl`.
+Gdy uzytkownik zmienia date posta w harmonogramie, post jest aktualizowany w bazie, ale tytuly dni ("Dzien 1 - sobota, 7 lutego") sa obliczane na podstawie `campaign.start_date` i numeru dnia (`post.day`), nie na podstawie `post.scheduled_at`. Jesli zmieni sie godzine/date w `scheduled_at` ale nie zmieni `day`, tytul zostaje taki sam.
 
 ### Zmiany
 
-**Plik 1: `src/pages/TermsOfService.tsx`**
+**Plik: `src/pages/CampaignDetails.tsx`**
+- Przy grupowaniu postow wg dni, uzyc `scheduled_at` do generowania tytulu dnia zamiast obliczania z `start_date + day`
+- Modyfikacja w sekcji grupowania postow - uzyc rzeczywistej daty z `scheduled_at`:
 
-Zmienić wszystkie wystąpienia:
-- `social-auto-flow.netlify.app` → `socialautoflow.pl`
-- `https://social-auto-flow.netlify.app` → `https://socialautoflow.pl`
+```typescript
+// Zamiast:
+const dayDate = new Date(new Date(campaign.start_date).getTime() + (dayNum - 1) * 24 * 60 * 60 * 1000);
 
-Dotyczy linii: 40-41, 55-56, 66, 243
-
-**Plik 2: `src/pages/PrivacyPolicy.tsx`**
-
-Zmienić wszystkie wystąpienia:
-- `social-auto-flow.netlify.app` → `socialautoflow.pl`
-- `https://social-auto-flow.netlify.app` → `https://socialautoflow.pl`
-
-Dotyczy linii: 40-41, 55-56
-
-**Plik 3: `src/pages/DataDeletion.tsx`**
-
-Zmienić nazwy (jeśli występują) na `SocialAutoFlow.pl`
+// Uzywaj rzeczywistej daty z pierwszego posta w danym dniu:
+const firstPostInDay = dayPosts[0];
+const dayDate = firstPostInDay ? new Date(firstPostInDay.scheduled_at) : 
+  new Date(new Date(campaign.start_date).getTime() + (dayNum - 1) * 24 * 60 * 60 * 1000);
+```
 
 ---
 
-## Problem 4: X - błąd "Edge Function returned a non-2xx status code"
+## Problem 7: X - blad "non-2xx status code"
 
 ### Diagnoza
-Z logów widzę, że X API zwraca 429 (rate limit). Funkcja `publish-to-x` rzuca exception zamiast zwracać strukturalny błąd. Frontend pokazuje generyczny komunikat.
+Funkcja `publish-to-x` zwraca HTTP 429 (linia 1043) i HTTP 403/500 (linie 1322-1324) dla bledow kampanii. Supabase client traktuje non-2xx jako blad i wyswietla generyczny komunikat "Edge Function returned a non-2xx status code" zamiast wlasciwego komunikatu.
 
-Logi pokazują:
-```
-x-app-limit-24hour-remaining: 0
-status: 429 "Too Many Requests"
-```
-
-Problem polega na tym, że wewnętrzna walidacja limitu działa (widzi 0/17 tweetów z naszej bazy), ale X API sam blokuje - prawdopodobnie bo limity są współdzielone z innymi użytkownikami.
+Zgodnie z memoria `error-handling/expected-edge-response-standard`, wszystkie oczekiwane bledy powinny zwracac HTTP 200 z `success: false`.
 
 ### Zmiany
 
 **Plik: `supabase/functions/publish-to-x/index.ts`**
 
-Upewnić się, że przy 429 zwracamy HTTP 200 z `success: false` (nie throw):
-
-```typescript
-// W funkcji sendTweet, przy obsłudze 429:
-if (response.status === 429) {
-  // Zapisz rate limit info...
-  
-  // Zamiast throw, return structured error
-  return {
-    success: false,
-    message: 'Osiągnięto dzienny limit publikacji X. Spróbuj ponownie później.',
-    errorCode: 'RATE_LIMITED',
-    resetAt: resetDate?.toISOString()
-  };
-}
-```
-
-Upewnić się, że główny handler łapie te strukturalne błędy i przekazuje je poprawnie.
+1. Linia 1043: zmiana `status: 429` na `status: 200` w daily limit response
+2. Linia 1075: zmiana `status: 429` na `status: 200` w API rate limit response  
+3. Linia 1322: zmiana `status: isForbiddenError ? 403 : 500` na `status: 200` w error response
+4. Upewnic sie ze wszystkie bledy kampanii zwracaja HTTP 200 z `success: false` i opisowym `message`
 
 ---
 
-## Problem 5: X - zmiana limitu na 15 postów/dzień
+## Problem 8: Instagram - hardcoded hashtagi
 
 ### Diagnoza
-Obecnie `X_FREE_TIER_DAILY_LIMIT = 17` (linia 8 w `publish-to-x`). Trzeba zmienić na 15 i zaktualizować wyświetlanie.
+W `publish-to-instagram/index.ts` (linia 324) jest hardcoded:
+```typescript
+postCaption += '\n\n#książki #antykwariat';
+```
+
+Te hashtagi sa dodawane do KAZDEGO posta na Instagramie, niezaleznie od tresci.
 
 ### Zmiany
 
-**Plik 1: `supabase/functions/publish-to-x/index.ts`**
+**Plik: `supabase/functions/publish-to-instagram/index.ts`**
+- Usunac hardcoded hashtagi (linia 324)
+- Zamiast tego, uzyc AI suffiksu z `user_settings.ai_suffix_instagram` ktory uzytkownik moze sam ustawic:
+
 ```typescript
-// Linia 8
-const X_FREE_TIER_DAILY_LIMIT = 15; // było 17
+// Linia 322-328 - zmiana:
+if (postCaption && aiSuffix) {
+  postCaption += `\n\n${aiSuffix}`;
+}
+// Usunieto: postCaption += '\n\n#książki #antykwariat';
 ```
-
-**Plik 2: `supabase/functions/get-x-rate-limits/index.ts`**
-```typescript
-// Linia 8
-const X_APP_DAILY_LIMIT = 15; // było 1500
-```
-
-**Plik 3: `src/components/platforms/XRateLimitStatus.tsx`**
-```typescript
-// Linia 23
-const APP_DAILY_LIMIT = 15; // było 1500
-
-// Zmienić opis w linii 191:
-"Limit X Free tier: {APP_DAILY_LIMIT} publikacji/dzień dla całej aplikacji."
-```
-
-**Mechanizm odejmowania w czasie rzeczywistym:**
-
-Funkcja `publish-to-x` już zapisuje publikacje do `x_daily_publications` i `platform_publications`. Przy każdej udanej publikacji limit jest automatycznie zmniejszany.
-
-Frontend odświeża dane co 60 sekund (linia 56). Można dodać real-time subscription dla natychmiastowej aktualizacji.
 
 ---
 
-## Problem 6: X zawsze pokazuje się w "Konta do publikacji"
+## Problem 9: LinkedIn video - nie widac na LinkedIn
 
-### Diagnoza - KRYTYCZNE
-Analiza bazy danych ujawniła root cause wszystkich problemów z platformami:
+### Diagnoza
+Obecny kod `publish-to-linkedin` (linie 313-331) uzywa `urn:li:digitalmediaRecipe:feedshare-image` do rejestracji uploadu. Dla wideo trzeba uzyc `urn:li:digitalmediaRecipe:feedshare-video` i ustawic `shareMediaCategory` na `'VIDEO'` zamiast `'IMAGE'`.
 
-```
-platforms: ['linkedin']
-target_accounts: {x: ['757aa522-...']}
-```
-
-Kampania ma platformę LinkedIn, ale konta są zapisane pod kluczem `x`! 
-
-To oznacza, że kod tworzący kampanię zawsze przypisuje wybrane konta do klucza `x` zamiast do odpowiedniej platformy.
+Ponadto wideo na LinkedIn wymaga dodatkowego kroku - czekania az LinkedIn przetworzy wideo (podobnie jak na Instagramie).
 
 ### Zmiany
 
-**Lokalizacja problemu: `src/components/campaigns/SimpleCampaignSetup.tsx` lub `CampaignBuilder.tsx`**
+**Plik: `supabase/functions/publish-to-linkedin/index.ts`**
 
-Szukamy miejsca gdzie `selected_accounts` lub `target_accounts` jest budowane i zapisywane. Musi być błąd w mapowaniu - zamiast:
-
+1. Dodac funkcje pomocnicza `isVideoUrl`:
 ```typescript
-target_accounts: {
-  [selectedPlatform]: accountIds  // np. linkedin: [...]
+function isVideoUrl(url: string): boolean {
+  return /\.(mp4|mov|webm|avi|mkv|m4v)$/i.test(url);
 }
 ```
 
-Jest prawdopodobnie:
+2. Zmienic logike uploadu mediow (linie 310-368):
 ```typescript
-target_accounts: {
-  x: accountIds  // zawsze x!
+const isVideo = isVideoUrl(finalImageUrl);
+
+// Krok 1: Rejestracja uploadu z odpowiednim recipe
+const registerResponse = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
+  method: 'POST',
+  headers: { ... },
+  body: JSON.stringify({
+    registerUploadRequest: {
+      recipes: [isVideo 
+        ? 'urn:li:digitalmediaRecipe:feedshare-video'
+        : 'urn:li:digitalmediaRecipe:feedshare-image'
+      ],
+      owner: `urn:li:person:${linkedinId}`,
+      serviceRelationships: [...]
+    }
+  })
+});
+```
+
+3. Zmienic `shareMediaCategory` na odpowiedni typ:
+```typescript
+shareMediaCategory: mediaAssets.length > 0 
+  ? (isVideoMedia ? 'VIDEO' : 'IMAGE') 
+  : 'NONE',
+```
+
+4. Dla wideo dodac oczekiwanie na przetworzenie (polling asset status):
+```typescript
+if (isVideo) {
+  // Poll asset status until READY
+  let assetReady = false;
+  for (let i = 0; i < 60; i++) {
+    const statusResponse = await fetch(
+      `https://api.linkedin.com/v2/assets/${encodeURIComponent(asset)}`,
+      { headers: { 'Authorization': `Bearer ${accessToken}` } }
+    );
+    const statusData = await statusResponse.json();
+    if (statusData.recipes?.[0]?.status === 'AVAILABLE') {
+      assetReady = true;
+      break;
+    }
+    await new Promise(r => setTimeout(r, 3000)); // wait 3s
+  }
+  if (!assetReady) {
+    throw new Error('Przetwarzanie wideo LinkedIn przekroczylo limit czasu');
+  }
 }
 ```
-
-**Plik: `src/pages/CampaignDetails.tsx` (linie 776-809)**
-
-Dodatkowo, fallback w wyświetlaniu (linia 796-809) używa `campaign.target_platforms` gdy nie ma `selected_accounts`, ale nie filtruje pustych. Trzeba upewnić się że nie wyświetla niczego gdy nie ma danych.
-
-Obecny kod:
-```typescript
-(campaign.target_platforms as string[] || []).length > 0 ? ...
-```
-
-To już wygląda poprawnie, ale problemem jest to, że `selected_accounts` istnieje ale ma złe klucze (x zamiast linkedin).
-
-**Rozwiązanie:**
-1. Znaleźć gdzie kampanie są tworzone i naprawić mapowanie platform → accounts
-2. W CampaignDetails, przy wyświetlaniu, filtrować tylko te platformy które są w `platforms` tablicy posta
 
 ---
 
-## Podsumowanie zmian
+## Podsumowanie zmian wedlug plikow
 
-| Nr | Plik | Zmiana |
-|----|------|--------|
-| 1 | `src/pages/platforms/PlatformInstagram.tsx` | Uproszczenie instrukcji połączenia |
-| 2 | `supabase/functions/publish-to-linkedin/index.ts` | Dodanie obsługi `campaignPostId` |
-| 3 | `src/pages/TermsOfService.tsx` | Zmiana URL na socialautoflow.pl |
-| 3 | `src/pages/PrivacyPolicy.tsx` | Zmiana URL na socialautoflow.pl |
-| 3 | `src/pages/DataDeletion.tsx` | Zmiana URL na socialautoflow.pl |
-| 4 | `supabase/functions/publish-to-x/index.ts` | Lepsza obsługa błędów 429 |
-| 5 | `supabase/functions/publish-to-x/index.ts` | Zmiana limitu na 15 |
-| 5 | `supabase/functions/get-x-rate-limits/index.ts` | Zmiana limitu na 15 |
-| 5 | `src/components/platforms/XRateLimitStatus.tsx` | Zmiana limitu na 15 |
-| 6 | Tworzenie kampanii (SimpleCampaignSetup/CampaignBuilder) | Naprawa mapowania platform → accounts |
+| Plik | Zmiana |
+|------|--------|
+| `supabase/functions/publish-to-x/index.ts` | Globalny limit 15/dzien (nie per konto), HTTP 200 dla bledow |
+| `supabase/functions/publish-to-linkedin/index.ts` | Fix bookId vs campaignPostId, obsluga wideo |
+| `supabase/functions/publish-to-instagram/index.ts` | Usuniecie hardcoded hashtagow |
+| `src/pages/CampaignDetails.tsx` | Dodanie ladowania kont LinkedIn, tytul dnia z scheduled_at |
 
 ---
 
 ## Sekcja techniczna
 
-### Architektura problemu z target_accounts
+### Globalny limit X vs per-konto
 
 ```text
-OBECNY STAN (błędny):
-SimpleCampaignSetup tworzy:
-  target_platforms: ['linkedin']
-  selected_accounts: { x: ['account-123'] }  ❌ zawsze x!
-
-auto-publish-books szuka:
-  targetAccounts['linkedin']  → undefined
-  → fallback: pobiera WSZYSTKIE konta LinkedIn usera
-  → ale user może nie mieć konta LinkedIn!
-  
-publish-to-linkedin dostaje:
-  campaignPostId: 'post-abc'
-  userId: 'user-123'
-  accountId: undefined (bo nie było w target_accounts)
-  → szuka bookId, ale to kampania, nie book
-  → text = undefined
-  → ERROR: "Brak tekstu do publikacji"
+OBECNY STAN (bledny):
+  checkDailyPublicationLimit(supabaseClient, accountId)
+  -> liczy: x_daily_publications WHERE account_id = 'abc'
+  -> Uzytkownik A opublikowal 5 tweetow = widzi 5/15
+  -> Uzytkownik B opublikowal 10 tweetow = widzi 10/15
+  -> RAZEM: 15, ale kazdy widzi swoje osobno!
 
 POPRAWNY STAN:
-SimpleCampaignSetup powinno tworzyć:
-  target_platforms: ['linkedin']
-  selected_accounts: { linkedin: ['linkedin-account-123'] }  ✅
-
-publish-to-linkedin dostaje:
-  campaignPostId: 'post-abc'
-  → pobiera tekst z campaign_posts.text
-  → SUCCESS
+  checkDailyPublicationLimit(supabaseClient)
+  -> liczy: x_daily_publications (BEZ filtra account_id)
+  -> Wszyscy widza: 15/15 - limit wyczerpany
 ```
 
-### Naprawa publish-to-linkedin dla campaignPostId
-
-```typescript
-// Nowa sekcja po testConnection:
-if (campaignPostId) {
-  const { data: post } = await supabase
-    .from('campaign_posts')
-    .select('text, custom_image_url, book_id')
-    .eq('id', campaignPostId)
-    .single();
-    
-  postText = post?.text;
-  finalImageUrl = post?.custom_image_url;
-  
-  if (!finalImageUrl && post?.book_id) {
-    // Fallback na obrazek książki
-  }
-}
-```
-
-### Zmiana limitów X
+### LinkedIn video upload flow
 
 ```text
-Przed:
-- X_FREE_TIER_DAILY_LIMIT = 17 (publish-to-x)
-- X_APP_DAILY_LIMIT = 1500 (get-x-rate-limits)
-- APP_DAILY_LIMIT = 1500 (XRateLimitStatus.tsx)
+1. Register Upload
+   recipe: feedshare-video (nie feedshare-image!)
+   
+2. Download video from URL
 
-Po:
-- X_FREE_TIER_DAILY_LIMIT = 15
-- X_APP_DAILY_LIMIT = 15
-- APP_DAILY_LIMIT = 15
+3. Upload video to LinkedIn (PUT)
+
+4. Poll asset status
+   GET /v2/assets/{asset}
+   Wait until recipes[0].status === 'AVAILABLE'
+   (moze trwac 1-3 minuty)
+
+5. Create UGC Post
+   shareMediaCategory: 'VIDEO' (nie 'IMAGE')
+   media: [{ status: 'READY', media: asset }]
+```
+
+### HTTP status codes w publish-to-x
+
+```text
+OBECNY STAN (bledny):
+  Daily limit -> HTTP 429 -> Supabase client: "non-2xx error"
+  Rate limit -> HTTP 429 -> Supabase client: "non-2xx error"
+  Forbidden -> HTTP 403 -> Supabase client: "non-2xx error"
+  Unknown -> HTTP 500 -> Supabase client: "non-2xx error"
+
+POPRAWNY STAN:
+  Daily limit -> HTTP 200, { success: false, message: "..." }
+  Rate limit -> HTTP 200, { success: false, message: "..." }
+  Forbidden -> HTTP 200, { success: false, message: "..." }
+  Unknown -> HTTP 200, { success: false, message: "..." }
 ```
