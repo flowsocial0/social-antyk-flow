@@ -223,6 +223,21 @@ const CampaignDetails = () => {
         });
       }
 
+      // Load LinkedIn accounts
+      if (selectedAccounts.linkedin?.length) {
+        const { data } = await (supabase as any)
+          .from('linkedin_oauth_tokens')
+          .select('id, display_name, account_name')
+          .in('id', selectedAccounts.linkedin);
+        data?.forEach((a: any) => {
+          newAccountsMap[a.id] = {
+            id: a.id,
+            display_name: a.display_name || a.account_name || 'Profil LinkedIn',
+            platform: 'linkedin'
+          };
+        });
+      }
+
       setAccountsMap(newAccountsMap);
     };
 
@@ -985,8 +1000,11 @@ const CampaignDetails = () => {
           </div>
 
           {Object.entries(postsByDay as Record<string, any[]>).map(([day, dayPosts]) => {
-            const dayDate = new Date(campaign.start_date);
-            dayDate.setDate(dayDate.getDate() + parseInt(day) - 1);
+            // Use actual scheduled_at from first post for accurate day title
+            const firstPost = (dayPosts as any[])[0];
+            const dayDate = firstPost?.scheduled_at 
+              ? new Date(firstPost.scheduled_at)
+              : (() => { const d = new Date(campaign.start_date); d.setDate(d.getDate() + parseInt(day) - 1); return d; })();
 
             return (
               <Card key={day} className="p-6 bg-gradient-card border-border/50">

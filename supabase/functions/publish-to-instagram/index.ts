@@ -319,12 +319,9 @@ serve(async (req) => {
       aiSuffix = userSettings.ai_suffix_instagram;
     }
 
-    // Add hashtags and AI disclaimer if suffix is set
-    if (postCaption) {
-      postCaption += '\n\n#książki #antykwariat';
-      if (aiSuffix) {
-        postCaption += `\n\n${aiSuffix}`;
-      }
+    // Add AI suffix if configured by user (no hardcoded hashtags)
+    if (postCaption && aiSuffix) {
+      postCaption += `\n\n${aiSuffix}`;
     }
 
     console.log('=== Final Publishing Data ===');

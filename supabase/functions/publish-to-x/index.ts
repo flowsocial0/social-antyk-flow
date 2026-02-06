@@ -228,51 +228,45 @@ async function preCheckXApiLimits(
 }
 
 // Check daily publication limit (our own tracking, not API headers)
+// GLOBAL limit - counts ALL publications across ALL users/accounts
 async function checkDailyPublicationLimit(
-  supabaseClient: any,
-  accountId: string
+  supabaseClient: any
 ): Promise<{ canPublish: boolean; publishedToday: number; resetAt: Date }> {
   try {
     const now = new Date();
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     
-    // Count publications in last 24 hours for this account
+    // Count ALL X publications across ALL users in last 24 hours
     const { count, error } = await supabaseClient
       .from('x_daily_publications')
       .select('*', { count: 'exact', head: true })
-      .eq('account_id', accountId)
       .gte('published_at', twentyFourHoursAgo.toISOString());
 
     if (error) {
       console.error('Error checking daily publication limit:', error);
-      // If we can't check, assume we can publish (fail open)
       return { canPublish: true, publishedToday: 0, resetAt: now };
     }
 
     const publishedToday = count || 0;
     const canPublish = publishedToday < X_FREE_TIER_DAILY_LIMIT;
     
-    // Calculate when the oldest tweet in the window will "expire"
-    let resetAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Default: 24h from now
+    let resetAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     
     if (!canPublish) {
-      // Find the oldest publication in the last 24h to calculate exact reset time
       const { data: oldestPublication } = await supabaseClient
         .from('x_daily_publications')
         .select('published_at')
-        .eq('account_id', accountId)
         .gte('published_at', twentyFourHoursAgo.toISOString())
         .order('published_at', { ascending: true })
         .limit(1)
         .maybeSingle();
       
       if (oldestPublication?.published_at) {
-        // Reset happens 24h after the oldest tweet in the window
         resetAt = new Date(new Date(oldestPublication.published_at).getTime() + 24 * 60 * 60 * 1000);
       }
     }
 
-    console.log(`📊 Daily publication check: ${publishedToday}/${X_FREE_TIER_DAILY_LIMIT} tweets in last 24h. Can publish: ${canPublish}`);
+    console.log(`📊 Global daily publication check: ${publishedToday}/${X_FREE_TIER_DAILY_LIMIT} tweets in last 24h (all users). Can publish: ${canPublish}`);
     
     return { canPublish, publishedToday, resetAt };
   } catch (err) {
@@ -1014,8 +1008,8 @@ Deno.serve(async (req) => {
     if (campaignPostId) {
       try {
         // Check daily publication limit FIRST (our own tracking)
-        if (xAccountId) {
-          const dailyLimitCheck = await checkDailyPublicationLimit(supabaseClient, xAccountId);
+        if (true) {
+          const dailyLimitCheck = await checkDailyPublicationLimit(supabaseClient);
           if (!dailyLimitCheck.canPublish) {
             console.log(`⚠️ Daily publication limit reached (${dailyLimitCheck.publishedToday}/${X_FREE_TIER_DAILY_LIMIT}). Reset at: ${dailyLimitCheck.resetAt.toISOString()}`);
             
@@ -1040,7 +1034,7 @@ Deno.serve(async (req) => {
                 message: `Dzienny limit publikacji X wyczerpany (${dailyLimitCheck.publishedToday}/${X_FREE_TIER_DAILY_LIMIT}). Free tier pozwala na ${X_FREE_TIER_DAILY_LIMIT} tweetów/24h. Publikacja zostanie wznowiona automatycznie.`
               }),
               { 
-                status: 429,
+                status: 200,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
               }
             );
@@ -1072,7 +1066,7 @@ Deno.serve(async (req) => {
                 message: 'Limit API X wyczerpany. Publikacja zostanie wznowiona automatycznie po resecie.'
               }),
               { 
-                status: 429,
+                status: 200,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
               }
             );
@@ -1320,7 +1314,7 @@ Deno.serve(async (req) => {
               error: userFriendlyError 
             }),
             { 
-              status: isForbiddenError ? 403 : 500,
+              status: 200,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             }
           );
@@ -1338,9 +1332,9 @@ Deno.serve(async (req) => {
     
     for (const id of idsToPublish) {
       try {
-        // Check daily publication limit before each book
-        if (xAccountId) {
-          const dailyLimitCheck = await checkDailyPublicationLimit(supabaseClient, xAccountId);
+        // Check daily publication limit before each book (global)
+        {
+          const dailyLimitCheck = await checkDailyPublicationLimit(supabaseClient);
           if (!dailyLimitCheck.canPublish) {
             console.log(`⚠️ Daily publication limit reached for book ${id}`);
             results.push({
@@ -1548,10 +1542,11 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false,
-        error: error.message || 'Unknown error' 
+        error: error.message || 'Unknown error',
+        message: error.message || 'Nieznany błąd podczas publikacji na X'
       }),
       {
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
