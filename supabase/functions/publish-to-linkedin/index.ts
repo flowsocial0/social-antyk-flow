@@ -185,8 +185,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // If bookId is provided, fetch book data and use AI text
-    if (bookId) {
+    // If bookId is provided AND not already handled by campaignPostId, fetch book data
+    if (bookId && !campaignPostId) {
       console.log('Fetching book data for bookId:', bookId);
       
       const { data: book, error: bookError } = await supabase
@@ -303,14 +303,20 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Helper to detect video URLs
+    const isVideoUrl = (url: string): boolean => /\.(mp4|mov|webm|avi|mkv|m4v)$/i.test(url);
+
     // Build the LinkedIn post
     let mediaAssets: string[] = [];
+    let isVideoMedia = false;
 
-    // If there's an image, we need to upload it first
+    // If there's media, we need to upload it first
     if (finalImageUrl) {
-      console.log('Uploading image to LinkedIn...');
+      const isVideo = isVideoUrl(finalImageUrl);
+      isVideoMedia = isVideo;
+      console.log(`Uploading ${isVideo ? 'video' : 'image'} to LinkedIn...`);
       
-      // Step 1: Register the image upload
+      // Step 1: Register the upload with appropriate recipe
       const registerResponse = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
         method: 'POST',
         headers: {
@@ -320,7 +326,10 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           registerUploadRequest: {
-            recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
+            recipes: [isVideo 
+              ? 'urn:li:digitalmediaRecipe:feedshare-video'
+              : 'urn:li:digitalmediaRecipe:feedshare-image'
+            ],
             owner: `urn:li:person:${linkedinId}`,
             serviceRelationships: [{
               relationshipType: 'OWNER',
@@ -341,29 +350,57 @@ Deno.serve(async (req) => {
       const asset = registerData.value?.asset;
 
       if (uploadUrl && asset) {
-        // Step 2: Download the image
-        const imageResponse = await fetch(finalImageUrl);
-        if (!imageResponse.ok) {
-          throw new Error('Failed to fetch image from URL');
+        // Step 2: Download the media
+        const mediaResponse = await fetch(finalImageUrl);
+        if (!mediaResponse.ok) {
+          throw new Error('Failed to fetch media from URL');
         }
-        const imageBlob = await imageResponse.blob();
+        const mediaBlob = await mediaResponse.blob();
 
-        // Step 3: Upload the image to LinkedIn
+        // Step 3: Upload the media to LinkedIn
         const uploadResponse = await fetch(uploadUrl, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
           },
-          body: imageBlob
+          body: mediaBlob
         });
 
         if (!uploadResponse.ok) {
-          console.error('LinkedIn image upload failed:', uploadResponse.status);
-          throw new Error('Failed to upload image to LinkedIn');
+          console.error('LinkedIn media upload failed:', uploadResponse.status);
+          throw new Error('Failed to upload media to LinkedIn');
+        }
+
+        // Step 3b: For video, wait for LinkedIn to process it
+        if (isVideo) {
+          console.log('Waiting for LinkedIn video processing...');
+          let assetReady = false;
+          for (let i = 0; i < 60; i++) {
+            const statusResponse = await fetch(
+              `https://api.linkedin.com/v2/assets/${encodeURIComponent(asset)}`,
+              { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+            const statusData = await statusResponse.json();
+            const recipeStatus = statusData.recipes?.[0]?.status;
+            console.log(`Video processing status check ${i + 1}: ${recipeStatus}`);
+            
+            if (recipeStatus === 'AVAILABLE') {
+              assetReady = true;
+              break;
+            }
+            if (recipeStatus === 'PROCESSING_FAILED') {
+              throw new Error('LinkedIn nie mógł przetworzyć wideo. Sprawdź format pliku.');
+            }
+            await new Promise(r => setTimeout(r, 3000));
+          }
+          if (!assetReady) {
+            throw new Error('Przetwarzanie wideo LinkedIn przekroczyło limit czasu (3 minuty)');
+          }
+          console.log('Video processing complete!');
         }
 
         mediaAssets.push(asset);
-        console.log('Image uploaded successfully:', asset);
+        console.log(`${isVideo ? 'Video' : 'Image'} uploaded successfully:`, asset);
       }
     }
 
@@ -376,7 +413,7 @@ Deno.serve(async (req) => {
           shareCommentary: {
             text: postText
           },
-          shareMediaCategory: mediaAssets.length > 0 ? 'IMAGE' : 'NONE',
+          shareMediaCategory: mediaAssets.length > 0 ? (isVideoMedia ? 'VIDEO' : 'IMAGE') : 'NONE',
         }
       },
       visibility: {
