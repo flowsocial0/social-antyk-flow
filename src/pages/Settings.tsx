@@ -17,12 +17,20 @@ const Settings = () => {
   
   const { settings, loading, saving, saveSettings } = useUserSettings();
   
-  // Form state
+  // Form state - suffixes
   const [aiSuffixX, setAiSuffixX] = useState("");
   const [aiSuffixFacebook, setAiSuffixFacebook] = useState("");
   const [aiSuffixInstagram, setAiSuffixInstagram] = useState("");
+  const [aiSuffixLinkedin, setAiSuffixLinkedin] = useState("");
   const [aiSuffixTiktok, setAiSuffixTiktok] = useState("");
   const [aiSuffixYoutube, setAiSuffixYoutube] = useState("");
+  // Form state - hashtags
+  const [hashtagsX, setHashtagsX] = useState("");
+  const [hashtagsFacebook, setHashtagsFacebook] = useState("");
+  const [hashtagsInstagram, setHashtagsInstagram] = useState("");
+  const [hashtagsLinkedin, setHashtagsLinkedin] = useState("");
+  const [hashtagsTiktok, setHashtagsTiktok] = useState("");
+  const [hashtagsYoutube, setHashtagsYoutube] = useState("");
   const [defaultWebsiteUrl, setDefaultWebsiteUrl] = useState("");
 
   useEffect(() => {
@@ -46,14 +54,20 @@ const Settings = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  // Initialize form with settings
   useEffect(() => {
     if (!loading) {
       setAiSuffixX(settings.ai_suffix_x);
       setAiSuffixFacebook(settings.ai_suffix_facebook);
       setAiSuffixInstagram(settings.ai_suffix_instagram);
+      setAiSuffixLinkedin(settings.ai_suffix_linkedin);
       setAiSuffixTiktok(settings.ai_suffix_tiktok);
       setAiSuffixYoutube(settings.ai_suffix_youtube);
+      setHashtagsX(settings.default_hashtags_x);
+      setHashtagsFacebook(settings.default_hashtags_facebook);
+      setHashtagsInstagram(settings.default_hashtags_instagram);
+      setHashtagsLinkedin(settings.default_hashtags_linkedin);
+      setHashtagsTiktok(settings.default_hashtags_tiktok);
+      setHashtagsYoutube(settings.default_hashtags_youtube);
       setDefaultWebsiteUrl(settings.default_website_url);
     }
   }, [loading, settings]);
@@ -63,8 +77,15 @@ const Settings = () => {
       ai_suffix_x: aiSuffixX,
       ai_suffix_facebook: aiSuffixFacebook,
       ai_suffix_instagram: aiSuffixInstagram,
+      ai_suffix_linkedin: aiSuffixLinkedin,
       ai_suffix_tiktok: aiSuffixTiktok,
       ai_suffix_youtube: aiSuffixYoutube,
+      default_hashtags_x: hashtagsX,
+      default_hashtags_facebook: hashtagsFacebook,
+      default_hashtags_instagram: hashtagsInstagram,
+      default_hashtags_linkedin: hashtagsLinkedin,
+      default_hashtags_tiktok: hashtagsTiktok,
+      default_hashtags_youtube: hashtagsYoutube,
       default_website_url: defaultWebsiteUrl,
     });
   };
@@ -83,7 +104,6 @@ const Settings = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
       <header className="border-b border-border bg-gradient-primary shadow-sm">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center gap-4">
@@ -106,67 +126,78 @@ const Settings = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="flex-1 container mx-auto px-4 py-8 space-y-8">
         {/* AI Suffixes */}
         <Card>
           <CardHeader>
             <CardTitle>Dopiski AI dla platform</CardTitle>
             <CardDescription>
-              Tekst dodawany automatycznie na końcu postów generowanych przez AI dla każdej platformy. 
-              Zostaw puste, aby nie dodawać żadnego dopisku.
+              Tekst dodawany automatycznie na końcu postów generowanych przez AI dla każdej platformy.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="ai_suffix_x">X (Twitter)</Label>
-                <Input
-                  id="ai_suffix_x"
-                  value={aiSuffixX}
-                  onChange={(e) => setAiSuffixX(e.target.value)}
-                  placeholder="np. (ai) lub #AI"
-                />
+                <Input id="ai_suffix_x" value={aiSuffixX} onChange={(e) => setAiSuffixX(e.target.value)} placeholder="np. (ai)" />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="ai_suffix_facebook">Facebook</Label>
-                <Input
-                  id="ai_suffix_facebook"
-                  value={aiSuffixFacebook}
-                  onChange={(e) => setAiSuffixFacebook(e.target.value)}
-                  placeholder="np. #AIgenerated"
-                />
+                <Input id="ai_suffix_facebook" value={aiSuffixFacebook} onChange={(e) => setAiSuffixFacebook(e.target.value)} placeholder="np. #AIgenerated" />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="ai_suffix_instagram">Instagram</Label>
-                <Input
-                  id="ai_suffix_instagram"
-                  value={aiSuffixInstagram}
-                  onChange={(e) => setAiSuffixInstagram(e.target.value)}
-                  placeholder="np. #AI"
-                />
+                <Input id="ai_suffix_instagram" value={aiSuffixInstagram} onChange={(e) => setAiSuffixInstagram(e.target.value)} placeholder="np. #AI" />
               </div>
-
+              <div className="space-y-2">
+                <Label htmlFor="ai_suffix_linkedin">LinkedIn</Label>
+                <Input id="ai_suffix_linkedin" value={aiSuffixLinkedin} onChange={(e) => setAiSuffixLinkedin(e.target.value)} placeholder="np. (ai)" />
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="ai_suffix_tiktok">TikTok</Label>
-                <Input
-                  id="ai_suffix_tiktok"
-                  value={aiSuffixTiktok}
-                  onChange={(e) => setAiSuffixTiktok(e.target.value)}
-                  placeholder="np. #AIcontent"
-                />
+                <Input id="ai_suffix_tiktok" value={aiSuffixTiktok} onChange={(e) => setAiSuffixTiktok(e.target.value)} placeholder="np. #AIcontent" />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="ai_suffix_youtube">YouTube</Label>
-                <Input
-                  id="ai_suffix_youtube"
-                  value={aiSuffixYoutube}
-                  onChange={(e) => setAiSuffixYoutube(e.target.value)}
-                  placeholder="np. #AI"
-                />
+                <Input id="ai_suffix_youtube" value={aiSuffixYoutube} onChange={(e) => setAiSuffixYoutube(e.target.value)} placeholder="np. #AI" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Default Hashtags */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Domyślne hashtagi</CardTitle>
+            <CardDescription>
+              Hashtagi dodawane automatycznie do postów na każdej platformie. Zostaw puste, aby nie dodawać.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="hashtags_x">X (Twitter)</Label>
+                <Input id="hashtags_x" value={hashtagsX} onChange={(e) => setHashtagsX(e.target.value)} placeholder="np. #książki" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hashtags_facebook">Facebook</Label>
+                <Input id="hashtags_facebook" value={hashtagsFacebook} onChange={(e) => setHashtagsFacebook(e.target.value)} placeholder="np. #książki #czytanie" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hashtags_instagram">Instagram</Label>
+                <Input id="hashtags_instagram" value={hashtagsInstagram} onChange={(e) => setHashtagsInstagram(e.target.value)} placeholder="np. #bookstagram" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hashtags_linkedin">LinkedIn</Label>
+                <Input id="hashtags_linkedin" value={hashtagsLinkedin} onChange={(e) => setHashtagsLinkedin(e.target.value)} placeholder="np. #books" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hashtags_tiktok">TikTok</Label>
+                <Input id="hashtags_tiktok" value={hashtagsTiktok} onChange={(e) => setHashtagsTiktok(e.target.value)} placeholder="np. #booktok" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hashtags_youtube">YouTube</Label>
+                <Input id="hashtags_youtube" value={hashtagsYoutube} onChange={(e) => setHashtagsYoutube(e.target.value)} placeholder="np. #books" />
               </div>
             </div>
           </CardContent>
@@ -197,7 +228,6 @@ const Settings = () => {
           </CardContent>
         </Card>
 
-        {/* Save Button */}
         <div className="flex justify-end">
           <Button onClick={handleSave} disabled={saving}>
             {saving ? (

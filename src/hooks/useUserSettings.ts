@@ -8,8 +8,15 @@ export interface UserSettings {
   ai_suffix_x: string;
   ai_suffix_facebook: string;
   ai_suffix_instagram: string;
+  ai_suffix_linkedin: string;
   ai_suffix_tiktok: string;
   ai_suffix_youtube: string;
+  default_hashtags_x: string;
+  default_hashtags_facebook: string;
+  default_hashtags_instagram: string;
+  default_hashtags_linkedin: string;
+  default_hashtags_tiktok: string;
+  default_hashtags_youtube: string;
   default_website_url: string;
 }
 
@@ -17,8 +24,15 @@ const defaultSettings: UserSettings = {
   ai_suffix_x: '(ai)',
   ai_suffix_facebook: '',
   ai_suffix_instagram: '',
+  ai_suffix_linkedin: '',
   ai_suffix_tiktok: '',
   ai_suffix_youtube: '',
+  default_hashtags_x: '',
+  default_hashtags_facebook: '',
+  default_hashtags_instagram: '',
+  default_hashtags_linkedin: '',
+  default_hashtags_tiktok: '',
+  default_hashtags_youtube: '',
   default_website_url: '',
 };
 
@@ -36,7 +50,6 @@ export const useUserSettings = () => {
         return;
       }
 
-      // Fetch user settings
       const { data, error } = await (supabase as any)
         .from('user_settings')
         .select('*')
@@ -47,44 +60,55 @@ export const useUserSettings = () => {
         console.error('Error fetching user settings:', error);
       }
 
-      // If user has settings, use them
+      // Fetch admin defaults for fallback
+      const { data: adminSettings, error: adminError } = await (supabase as any)
+        .from('admin_settings')
+        .select('setting_value')
+        .eq('setting_key', 'default_user_settings')
+        .maybeSingle();
+
+      if (adminError) {
+        console.error('Error fetching admin settings:', adminError);
+      }
+
+      const admin = adminSettings?.setting_value || {};
+
       if (data) {
+        // User has settings - use them, fallback to admin for missing fields
         setSettings({
           id: data.id,
           user_id: data.user_id,
-          ai_suffix_x: data.ai_suffix_x ?? '(ai)',
-          ai_suffix_facebook: data.ai_suffix_facebook ?? '',
-          ai_suffix_instagram: data.ai_suffix_instagram ?? '',
-          ai_suffix_tiktok: data.ai_suffix_tiktok ?? '',
-          ai_suffix_youtube: data.ai_suffix_youtube ?? '',
-          default_website_url: data.default_website_url ?? '',
+          ai_suffix_x: data.ai_suffix_x ?? admin.ai_suffix_x ?? '(ai)',
+          ai_suffix_facebook: data.ai_suffix_facebook ?? admin.ai_suffix_facebook ?? '',
+          ai_suffix_instagram: data.ai_suffix_instagram ?? admin.ai_suffix_instagram ?? '',
+          ai_suffix_linkedin: data.ai_suffix_linkedin ?? admin.ai_suffix_linkedin ?? '',
+          ai_suffix_tiktok: data.ai_suffix_tiktok ?? admin.ai_suffix_tiktok ?? '',
+          ai_suffix_youtube: data.ai_suffix_youtube ?? admin.ai_suffix_youtube ?? '',
+          default_hashtags_x: data.default_hashtags_x ?? admin.default_hashtags_x ?? '',
+          default_hashtags_facebook: data.default_hashtags_facebook ?? admin.default_hashtags_facebook ?? '',
+          default_hashtags_instagram: data.default_hashtags_instagram ?? admin.default_hashtags_instagram ?? '',
+          default_hashtags_linkedin: data.default_hashtags_linkedin ?? admin.default_hashtags_linkedin ?? '',
+          default_hashtags_tiktok: data.default_hashtags_tiktok ?? admin.default_hashtags_tiktok ?? '',
+          default_hashtags_youtube: data.default_hashtags_youtube ?? admin.default_hashtags_youtube ?? '',
+          default_website_url: data.default_website_url ?? admin.default_website_url ?? '',
         });
       } else {
-        // No user settings found - try to get admin defaults
-        const { data: adminSettings, error: adminError } = await (supabase as any)
-          .from('admin_settings')
-          .select('setting_value')
-          .eq('setting_key', 'default_user_settings')
-          .maybeSingle();
-
-        if (adminError) {
-          console.error('Error fetching admin settings:', adminError);
-        }
-
-        if (adminSettings?.setting_value) {
-          const adminDefaults = adminSettings.setting_value;
-          setSettings({
-            ai_suffix_x: adminDefaults.ai_suffix_x ?? '(ai)',
-            ai_suffix_facebook: adminDefaults.ai_suffix_facebook ?? '',
-            ai_suffix_instagram: adminDefaults.ai_suffix_instagram ?? '',
-            ai_suffix_tiktok: adminDefaults.ai_suffix_tiktok ?? '',
-            ai_suffix_youtube: adminDefaults.ai_suffix_youtube ?? '',
-            default_website_url: adminDefaults.default_website_url ?? '',
-          });
-        } else {
-          // No admin settings either, use hardcoded defaults
-          setSettings(defaultSettings);
-        }
+        // No user settings - use admin defaults
+        setSettings({
+          ai_suffix_x: admin.ai_suffix_x ?? '(ai)',
+          ai_suffix_facebook: admin.ai_suffix_facebook ?? '',
+          ai_suffix_instagram: admin.ai_suffix_instagram ?? '',
+          ai_suffix_linkedin: admin.ai_suffix_linkedin ?? '',
+          ai_suffix_tiktok: admin.ai_suffix_tiktok ?? '',
+          ai_suffix_youtube: admin.ai_suffix_youtube ?? '',
+          default_hashtags_x: admin.default_hashtags_x ?? '',
+          default_hashtags_facebook: admin.default_hashtags_facebook ?? '',
+          default_hashtags_instagram: admin.default_hashtags_instagram ?? '',
+          default_hashtags_linkedin: admin.default_hashtags_linkedin ?? '',
+          default_hashtags_tiktok: admin.default_hashtags_tiktok ?? '',
+          default_hashtags_youtube: admin.default_hashtags_youtube ?? '',
+          default_website_url: admin.default_website_url ?? '',
+        });
       }
     } catch (err) {
       console.error('Error in useUserSettings:', err);
@@ -111,13 +135,19 @@ export const useUserSettings = () => {
         ai_suffix_x: newSettings.ai_suffix_x ?? settings.ai_suffix_x,
         ai_suffix_facebook: newSettings.ai_suffix_facebook ?? settings.ai_suffix_facebook,
         ai_suffix_instagram: newSettings.ai_suffix_instagram ?? settings.ai_suffix_instagram,
+        ai_suffix_linkedin: newSettings.ai_suffix_linkedin ?? settings.ai_suffix_linkedin,
         ai_suffix_tiktok: newSettings.ai_suffix_tiktok ?? settings.ai_suffix_tiktok,
         ai_suffix_youtube: newSettings.ai_suffix_youtube ?? settings.ai_suffix_youtube,
+        default_hashtags_x: newSettings.default_hashtags_x ?? settings.default_hashtags_x,
+        default_hashtags_facebook: newSettings.default_hashtags_facebook ?? settings.default_hashtags_facebook,
+        default_hashtags_instagram: newSettings.default_hashtags_instagram ?? settings.default_hashtags_instagram,
+        default_hashtags_linkedin: newSettings.default_hashtags_linkedin ?? settings.default_hashtags_linkedin,
+        default_hashtags_tiktok: newSettings.default_hashtags_tiktok ?? settings.default_hashtags_tiktok,
+        default_hashtags_youtube: newSettings.default_hashtags_youtube ?? settings.default_hashtags_youtube,
         default_website_url: newSettings.default_website_url ?? settings.default_website_url,
         user_id: user.id,
       };
 
-      // Use any to bypass type checking for new table
       const { data, error } = await (supabase as any)
         .from('user_settings')
         .upsert(settingsToSave, {
@@ -138,8 +168,15 @@ export const useUserSettings = () => {
         ai_suffix_x: data.ai_suffix_x || '(ai)',
         ai_suffix_facebook: data.ai_suffix_facebook || '',
         ai_suffix_instagram: data.ai_suffix_instagram || '',
+        ai_suffix_linkedin: data.ai_suffix_linkedin || '',
         ai_suffix_tiktok: data.ai_suffix_tiktok || '',
         ai_suffix_youtube: data.ai_suffix_youtube || '',
+        default_hashtags_x: data.default_hashtags_x || '',
+        default_hashtags_facebook: data.default_hashtags_facebook || '',
+        default_hashtags_instagram: data.default_hashtags_instagram || '',
+        default_hashtags_linkedin: data.default_hashtags_linkedin || '',
+        default_hashtags_tiktok: data.default_hashtags_tiktok || '',
+        default_hashtags_youtube: data.default_hashtags_youtube || '',
         default_website_url: data.default_website_url || '',
       });
       

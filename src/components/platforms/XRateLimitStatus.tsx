@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
-import { formatDistanceToNow } from "date-fns";
+import { format } from "date-fns";
 import { pl } from "date-fns/locale";
 
 interface RateLimitsResponse {
@@ -15,12 +15,34 @@ interface RateLimitsResponse {
     limit: number;
     reset_at: string | null;
     is_limited: boolean;
+    published_24h?: number;
   } | null;
   error?: string;
 }
 
-// App-level daily limit for X Free tier (shared across all users)
 const APP_DAILY_LIMIT = 15;
+
+function formatResetTime(resetAt: string | null): string | null {
+  if (!resetAt) return null;
+  
+  const resetDate = new Date(resetAt);
+  const now = Date.now();
+  const diffMs = resetDate.getTime() - now;
+  
+  if (diffMs <= 0) {
+    return "Limit powinien się odnowić — odśwież";
+  }
+  
+  const hours = Math.floor(diffMs / (1000 * 60 * 60));
+  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  
+  const exactTime = format(resetDate, "d MMM, HH:mm", { locale: pl });
+  
+  if (hours > 0) {
+    return `${exactTime} (za ${hours}h ${minutes}min)`;
+  }
+  return `${exactTime} (za ${minutes}min)`;
+}
 
 export function XRateLimitStatus() {
   const { data, isLoading, error, refetch, isFetching } = useQuery<RateLimitsResponse>({
@@ -43,7 +65,6 @@ export function XRateLimitStatus() {
 
         if (error) throw error;
         
-        // Transform response to focus on app limit only
         return {
           success: data?.success ?? false,
           appLimit: data?.appLimit ?? null,
@@ -112,6 +133,7 @@ export function XRateLimitStatus() {
 
   const { remaining, limit, reset_at, is_limited } = appLimit;
   const percentage = limit > 0 ? (remaining / limit) * 100 : 0;
+  const resetText = formatResetTime(reset_at);
 
   return (
     <Card className={is_limited ? "border-red-500/50" : ""}>
@@ -127,25 +149,16 @@ export function XRateLimitStatus() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Status alert */}
         {is_limited && (
           <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
             <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />
             <span className="text-sm">
               Dzienny limit aplikacji wyczerpany. Żaden użytkownik nie może publikować.
-              {reset_at && (
-                <> Reset{" "}
-                {formatDistanceToNow(new Date(reset_at), {
-                  addSuffix: true,
-                  locale: pl,
-                })}
-                </>
-              )}
+              {resetText && <> Reset: {resetText}</>}
             </span>
           </div>
         )}
 
-        {/* Progress bar */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Dostępne publikacje</span>
@@ -171,19 +184,10 @@ export function XRateLimitStatus() {
             <span>
               Pozostało: {remaining} z {limit}
             </span>
-            {reset_at && (
-              <span>
-                Reset:{" "}
-                {formatDistanceToNow(new Date(reset_at), {
-                  addSuffix: true,
-                  locale: pl,
-                })}
-              </span>
-            )}
+            {resetText && <span>Reset: {resetText}</span>}
           </div>
         </div>
 
-        {/* Info */}
         <div className="text-xs text-muted-foreground pt-2 border-t">
           <p className="flex items-start gap-1">
             <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
