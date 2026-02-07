@@ -5,8 +5,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Twitter, Facebook, Instagram, Youtube, CheckCircle2, Loader2, Video, ArrowLeft, Plus, Trash2, Linkedin } from "lucide-react";
+import { Twitter, Facebook, Instagram, Youtube, CheckCircle2, Loader2, Video, ArrowLeft, Plus, Trash2, Linkedin, MessageCircle, Send, Globe } from "lucide-react";
 import { Footer } from "@/components/layout/Footer";
+import { TelegramSetupDialog } from "@/components/social/TelegramSetupDialog";
+import { BlueskySetupDialog } from "@/components/social/BlueskySetupDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +33,9 @@ interface PlatformAccounts {
   tiktok: SocialAccount[];
   youtube: SocialAccount[];
   linkedin: SocialAccount[];
+  threads: SocialAccount[];
+  telegram: SocialAccount[];
+  bluesky: SocialAccount[];
 }
 
 export default function SocialAccounts() {
@@ -43,6 +48,9 @@ export default function SocialAccounts() {
     tiktok: [],
     youtube: [],
     linkedin: [],
+    threads: [],
+    telegram: [],
+    bluesky: [],
   });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; platform: string; accountId: string; accountName: string }>({
     open: false,
@@ -50,6 +58,8 @@ export default function SocialAccounts() {
     accountId: '',
     accountName: '',
   });
+  const [telegramDialogOpen, setTelegramDialogOpen] = useState(false);
+  const [blueskyDialogOpen, setBlueskyDialogOpen] = useState(false);
 
   useEffect(() => {
     loadAllAccounts();
@@ -73,13 +83,16 @@ export default function SocialAccounts() {
     if (!session) return;
 
     // Load all accounts for each platform
-    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult] = await Promise.all([
+    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, threadsResult, telegramResult, blueskyResult] = await Promise.all([
       supabase.from('twitter_oauth1_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('facebook_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('instagram_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('tiktok_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('youtube_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('linkedin_oauth_tokens').select('*').eq('user_id', session.user.id),
+      (supabase as any).from('threads_oauth_tokens').select('*').eq('user_id', session.user.id),
+      (supabase as any).from('telegram_tokens').select('*').eq('user_id', session.user.id),
+      (supabase as any).from('bluesky_tokens').select('*').eq('user_id', session.user.id),
     ]);
 
     setAccounts({
@@ -112,6 +125,21 @@ export default function SocialAccounts() {
         id: a.id,
         account_name: a.account_name,
         display_name: a.display_name || 'Profil LinkedIn',
+      })),
+      threads: (threadsResult.data || []).map((a: any) => ({
+        id: a.id,
+        account_name: a.account_name,
+        display_name: a.username ? `@${a.username}` : 'Konto Threads',
+      })),
+      telegram: (telegramResult.data || []).map((a: any) => ({
+        id: a.id,
+        account_name: a.account_name,
+        display_name: a.channel_name || a.chat_id || 'Kanał Telegram',
+      })),
+      bluesky: (blueskyResult.data || []).map((a: any) => ({
+        id: a.id,
+        account_name: a.account_name,
+        display_name: a.handle || 'Konto Bluesky',
       })),
     });
   };
@@ -291,6 +319,41 @@ export default function SocialAccounts() {
     }
   };
 
+  const connectThreads = async () => {
+    setLoading('threads', true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Musisz być zalogowany');
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('threads-oauth-start', {
+        body: { userId: session.user.id }
+      });
+      
+      if (error) throw error;
+      
+      if (data?.authUrl) {
+        if (data.state) sessionStorage.setItem('threads_oauth_state', data.state);
+        sessionStorage.setItem('threads_user_id', session.user.id);
+        window.location.href = data.authUrl;
+      }
+    } catch (error: any) {
+      toast.error('Nie udało się połączyć z Threads', { description: error.message });
+    } finally {
+      setLoading('threads', false);
+    }
+  };
+
+  const connectTelegram = async () => {
+    setTelegramDialogOpen(true);
+  };
+
+  const connectBluesky = async () => {
+    setBlueskyDialogOpen(true);
+  };
+
   const deleteAccount = async (platform: string, accountId: string) => {
     setLoading(`delete-${accountId}`, true);
     try {
@@ -304,6 +367,9 @@ export default function SocialAccounts() {
         tiktok: 'tiktok_oauth_tokens',
         youtube: 'youtube_oauth_tokens',
         linkedin: 'linkedin_oauth_tokens',
+        threads: 'threads_oauth_tokens',
+        telegram: 'telegram_tokens',
+        bluesky: 'bluesky_tokens',
       };
 
       const { error } = await (supabase as any)
@@ -334,6 +400,9 @@ export default function SocialAccounts() {
     { id: 'tiktok', name: 'TikTok', icon: Video, color: 'text-black dark:text-white', bgColor: 'bg-black/10 dark:bg-white/10', connect: connectTikTok },
     { id: 'youtube', name: 'YouTube', icon: Youtube, color: 'text-red-500', bgColor: 'bg-red-500/10', connect: connectYouTube },
     { id: 'linkedin', name: 'LinkedIn', icon: Linkedin, color: 'text-blue-700', bgColor: 'bg-blue-700/10', connect: connectLinkedIn },
+    { id: 'threads', name: 'Threads', icon: MessageCircle, color: 'text-slate-800', bgColor: 'bg-slate-800/10', connect: connectThreads },
+    { id: 'telegram', name: 'Telegram', icon: Send, color: 'text-sky-500', bgColor: 'bg-sky-500/10', connect: connectTelegram, formType: 'telegram' as const },
+    { id: 'bluesky', name: 'Bluesky', icon: Globe, color: 'text-sky-600', bgColor: 'bg-sky-600/10', connect: connectBluesky, formType: 'bluesky' as const },
   ];
 
   return (
@@ -472,6 +541,17 @@ export default function SocialAccounts() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <TelegramSetupDialog
+        open={telegramDialogOpen}
+        onOpenChange={setTelegramDialogOpen}
+        onSuccess={loadAllAccounts}
+      />
+      <BlueskySetupDialog
+        open={blueskyDialogOpen}
+        onOpenChange={setBlueskyDialogOpen}
+        onSuccess={loadAllAccounts}
+      />
     </div>
   );
 }
