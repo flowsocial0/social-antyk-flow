@@ -78,7 +78,46 @@ Deno.serve(async (req) => {
       throw new Error('YouTube OAuth not configured');
     }
 
-    const requestData: PublishRequest = await req.json();
+    const requestData = await req.json();
+    
+    // Handle test connection request
+    if (requestData.testConnection) {
+      console.log('[YouTube] Test connection request');
+      
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) throw new Error('Missing authorization header');
+      
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+      const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } }
+      });
+      
+      const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+      if (userError || !user) throw new Error('Not authenticated');
+      
+      const supabaseServiceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRole);
+      
+      const { data: tokens } = await supabaseAdmin
+        .from('youtube_oauth_tokens')
+        .select('id, channel_title')
+        .eq('user_id', user.id);
+      
+      const connected = tokens && tokens.length > 0;
+      const channelName = tokens?.[0]?.channel_title;
+      
+      return new Response(
+        JSON.stringify({ 
+          success: connected, 
+          connected, 
+          name: channelName,
+          accountCount: tokens?.length || 0 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     console.log('[YouTube] Publish request received:', JSON.stringify({
       bookId: requestData.bookId,
       contentId: requestData.contentId,
