@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
       error: errorParam || 'none'
     });
 
-    const FRONTEND_URL_RAW = Deno.env.get('FRONTEND_URL') || 'https://social-auto-flow.netlify.app';
+    const FRONTEND_URL_RAW = Deno.env.get('FRONTEND_URL') || 'https://socialautoflow.pl';
     // Remove trailing slash to avoid double slashes in URLs
     const FRONTEND_URL = FRONTEND_URL_RAW.replace(/\/$/, '');
 
@@ -308,7 +308,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Facebook OAuth callback error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const FRONTEND_URL_FALLBACK = (Deno.env.get('FRONTEND_URL') || 'https://social-auto-flow.netlify.app').replace(/\/$/, '');
+    const FRONTEND_URL_FALLBACK = (Deno.env.get('FRONTEND_URL') || 'https://socialautoflow.pl').replace(/\/$/, '');
     
     // Redirect back to app with error
     const redirectUrl = new URL(`${FRONTEND_URL_FALLBACK}/platforms/facebook`);

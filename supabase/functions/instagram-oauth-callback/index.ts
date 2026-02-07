@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // Remove trailing slash to avoid double slashes in URLs
-const FRONTEND_URL = (Deno.env.get('FRONTEND_URL') || 'https://social-auto-flow.netlify.app').replace(/\/$/, '');
+const FRONTEND_URL = (Deno.env.get('FRONTEND_URL') || 'https://socialautoflow.pl').replace(/\/$/, '');
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
