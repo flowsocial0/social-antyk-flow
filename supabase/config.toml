@@ -131,3 +131,21 @@ verify_jwt = false
 
 [functions.publish-to-gab]
 verify_jwt = false
+
+[functions.pinterest-oauth-start]
+verify_jwt = false
+
+[functions.pinterest-oauth-callback]
+verify_jwt = false
+
+[functions.publish-to-pinterest]
+verify_jwt = false
+
+[functions.reddit-oauth-start]
+verify_jwt = false
+
+[functions.reddit-oauth-callback]
+verify_jwt = false
+
+[functions.publish-to-reddit]
+verify_jwt = false

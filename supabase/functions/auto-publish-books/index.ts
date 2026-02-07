@@ -57,6 +57,8 @@ function getTokenTableName(platform: string): string {
     case 'bluesky': return 'bluesky_tokens';
     case 'mastodon': return 'mastodon_tokens';
     case 'gab': return 'gab_tokens';
+    case 'pinterest': return 'pinterest_oauth_tokens';
+    case 'reddit': return 'reddit_oauth_tokens';
     default: return '';
   }
 }
@@ -75,6 +77,8 @@ function getPlatformNamePL(platform: string): string {
     case 'bluesky': return 'Bluesky';
     case 'mastodon': return 'Mastodon';
     case 'gab': return 'Gab';
+    case 'pinterest': return 'Pinterest';
+    case 'reddit': return 'Reddit';
     default: return platform;
   }
 }
@@ -191,6 +195,12 @@ Deno.serve(async (req) => {
             break;
           case 'gab':
             publishFunctionName = 'publish-to-gab';
+            break;
+          case 'pinterest':
+            publishFunctionName = 'publish-to-pinterest';
+            break;
+          case 'reddit':
+            publishFunctionName = 'publish-to-reddit';
             break;
           default:
             console.error(`No publish function for platform: ${content.platform}`);
@@ -330,6 +340,12 @@ Deno.serve(async (req) => {
               break;
             case 'gab':
               publishFunctionName = 'publish-to-gab';
+              break;
+            case 'pinterest':
+              publishFunctionName = 'publish-to-pinterest';
+              break;
+            case 'reddit':
+              publishFunctionName = 'publish-to-reddit';
               break;
             default:
               console.error(`No publish function for platform: ${platform}`);
