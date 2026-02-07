@@ -113,3 +113,21 @@ verify_jwt = false
 
 [functions.elevenlabs-conversation-token]
 verify_jwt = false
+
+[functions.mastodon-oauth-start]
+verify_jwt = false
+
+[functions.mastodon-oauth-callback]
+verify_jwt = false
+
+[functions.publish-to-mastodon]
+verify_jwt = false
+
+[functions.gab-oauth-start]
+verify_jwt = false
+
+[functions.gab-oauth-callback]
+verify_jwt = false
+
+[functions.publish-to-gab]
+verify_jwt = false

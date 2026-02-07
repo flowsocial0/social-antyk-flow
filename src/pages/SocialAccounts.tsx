@@ -9,6 +9,7 @@ import { Twitter, Facebook, Instagram, Youtube, CheckCircle2, Loader2, Video, Ar
 import { Footer } from "@/components/layout/Footer";
 import { TelegramSetupDialog } from "@/components/social/TelegramSetupDialog";
 import { BlueskySetupDialog } from "@/components/social/BlueskySetupDialog";
+import { MastodonSetupDialog } from "@/components/social/MastodonSetupDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +37,8 @@ interface PlatformAccounts {
   threads: SocialAccount[];
   telegram: SocialAccount[];
   bluesky: SocialAccount[];
+  mastodon: SocialAccount[];
+  gab: SocialAccount[];
 }
 
 export default function SocialAccounts() {
@@ -51,6 +54,8 @@ export default function SocialAccounts() {
     threads: [],
     telegram: [],
     bluesky: [],
+    mastodon: [],
+    gab: [],
   });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; platform: string; accountId: string; accountName: string }>({
     open: false,
@@ -60,6 +65,7 @@ export default function SocialAccounts() {
   });
   const [telegramDialogOpen, setTelegramDialogOpen] = useState(false);
   const [blueskyDialogOpen, setBlueskyDialogOpen] = useState(false);
+  const [mastodonDialogOpen, setMastodonDialogOpen] = useState(false);
 
   useEffect(() => {
     loadAllAccounts();
@@ -83,7 +89,7 @@ export default function SocialAccounts() {
     if (!session) return;
 
     // Load all accounts for each platform
-    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, threadsResult, telegramResult, blueskyResult] = await Promise.all([
+    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, threadsResult, telegramResult, blueskyResult, mastodonResult, gabResult] = await Promise.all([
       supabase.from('twitter_oauth1_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('facebook_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('instagram_oauth_tokens').select('*').eq('user_id', session.user.id),
@@ -93,6 +99,8 @@ export default function SocialAccounts() {
       (supabase as any).from('threads_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('telegram_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('bluesky_tokens').select('*').eq('user_id', session.user.id),
+      (supabase as any).from('mastodon_tokens').select('*').eq('user_id', session.user.id).not('access_token', 'like', 'pending_%'),
+      (supabase as any).from('gab_tokens').select('*').eq('user_id', session.user.id).not('access_token', 'like', 'pending_%'),
     ]);
 
     setAccounts({
@@ -140,6 +148,16 @@ export default function SocialAccounts() {
         id: a.id,
         account_name: a.account_name,
         display_name: a.handle || 'Konto Bluesky',
+      })),
+      mastodon: (mastodonResult.data || []).map((a: any) => ({
+        id: a.id,
+        account_name: a.account_name,
+        display_name: a.username ? `@${a.username}@${new URL(a.server_url).hostname}` : a.server_url,
+      })),
+      gab: (gabResult.data || []).map((a: any) => ({
+        id: a.id,
+        account_name: a.account_name,
+        display_name: a.username ? `@${a.username}` : 'Konto Gab',
       })),
     });
   };
@@ -354,6 +372,37 @@ export default function SocialAccounts() {
     setBlueskyDialogOpen(true);
   };
 
+  const connectMastodon = async () => {
+    setMastodonDialogOpen(true);
+  };
+
+  const connectGab = async () => {
+    setLoading('gab', true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Musisz być zalogowany');
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('gab-oauth-start', {
+        body: { userId: session.user.id },
+      });
+
+      if (error) throw error;
+
+      if (data?.url) {
+        if (data.state) sessionStorage.setItem('gab_oauth_state', data.state);
+        sessionStorage.setItem('gab_user_id', session.user.id);
+        window.location.href = data.url;
+      }
+    } catch (error: any) {
+      toast.error('Nie udało się połączyć z Gab', { description: error.message });
+    } finally {
+      setLoading('gab', false);
+    }
+  };
+
   const deleteAccount = async (platform: string, accountId: string) => {
     setLoading(`delete-${accountId}`, true);
     try {
@@ -370,6 +419,8 @@ export default function SocialAccounts() {
         threads: 'threads_oauth_tokens',
         telegram: 'telegram_tokens',
         bluesky: 'bluesky_tokens',
+        mastodon: 'mastodon_tokens',
+        gab: 'gab_tokens',
       };
 
       const { error } = await (supabase as any)
@@ -403,6 +454,8 @@ export default function SocialAccounts() {
     { id: 'threads', name: 'Threads', icon: MessageCircle, color: 'text-slate-800', bgColor: 'bg-slate-800/10', connect: connectThreads },
     { id: 'telegram', name: 'Telegram', icon: Send, color: 'text-sky-500', bgColor: 'bg-sky-500/10', connect: connectTelegram, formType: 'telegram' as const },
     { id: 'bluesky', name: 'Bluesky', icon: Globe, color: 'text-sky-600', bgColor: 'bg-sky-600/10', connect: connectBluesky, formType: 'bluesky' as const },
+    { id: 'mastodon', name: 'Mastodon', icon: Globe, color: 'text-purple-600', bgColor: 'bg-purple-600/10', connect: connectMastodon, formType: 'mastodon' as const },
+    { id: 'gab', name: 'Gab', icon: MessageCircle, color: 'text-green-700', bgColor: 'bg-green-700/10', connect: connectGab },
   ];
 
   return (
@@ -550,6 +603,11 @@ export default function SocialAccounts() {
       <BlueskySetupDialog
         open={blueskyDialogOpen}
         onOpenChange={setBlueskyDialogOpen}
+        onSuccess={loadAllAccounts}
+      />
+      <MastodonSetupDialog
+        open={mastodonDialogOpen}
+        onOpenChange={setMastodonDialogOpen}
         onSuccess={loadAllAccounts}
       />
     </div>
