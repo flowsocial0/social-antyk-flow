@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
     // Return the required response format
     return new Response(
       JSON.stringify({
-        url: `https://social-auto-flow.netlify.app/data-deletion?confirmation=${confirmationCode}`,
+        url: `https://socialautoflow.pl/data-deletion?confirmation=${confirmationCode}`,
         confirmation_code: confirmationCode
       }),
       {

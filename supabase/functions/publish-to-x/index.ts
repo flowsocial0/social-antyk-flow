@@ -1126,7 +1126,21 @@ Deno.serve(async (req) => {
         let tweetText = (fixUrlsInText(campaignPost.text) + linkPart + suffixPart).trim();
 
         let mediaIds: string[] = [];
-        if (campaignPost.book?.image_url || campaignPost.book?.storage_path) {
+        
+        // Priority 1: custom_image_url from campaign post
+        if (campaignPost.custom_image_url) {
+          try {
+            console.log(`📤 Uploading custom campaign image: ${campaignPost.custom_image_url}`);
+            const mediaId = await uploadMedia(campaignPost.custom_image_url, oauth1Token.oauth_token, oauth1Token.oauth_token_secret);
+            mediaIds = [mediaId];
+            console.log("✅ Custom campaign image uploaded, media_id:", mediaId);
+          } catch (error: any) {
+            console.error("❌ Custom image upload failed, trying book image as fallback:", error.message);
+          }
+        }
+        
+        // Priority 2: book image (only if no custom image uploaded)
+        if (mediaIds.length === 0 && (campaignPost.book?.image_url || campaignPost.book?.storage_path)) {
           try {
             if (campaignPost.book.storage_path) {
               console.log(`📤 Uploading media from storage_path: ${campaignPost.book.storage_path}`);
@@ -1166,20 +1180,13 @@ Deno.serve(async (req) => {
               console.log("✅ Media uploaded successfully from image_url, media_id:", mediaId);
             }
           } catch (error: any) {
-            console.error("❌ Media upload failed:", error);
-            console.error("Error details:", {
-              message: error.message,
-              stack: error.stack,
-              storage_path: campaignPost.book?.storage_path,
-              image_url: campaignPost.book?.image_url
-            });
-            
-            if (campaignPost.type === 'sales') {
-              throw new Error(`Sales post requires image but upload failed: ${error.message}`);
-            }
+            console.error("❌ Media upload failed:", error.message);
           }
-        } else if (campaignPost.type === 'sales') {
-          throw new Error('Sales post missing book image (no storage_path or image_url)');
+        }
+        
+        // Priority 3: no image at all - allow text-only publishing (even for sales posts)
+        if (mediaIds.length === 0) {
+          console.warn(`⚠️ No image available for ${campaignPost.type} post - publishing text only`);
         }
 
         console.log(`🐦 Sending tweet with ${mediaIds.length} media attachments`);
