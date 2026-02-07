@@ -4,11 +4,12 @@ import { Badge } from "@/components/ui/badge";
 export const OtherPlatformsContent = () => {
   const upcomingPlatforms = [
     { name: "BeReal", status: "W rozważaniu" },
-    { name: "Locals", status: "W rozważaniu" },
     { name: "Rumble", status: "W rozważaniu" },
     { name: "Parler", status: "W rozważaniu" },
     { name: "MeWe", status: "W rozważaniu" },
-    { name: "OnlyFans", status: "W rozważaniu" },
+    { name: "Nostr", status: "Planowana" },
+    { name: "Pixelfed", status: "Planowana" },
+    { name: "Truth Social", status: "Planowana" },
   ];
 
   return (

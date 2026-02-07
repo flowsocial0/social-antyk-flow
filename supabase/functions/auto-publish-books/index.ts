@@ -59,6 +59,10 @@ function getTokenTableName(platform: string): string {
     case 'gab': return 'gab_tokens';
     case 'pinterest': return 'pinterest_oauth_tokens';
     case 'reddit': return 'reddit_oauth_tokens';
+    case 'discord': return 'discord_tokens';
+    case 'tumblr': return 'tumblr_oauth_tokens';
+    case 'snapchat': return 'snapchat_oauth_tokens';
+    case 'google_business': return 'google_business_tokens';
     default: return '';
   }
 }
@@ -79,6 +83,10 @@ function getPlatformNamePL(platform: string): string {
     case 'gab': return 'Gab';
     case 'pinterest': return 'Pinterest';
     case 'reddit': return 'Reddit';
+    case 'discord': return 'Discord';
+    case 'tumblr': return 'Tumblr';
+    case 'snapchat': return 'Snapchat';
+    case 'google_business': return 'Google Business';
     default: return platform;
   }
 }
@@ -201,6 +209,18 @@ Deno.serve(async (req) => {
             break;
           case 'reddit':
             publishFunctionName = 'publish-to-reddit';
+            break;
+          case 'discord':
+            publishFunctionName = 'publish-to-discord';
+            break;
+          case 'tumblr':
+            publishFunctionName = 'publish-to-tumblr';
+            break;
+          case 'snapchat':
+            publishFunctionName = 'publish-to-snapchat';
+            break;
+          case 'google_business':
+            publishFunctionName = 'publish-to-google-business';
             break;
           default:
             console.error(`No publish function for platform: ${content.platform}`);
@@ -346,6 +366,18 @@ Deno.serve(async (req) => {
               break;
             case 'reddit':
               publishFunctionName = 'publish-to-reddit';
+              break;
+            case 'discord':
+              publishFunctionName = 'publish-to-discord';
+              break;
+            case 'tumblr':
+              publishFunctionName = 'publish-to-tumblr';
+              break;
+            case 'snapchat':
+              publishFunctionName = 'publish-to-snapchat';
+              break;
+            case 'google_business':
+              publishFunctionName = 'publish-to-google-business';
               break;
             default:
               console.error(`No publish function for platform: ${platform}`);

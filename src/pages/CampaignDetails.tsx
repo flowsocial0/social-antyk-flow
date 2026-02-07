@@ -330,17 +330,32 @@ const CampaignDetails = () => {
 
       // Load Reddit accounts
       if (selectedAccounts.reddit?.length) {
-        const { data } = await (supabase as any)
-          .from('reddit_oauth_tokens')
-          .select('id, username, account_name')
-          .in('id', selectedAccounts.reddit);
-        data?.forEach((a: any) => {
-          newAccountsMap[a.id] = {
-            id: a.id,
-            display_name: a.username ? `u/${a.username}` : (a.account_name || 'Konto Reddit'),
-            platform: 'reddit'
-          };
-        });
+        const { data } = await (supabase as any).from('reddit_oauth_tokens').select('id, username, account_name').in('id', selectedAccounts.reddit);
+        data?.forEach((a: any) => { newAccountsMap[a.id] = { id: a.id, display_name: a.username ? `u/${a.username}` : (a.account_name || 'Konto Reddit'), platform: 'reddit' }; });
+      }
+
+      // Load Discord accounts
+      if (selectedAccounts.discord?.length) {
+        const { data } = await (supabase as any).from('discord_tokens').select('id, channel_name, account_name').in('id', selectedAccounts.discord);
+        data?.forEach((a: any) => { newAccountsMap[a.id] = { id: a.id, display_name: a.channel_name || (a.account_name || 'Kanał Discord'), platform: 'discord' }; });
+      }
+
+      // Load Tumblr accounts
+      if (selectedAccounts.tumblr?.length) {
+        const { data } = await (supabase as any).from('tumblr_oauth_tokens').select('id, blog_name, username, account_name').in('id', selectedAccounts.tumblr);
+        data?.forEach((a: any) => { newAccountsMap[a.id] = { id: a.id, display_name: a.blog_name || a.username || (a.account_name || 'Blog Tumblr'), platform: 'tumblr' }; });
+      }
+
+      // Load Snapchat accounts
+      if (selectedAccounts.snapchat?.length) {
+        const { data } = await (supabase as any).from('snapchat_oauth_tokens').select('id, display_name, account_name').in('id', selectedAccounts.snapchat);
+        data?.forEach((a: any) => { newAccountsMap[a.id] = { id: a.id, display_name: a.display_name || (a.account_name || 'Konto Snapchat'), platform: 'snapchat' }; });
+      }
+
+      // Load Google Business accounts
+      if (selectedAccounts.google_business?.length) {
+        const { data } = await (supabase as any).from('google_business_tokens').select('id, business_name, account_name').in('id', selectedAccounts.google_business);
+        data?.forEach((a: any) => { newAccountsMap[a.id] = { id: a.id, display_name: a.business_name || (a.account_name || 'Firma Google'), platform: 'google_business' }; });
       }
 
       setAccountsMap(newAccountsMap);
