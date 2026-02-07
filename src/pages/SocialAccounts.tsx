@@ -614,11 +614,11 @@ export default function SocialAccounts() {
         <div className="mb-8">
           <Button 
             variant="ghost" 
-            onClick={() => navigate("/")} 
+            onClick={() => navigate(-1)} 
             className="mb-4 gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
-            Powrót do aplikacji
+            Powrót
           </Button>
           <h1 className="text-3xl font-bold mb-2">Konta społecznościowe</h1>
           <p className="text-muted-foreground">
