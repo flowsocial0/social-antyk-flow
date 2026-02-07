@@ -12,6 +12,8 @@ interface Book {
   image_url: string | null;
   sale_price: number | null;
   promotional_price: number | null;
+  video_url: string | null;
+  video_storage_path: string | null;
 }
 
 interface BookPlatformContent {
@@ -133,7 +135,7 @@ Deno.serve(async (req) => {
       .from('campaign_posts')
       .select(`
         *,
-        book:books(id, code, title, image_url, sale_price, promotional_price),
+        book:books(id, code, title, image_url, sale_price, promotional_price, video_url, video_storage_path),
         campaign:campaigns!inner(id, user_id, target_platforms, status)
       `)
       .lte('scheduled_at', now)
@@ -439,19 +441,28 @@ Deno.serve(async (req) => {
             // Priority: custom_image_url (from simple campaign) > book.image_url
             const mediaUrl = post.custom_image_url || post.book?.image_url || null;
             
-            // Detect if it's a video based on extension
-            const isVideo = mediaUrl ? /\.(mp4|mov|webm|avi|mkv|m4v)$/i.test(mediaUrl) : false;
+            // For video: check custom_image_url, then book's video_url/video_storage_path
+            const bookVideoUrl = post.book?.video_url || 
+              (post.book?.video_storage_path ? `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${post.book.video_storage_path}` : null);
             
-            console.log(`Media for post ${post.id}: url=${mediaUrl ? 'present' : 'none'}, isVideo=${isVideo}`);
+            // Detect if mediaUrl is a video based on extension
+            const isMediaVideo = mediaUrl ? /\.(mp4|mov|webm|avi|mkv|m4v)$/i.test(mediaUrl) : false;
+            
+            // Final video URL: if mediaUrl is video use it, otherwise use book's dedicated video_url
+            const videoUrl = isMediaVideo ? mediaUrl : bookVideoUrl;
+            const imageUrl = isMediaVideo ? null : mediaUrl;
+            
+            console.log(`Media for post ${post.id}: image=${imageUrl ? 'present' : 'none'}, video=${videoUrl ? 'present' : 'none'}`);
             
             const { data, error: publishError } = await supabase.functions.invoke(publishFunctionName, {
               body: { 
+                bookId: post.book_id || post.book?.id,  // Pass bookId for platforms that need it
                 campaignPostId: post.id,
                 platform: platform,
-                userId: accountOwnerId, // Use the owner of THIS account
-                accountId: accountId,   // Specific account to publish to
-                imageUrl: isVideo ? null : mediaUrl,  // Only pass as imageUrl if it's not a video
-                videoUrl: isVideo ? mediaUrl : null   // Pass as videoUrl if it's a video
+                userId: accountOwnerId,
+                accountId: accountId,
+                imageUrl: imageUrl,
+                videoUrl: videoUrl
               }
             });
 
