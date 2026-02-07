@@ -23,6 +23,9 @@ import MastodonCallback from "./pages/MastodonCallback";
 import GabCallback from "./pages/GabCallback";
 import PinterestCallback from "./pages/PinterestCallback";
 import RedditCallback from "./pages/RedditCallback";
+import TumblrCallback from "./pages/TumblrCallback";
+import SnapchatCallback from "./pages/SnapchatCallback";
+import GoogleBusinessCallback from "./pages/GoogleBusinessCallback";
 import BookPreview from "./pages/BookPreview";
 import BookRedirect from "./pages/BookRedirect";
 import Settings from "./pages/Settings";
@@ -125,6 +128,9 @@ const App = () => (
           <Route path="/oauth/gab/callback" element={<GabCallback />} />
           <Route path="/oauth/pinterest/callback" element={<PinterestCallback />} />
           <Route path="/oauth/reddit/callback" element={<RedditCallback />} />
+          <Route path="/oauth/tumblr/callback" element={<TumblrCallback />} />
+          <Route path="/oauth/snapchat/callback" element={<SnapchatCallback />} />
+          <Route path="/oauth/google-business/callback" element={<GoogleBusinessCallback />} />
           <Route path="/book/:id" element={<BookPreview />} />
           <Route path="/book/:id/redirect" element={<BookRedirect />} />
           <Route path="/platforms/x" element={<PlatformX />} />

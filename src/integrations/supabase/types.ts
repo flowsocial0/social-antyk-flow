@@ -543,6 +543,39 @@ export type Database = {
         }
         Relationships: []
       }
+      discord_tokens: {
+        Row: {
+          account_name: string | null
+          channel_name: string | null
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          updated_at: string | null
+          user_id: string
+          webhook_url: string
+        }
+        Insert: {
+          account_name?: string | null
+          channel_name?: string | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          updated_at?: string | null
+          user_id: string
+          webhook_url: string
+        }
+        Update: {
+          account_name?: string | null
+          channel_name?: string | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+          webhook_url?: string
+        }
+        Relationships: []
+      }
       facebook_oauth_tokens: {
         Row: {
           access_token: string
@@ -651,6 +684,54 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      google_business_tokens: {
+        Row: {
+          access_token: string
+          account_id: string | null
+          account_name: string | null
+          business_name: string | null
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          is_default: boolean | null
+          location_id: string | null
+          refresh_token: string | null
+          scope: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          account_id?: string | null
+          account_name?: string | null
+          business_name?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          location_id?: string | null
+          refresh_token?: string | null
+          scope?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          account_id?: string | null
+          account_name?: string | null
+          business_name?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          location_id?: string | null
+          refresh_token?: string | null
+          scope?: string | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -999,6 +1080,51 @@ export type Database = {
         }
         Relationships: []
       }
+      snapchat_oauth_tokens: {
+        Row: {
+          access_token: string
+          account_name: string | null
+          created_at: string | null
+          display_name: string | null
+          expires_at: string | null
+          id: string
+          is_default: boolean | null
+          organization_id: string | null
+          refresh_token: string | null
+          scope: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          account_name?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          expires_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          organization_id?: string | null
+          refresh_token?: string | null
+          scope?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          account_name?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          expires_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          organization_id?: string | null
+          refresh_token?: string | null
+          scope?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       telegram_tokens: {
         Row: {
           account_name: string | null
@@ -1119,6 +1245,51 @@ export type Database = {
           scope?: string | null
           updated_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      tumblr_oauth_tokens: {
+        Row: {
+          access_token: string
+          account_name: string | null
+          blog_name: string | null
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          is_default: boolean | null
+          refresh_token: string | null
+          scope: string | null
+          updated_at: string | null
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          access_token: string
+          account_name?: string | null
+          blog_name?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          refresh_token?: string | null
+          scope?: string | null
+          updated_at?: string | null
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          access_token?: string
+          account_name?: string | null
+          blog_name?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          refresh_token?: string | null
+          scope?: string | null
+          updated_at?: string | null
+          user_id?: string
+          username?: string | null
         }
         Relationships: []
       }

@@ -18,7 +18,11 @@ export type PlatformId =
   | 'threads' 
   | 'bluesky' 
   | 'mastodon' 
-  | 'gab';
+  | 'gab'
+  | 'discord'
+  | 'tumblr'
+  | 'snapchat'
+  | 'google_business';
 
 export type MediaType = 'video-only' | 'image-only' | 'both';
 
@@ -190,6 +194,54 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     path: '/platforms/gab',
     status: 'active',
     priority: 11,
+    mediaType: 'both',
+  },
+  discord: {
+    id: 'discord',
+    name: 'Discord',
+    icon: MessageCircle,
+    color: 'text-indigo-500',
+    gradientFrom: 'from-indigo-500/20',
+    gradientTo: 'to-indigo-600/20',
+    path: '/platforms/discord',
+    status: 'active',
+    priority: 12,
+    mediaType: 'both',
+  },
+  tumblr: {
+    id: 'tumblr',
+    name: 'Tumblr',
+    icon: Globe,
+    color: 'text-blue-900',
+    gradientFrom: 'from-blue-900/20',
+    gradientTo: 'to-blue-950/20',
+    path: '/platforms/tumblr',
+    status: 'active',
+    priority: 13,
+    mediaType: 'both',
+  },
+  snapchat: {
+    id: 'snapchat',
+    name: 'Snapchat',
+    icon: Camera,
+    color: 'text-yellow-500',
+    gradientFrom: 'from-yellow-500/20',
+    gradientTo: 'to-yellow-600/20',
+    path: '/platforms/snapchat',
+    status: 'active',
+    priority: 14,
+    mediaType: 'image-only',
+  },
+  google_business: {
+    id: 'google_business',
+    name: 'Google Business',
+    icon: Map,
+    color: 'text-blue-500',
+    gradientFrom: 'from-blue-500/20',
+    gradientTo: 'to-green-500/20',
+    path: '/platforms/google-business',
+    status: 'active',
+    priority: 15,
     mediaType: 'both',
   },
 };
