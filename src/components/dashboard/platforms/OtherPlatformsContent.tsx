@@ -3,14 +3,12 @@ import { Badge } from "@/components/ui/badge";
 
 export const OtherPlatformsContent = () => {
   const upcomingPlatforms = [
-    { name: "TikTok", status: "Planowana" },
-    { name: "Pinterest", status: "Planowana" },
-    { name: "Reddit", status: "Planowana" },
-    { name: "Telegram", status: "Planowana" },
-    { name: "Threads", status: "Planowana" },
     { name: "BeReal", status: "W rozważaniu" },
-    { name: "Bluesky", status: "W rozważaniu" },
-    { name: "Mastodon", status: "W rozważaniu" },
+    { name: "Locals", status: "W rozważaniu" },
+    { name: "Rumble", status: "W rozważaniu" },
+    { name: "Parler", status: "W rozważaniu" },
+    { name: "MeWe", status: "W rozważaniu" },
+    { name: "OnlyFans", status: "W rozważaniu" },
   ];
 
   return (

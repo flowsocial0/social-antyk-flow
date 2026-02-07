@@ -238,6 +238,111 @@ const CampaignDetails = () => {
         });
       }
 
+      // Load Threads accounts
+      if (selectedAccounts.threads?.length) {
+        const { data } = await (supabase as any)
+          .from('threads_oauth_tokens')
+          .select('id, username, account_name')
+          .in('id', selectedAccounts.threads);
+        data?.forEach((a: any) => {
+          newAccountsMap[a.id] = {
+            id: a.id,
+            display_name: a.username ? `@${a.username}` : (a.account_name || 'Konto Threads'),
+            platform: 'threads'
+          };
+        });
+      }
+
+      // Load Telegram accounts
+      if (selectedAccounts.telegram?.length) {
+        const { data } = await (supabase as any)
+          .from('telegram_tokens')
+          .select('id, channel_name, chat_id, account_name')
+          .in('id', selectedAccounts.telegram);
+        data?.forEach((a: any) => {
+          newAccountsMap[a.id] = {
+            id: a.id,
+            display_name: a.channel_name || a.account_name || `Chat ${a.chat_id}`,
+            platform: 'telegram'
+          };
+        });
+      }
+
+      // Load Bluesky accounts
+      if (selectedAccounts.bluesky?.length) {
+        const { data } = await (supabase as any)
+          .from('bluesky_tokens')
+          .select('id, handle, account_name')
+          .in('id', selectedAccounts.bluesky);
+        data?.forEach((a: any) => {
+          newAccountsMap[a.id] = {
+            id: a.id,
+            display_name: a.handle ? `@${a.handle}` : (a.account_name || 'Konto Bluesky'),
+            platform: 'bluesky'
+          };
+        });
+      }
+
+      // Load Mastodon accounts
+      if (selectedAccounts.mastodon?.length) {
+        const { data } = await (supabase as any)
+          .from('mastodon_tokens')
+          .select('id, username, server_url, account_name')
+          .in('id', selectedAccounts.mastodon);
+        data?.forEach((a: any) => {
+          newAccountsMap[a.id] = {
+            id: a.id,
+            display_name: a.username ? `@${a.username}@${a.server_url?.replace('https://', '')}` : (a.account_name || 'Konto Mastodon'),
+            platform: 'mastodon'
+          };
+        });
+      }
+
+      // Load Gab accounts
+      if (selectedAccounts.gab?.length) {
+        const { data } = await (supabase as any)
+          .from('gab_tokens')
+          .select('id, username, account_name')
+          .in('id', selectedAccounts.gab);
+        data?.forEach((a: any) => {
+          newAccountsMap[a.id] = {
+            id: a.id,
+            display_name: a.username ? `@${a.username}` : (a.account_name || 'Konto Gab'),
+            platform: 'gab'
+          };
+        });
+      }
+
+      // Load Pinterest accounts
+      if (selectedAccounts.pinterest?.length) {
+        const { data } = await (supabase as any)
+          .from('pinterest_oauth_tokens')
+          .select('id, username, account_name')
+          .in('id', selectedAccounts.pinterest);
+        data?.forEach((a: any) => {
+          newAccountsMap[a.id] = {
+            id: a.id,
+            display_name: a.username ? `@${a.username}` : (a.account_name || 'Konto Pinterest'),
+            platform: 'pinterest'
+          };
+        });
+      }
+
+      // Load Reddit accounts
+      if (selectedAccounts.reddit?.length) {
+        const { data } = await (supabase as any)
+          .from('reddit_oauth_tokens')
+          .select('id, username, account_name')
+          .in('id', selectedAccounts.reddit);
+        data?.forEach((a: any) => {
+          newAccountsMap[a.id] = {
+            id: a.id,
+            display_name: a.username ? `u/${a.username}` : (a.account_name || 'Konto Reddit'),
+            platform: 'reddit'
+          };
+        });
+      }
+
       setAccountsMap(newAccountsMap);
     };
 

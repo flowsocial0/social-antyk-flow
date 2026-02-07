@@ -69,13 +69,20 @@ export const AccountSelector = ({ selectedPlatforms, selectedAccounts, onChange 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult] = await Promise.all([
+    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, threadsResult, telegramResult, blueskyResult, mastodonResult, gabResult, pinterestResult, redditResult] = await Promise.all([
       supabase.from('twitter_oauth1_tokens').select('id, screen_name, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('facebook_oauth_tokens').select('id, page_name, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('instagram_oauth_tokens').select('id, instagram_username, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('tiktok_oauth_tokens').select('id, open_id, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('youtube_oauth_tokens').select('id, channel_title, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('linkedin_oauth_tokens').select('id, display_name, account_name, is_default').eq('user_id', session.user.id),
+      (supabase as any).from('threads_oauth_tokens').select('id, username, account_name, is_default').eq('user_id', session.user.id),
+      (supabase as any).from('telegram_tokens').select('id, channel_name, chat_id, account_name, is_default').eq('user_id', session.user.id),
+      (supabase as any).from('bluesky_tokens').select('id, handle, account_name, is_default').eq('user_id', session.user.id),
+      (supabase as any).from('mastodon_tokens').select('id, username, server_url, account_name, is_default').eq('user_id', session.user.id),
+      (supabase as any).from('gab_tokens').select('id, username, account_name, is_default').eq('user_id', session.user.id),
+      (supabase as any).from('pinterest_oauth_tokens').select('id, username, account_name, is_default').eq('user_id', session.user.id),
+      (supabase as any).from('reddit_oauth_tokens').select('id, username, account_name, is_default').eq('user_id', session.user.id),
     ]);
 
     const newAccounts: Record<string, AccountOption[]> = {
@@ -107,6 +114,41 @@ export const AccountSelector = ({ selectedPlatforms, selectedAccounts, onChange 
       linkedin: (linkedinResult.data || []).map((a: any) => ({
         id: a.id,
         display_name: a.display_name || a.account_name || 'Profil LinkedIn',
+        is_default: a.is_default ?? false,
+      })),
+      threads: (threadsResult.data || []).map((a: any) => ({
+        id: a.id,
+        display_name: a.username ? `@${a.username}` : (a.account_name || 'Konto Threads'),
+        is_default: a.is_default ?? false,
+      })),
+      telegram: (telegramResult.data || []).map((a: any) => ({
+        id: a.id,
+        display_name: a.channel_name || a.account_name || `Chat ${a.chat_id}`,
+        is_default: a.is_default ?? false,
+      })),
+      bluesky: (blueskyResult.data || []).map((a: any) => ({
+        id: a.id,
+        display_name: a.handle ? `@${a.handle}` : (a.account_name || 'Konto Bluesky'),
+        is_default: a.is_default ?? false,
+      })),
+      mastodon: (mastodonResult.data || []).map((a: any) => ({
+        id: a.id,
+        display_name: a.username ? `@${a.username}@${a.server_url?.replace('https://', '')}` : (a.account_name || 'Konto Mastodon'),
+        is_default: a.is_default ?? false,
+      })),
+      gab: (gabResult.data || []).map((a: any) => ({
+        id: a.id,
+        display_name: a.username ? `@${a.username}` : (a.account_name || 'Konto Gab'),
+        is_default: a.is_default ?? false,
+      })),
+      pinterest: (pinterestResult.data || []).map((a: any) => ({
+        id: a.id,
+        display_name: a.username ? `@${a.username}` : (a.account_name || 'Konto Pinterest'),
+        is_default: a.is_default ?? false,
+      })),
+      reddit: (redditResult.data || []).map((a: any) => ({
+        id: a.id,
+        display_name: a.username ? `u/${a.username}` : (a.account_name || 'Konto Reddit'),
         is_default: a.is_default ?? false,
       })),
     };
