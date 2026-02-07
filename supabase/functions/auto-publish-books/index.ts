@@ -55,6 +55,8 @@ function getTokenTableName(platform: string): string {
     case 'threads': return 'threads_oauth_tokens';
     case 'telegram': return 'telegram_tokens';
     case 'bluesky': return 'bluesky_tokens';
+    case 'mastodon': return 'mastodon_tokens';
+    case 'gab': return 'gab_tokens';
     default: return '';
   }
 }
@@ -71,6 +73,8 @@ function getPlatformNamePL(platform: string): string {
     case 'threads': return 'Threads';
     case 'telegram': return 'Telegram';
     case 'bluesky': return 'Bluesky';
+    case 'mastodon': return 'Mastodon';
+    case 'gab': return 'Gab';
     default: return platform;
   }
 }
@@ -181,6 +185,12 @@ Deno.serve(async (req) => {
             break;
           case 'bluesky':
             publishFunctionName = 'publish-to-bluesky';
+            break;
+          case 'mastodon':
+            publishFunctionName = 'publish-to-mastodon';
+            break;
+          case 'gab':
+            publishFunctionName = 'publish-to-gab';
             break;
           default:
             console.error(`No publish function for platform: ${content.platform}`);
@@ -314,6 +324,12 @@ Deno.serve(async (req) => {
               break;
             case 'bluesky':
               publishFunctionName = 'publish-to-bluesky';
+              break;
+            case 'mastodon':
+              publishFunctionName = 'publish-to-mastodon';
+              break;
+            case 'gab':
+              publishFunctionName = 'publish-to-gab';
               break;
             default:
               console.error(`No publish function for platform: ${platform}`);

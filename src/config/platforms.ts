@@ -176,8 +176,8 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-purple-600/20',
     gradientTo: 'to-purple-700/20',
     path: '/platforms/mastodon',
-    status: 'planned',
-    priority: 12,
+    status: 'active',
+    priority: 10,
     mediaType: 'both',
   },
   gab: {
@@ -188,8 +188,8 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-green-700/20',
     gradientTo: 'to-green-800/20',
     path: '/platforms/gab',
-    status: 'planned',
-    priority: 13,
+    status: 'active',
+    priority: 11,
     mediaType: 'both',
   },
 };
