@@ -25,6 +25,8 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
     if (platform === "telegram") return "telegram_tokens";
     if (platform === "bluesky") return "bluesky_tokens";
     if (platform === "threads") return "threads_oauth_tokens";
+    if (platform === "pinterest") return "pinterest_oauth_tokens";
+    if (platform === "reddit") return "reddit_oauth_tokens";
     return `${platform}_oauth_tokens`;
   };
 
@@ -57,6 +59,8 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
         else if (platform === "threads") name = token.username ? `@${token.username}` : "Konto Threads";
         else if (platform === "telegram") name = token.channel_name || token.chat_id || "Kanał Telegram";
         else if (platform === "bluesky") name = token.handle || "Konto Bluesky";
+        else if (platform === "pinterest") name = token.username ? `@${token.username}` : "Konto Pinterest";
+        else if (platform === "reddit") name = token.username ? `u/${token.username}` : "Konto Reddit";
 
         return {
           id: token.id,
@@ -109,7 +113,7 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
   const handleConnect = async () => {
     if (onConnect) {
       onConnect();
-    } else if (["x", "facebook", "tiktok", "instagram", "youtube", "linkedin", "threads", "telegram", "bluesky"].includes(platform)) {
+    } else if (["x", "facebook", "tiktok", "instagram", "youtube", "linkedin", "threads", "telegram", "bluesky", "pinterest", "reddit"].includes(platform)) {
       window.location.href = "/settings/social-accounts";
     } else {
       toast({

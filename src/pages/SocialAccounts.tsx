@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Twitter, Facebook, Instagram, Youtube, CheckCircle2, Loader2, Video, ArrowLeft, Plus, Trash2, Linkedin, MessageCircle, Send, Globe } from "lucide-react";
+import { Twitter, Facebook, Instagram, Youtube, CheckCircle2, Loader2, Video, ArrowLeft, Plus, Trash2, Linkedin, MessageCircle, Send, Globe, Image } from "lucide-react";
 import { Footer } from "@/components/layout/Footer";
 import { TelegramSetupDialog } from "@/components/social/TelegramSetupDialog";
 import { BlueskySetupDialog } from "@/components/social/BlueskySetupDialog";
@@ -39,6 +39,8 @@ interface PlatformAccounts {
   bluesky: SocialAccount[];
   mastodon: SocialAccount[];
   gab: SocialAccount[];
+  pinterest: SocialAccount[];
+  reddit: SocialAccount[];
 }
 
 export default function SocialAccounts() {
@@ -56,6 +58,8 @@ export default function SocialAccounts() {
     bluesky: [],
     mastodon: [],
     gab: [],
+    pinterest: [],
+    reddit: [],
   });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; platform: string; accountId: string; accountName: string }>({
     open: false,
@@ -89,7 +93,7 @@ export default function SocialAccounts() {
     if (!session) return;
 
     // Load all accounts for each platform
-    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, threadsResult, telegramResult, blueskyResult, mastodonResult, gabResult] = await Promise.all([
+    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, threadsResult, telegramResult, blueskyResult, mastodonResult, gabResult, pinterestResult, redditResult] = await Promise.all([
       supabase.from('twitter_oauth1_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('facebook_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('instagram_oauth_tokens').select('*').eq('user_id', session.user.id),
@@ -101,6 +105,8 @@ export default function SocialAccounts() {
       (supabase as any).from('bluesky_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('mastodon_tokens').select('*').eq('user_id', session.user.id).not('access_token', 'like', 'pending_%'),
       (supabase as any).from('gab_tokens').select('*').eq('user_id', session.user.id).not('access_token', 'like', 'pending_%'),
+      (supabase as any).from('pinterest_oauth_tokens').select('*').eq('user_id', session.user.id),
+      (supabase as any).from('reddit_oauth_tokens').select('*').eq('user_id', session.user.id),
     ]);
 
     setAccounts({
@@ -158,6 +164,16 @@ export default function SocialAccounts() {
         id: a.id,
         account_name: a.account_name,
         display_name: a.username ? `@${a.username}` : 'Konto Gab',
+      })),
+      pinterest: (pinterestResult.data || []).map((a: any) => ({
+        id: a.id,
+        account_name: a.account_name,
+        display_name: a.username ? `@${a.username}` : 'Konto Pinterest',
+      })),
+      reddit: (redditResult.data || []).map((a: any) => ({
+        id: a.id,
+        account_name: a.account_name,
+        display_name: a.username ? `u/${a.username}` : 'Konto Reddit',
       })),
     });
   };
@@ -403,6 +419,60 @@ export default function SocialAccounts() {
     }
   };
 
+  const connectPinterest = async () => {
+    setLoading('pinterest', true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Musisz być zalogowany');
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('pinterest-oauth-start', {
+        body: { userId: session.user.id },
+      });
+
+      if (error) throw error;
+
+      if (data?.url) {
+        if (data.state) sessionStorage.setItem('pinterest_oauth_state', data.state);
+        sessionStorage.setItem('pinterest_user_id', session.user.id);
+        window.location.href = data.url;
+      }
+    } catch (error: any) {
+      toast.error('Nie udało się połączyć z Pinterest', { description: error.message });
+    } finally {
+      setLoading('pinterest', false);
+    }
+  };
+
+  const connectReddit = async () => {
+    setLoading('reddit', true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Musisz być zalogowany');
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('reddit-oauth-start', {
+        body: { userId: session.user.id },
+      });
+
+      if (error) throw error;
+
+      if (data?.url) {
+        if (data.state) sessionStorage.setItem('reddit_oauth_state', data.state);
+        sessionStorage.setItem('reddit_user_id', session.user.id);
+        window.location.href = data.url;
+      }
+    } catch (error: any) {
+      toast.error('Nie udało się połączyć z Reddit', { description: error.message });
+    } finally {
+      setLoading('reddit', false);
+    }
+  };
+
   const deleteAccount = async (platform: string, accountId: string) => {
     setLoading(`delete-${accountId}`, true);
     try {
@@ -421,6 +491,8 @@ export default function SocialAccounts() {
         bluesky: 'bluesky_tokens',
         mastodon: 'mastodon_tokens',
         gab: 'gab_tokens',
+        pinterest: 'pinterest_oauth_tokens',
+        reddit: 'reddit_oauth_tokens',
       };
 
       const { error } = await (supabase as any)
@@ -456,6 +528,8 @@ export default function SocialAccounts() {
     { id: 'bluesky', name: 'Bluesky', icon: Globe, color: 'text-sky-600', bgColor: 'bg-sky-600/10', connect: connectBluesky, formType: 'bluesky' as const },
     { id: 'mastodon', name: 'Mastodon', icon: Globe, color: 'text-purple-600', bgColor: 'bg-purple-600/10', connect: connectMastodon, formType: 'mastodon' as const },
     { id: 'gab', name: 'Gab', icon: MessageCircle, color: 'text-green-700', bgColor: 'bg-green-700/10', connect: connectGab },
+    { id: 'pinterest', name: 'Pinterest', icon: Image, color: 'text-red-600', bgColor: 'bg-red-600/10', connect: connectPinterest },
+    { id: 'reddit', name: 'Reddit', icon: MessageCircle, color: 'text-orange-500', bgColor: 'bg-orange-500/10', connect: connectReddit },
   ];
 
   return (

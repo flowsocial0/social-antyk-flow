@@ -21,6 +21,8 @@ import LinkedInCallback from "./pages/LinkedInCallback";
 import ThreadsCallback from "./pages/ThreadsCallback";
 import MastodonCallback from "./pages/MastodonCallback";
 import GabCallback from "./pages/GabCallback";
+import PinterestCallback from "./pages/PinterestCallback";
+import RedditCallback from "./pages/RedditCallback";
 import BookPreview from "./pages/BookPreview";
 import BookRedirect from "./pages/BookRedirect";
 import Settings from "./pages/Settings";
@@ -121,6 +123,8 @@ const App = () => (
           <Route path="/oauth/threads/callback" element={<ThreadsCallback />} />
           <Route path="/oauth/mastodon/callback" element={<MastodonCallback />} />
           <Route path="/oauth/gab/callback" element={<GabCallback />} />
+          <Route path="/oauth/pinterest/callback" element={<PinterestCallback />} />
+          <Route path="/oauth/reddit/callback" element={<RedditCallback />} />
           <Route path="/book/:id" element={<BookPreview />} />
           <Route path="/book/:id/redirect" element={<BookRedirect />} />
           <Route path="/platforms/x" element={<PlatformX />} />
