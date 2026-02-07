@@ -18,6 +18,7 @@ import FacebookCallback from "./pages/FacebookCallback";
 import TikTokCallback from "./pages/TikTokCallback";
 import YouTubeCallback from "./pages/YouTubeCallback";
 import LinkedInCallback from "./pages/LinkedInCallback";
+import ThreadsCallback from "./pages/ThreadsCallback";
 import BookPreview from "./pages/BookPreview";
 import BookRedirect from "./pages/BookRedirect";
 import Settings from "./pages/Settings";
@@ -115,6 +116,7 @@ const App = () => (
           <Route path="/oauth/tiktok/callback" element={<TikTokCallback />} />
           <Route path="/oauth/youtube/callback" element={<YouTubeCallback />} />
           <Route path="/oauth/linkedin/callback" element={<LinkedInCallback />} />
+          <Route path="/oauth/threads/callback" element={<ThreadsCallback />} />
           <Route path="/book/:id" element={<BookPreview />} />
           <Route path="/book/:id/redirect" element={<BookRedirect />} />
           <Route path="/platforms/x" element={<PlatformX />} />

@@ -117,7 +117,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientTo: 'to-red-700/20',
     path: '/platforms/pinterest',
     status: 'planned',
-    priority: 7,
+    priority: 8,
     mediaType: 'image-only',
   },
   reddit: {
@@ -129,7 +129,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientTo: 'to-orange-600/20',
     path: '/platforms/reddit',
     status: 'planned',
-    priority: 8,
+    priority: 9,
     mediaType: 'both',
   },
   telegram: {
@@ -140,8 +140,8 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-sky-500/20',
     gradientTo: 'to-sky-600/20',
     path: '/platforms/telegram',
-    status: 'planned',
-    priority: 9,
+    status: 'active',
+    priority: 7,
     mediaType: 'both',
   },
   threads: {
@@ -152,8 +152,8 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-slate-800/20',
     gradientTo: 'to-slate-900/20',
     path: '/platforms/threads',
-    status: 'planned',
-    priority: 10,
+    status: 'active',
+    priority: 6,
     mediaType: 'both',
   },
   bluesky: {
@@ -164,8 +164,8 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-sky-600/20',
     gradientTo: 'to-sky-700/20',
     path: '/platforms/bluesky',
-    status: 'planned',
-    priority: 11,
+    status: 'active',
+    priority: 7,
     mediaType: 'both',
   },
   mastodon: {

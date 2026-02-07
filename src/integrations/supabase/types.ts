@@ -71,6 +71,42 @@ export type Database = {
         }
         Relationships: []
       }
+      bluesky_tokens: {
+        Row: {
+          account_name: string | null
+          app_password: string
+          created_at: string | null
+          did: string | null
+          handle: string
+          id: string
+          is_default: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          account_name?: string | null
+          app_password: string
+          created_at?: string | null
+          did?: string | null
+          handle: string
+          id?: string
+          is_default?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          account_name?: string | null
+          app_password?: string
+          created_at?: string | null
+          did?: string | null
+          handle?: string
+          id?: string
+          is_default?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       book_campaign_texts: {
         Row: {
           book_id: string
@@ -576,6 +612,48 @@ export type Database = {
         }
         Relationships: []
       }
+      gab_tokens: {
+        Row: {
+          access_token: string
+          account_name: string | null
+          client_id: string | null
+          client_secret: string | null
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          scope: string | null
+          updated_at: string | null
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          access_token: string
+          account_name?: string | null
+          client_id?: string | null
+          client_secret?: string | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          scope?: string | null
+          updated_at?: string | null
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          access_token?: string
+          account_name?: string | null
+          client_id?: string | null
+          client_secret?: string | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          scope?: string | null
+          updated_at?: string | null
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
       instagram_oauth_tokens: {
         Row: {
           access_token: string
@@ -672,6 +750,93 @@ export type Database = {
           token_type?: string | null
           updated_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      mastodon_tokens: {
+        Row: {
+          access_token: string
+          account_name: string | null
+          client_id: string | null
+          client_secret: string | null
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          scope: string | null
+          server_url: string
+          updated_at: string | null
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          access_token: string
+          account_name?: string | null
+          client_id?: string | null
+          client_secret?: string | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          scope?: string | null
+          server_url: string
+          updated_at?: string | null
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          access_token?: string
+          account_name?: string | null
+          client_id?: string | null
+          client_secret?: string | null
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          scope?: string | null
+          server_url?: string
+          updated_at?: string | null
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
+      pinterest_oauth_tokens: {
+        Row: {
+          access_token: string
+          account_name: string | null
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          is_default: boolean | null
+          refresh_token: string | null
+          scope: string | null
+          updated_at: string | null
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          access_token: string
+          account_name?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          refresh_token?: string | null
+          scope?: string | null
+          updated_at?: string | null
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          access_token?: string
+          account_name?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          refresh_token?: string | null
+          scope?: string | null
+          updated_at?: string | null
+          user_id?: string
+          username?: string | null
         }
         Relationships: []
       }
@@ -786,6 +951,132 @@ export type Database = {
           updated_at?: string
           used?: number | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      reddit_oauth_tokens: {
+        Row: {
+          access_token: string
+          account_name: string | null
+          created_at: string | null
+          default_subreddit: string | null
+          expires_at: string | null
+          id: string
+          is_default: boolean | null
+          refresh_token: string | null
+          scope: string | null
+          updated_at: string | null
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          access_token: string
+          account_name?: string | null
+          created_at?: string | null
+          default_subreddit?: string | null
+          expires_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          refresh_token?: string | null
+          scope?: string | null
+          updated_at?: string | null
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          access_token?: string
+          account_name?: string | null
+          created_at?: string | null
+          default_subreddit?: string | null
+          expires_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          refresh_token?: string | null
+          scope?: string | null
+          updated_at?: string | null
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
+      telegram_tokens: {
+        Row: {
+          account_name: string | null
+          bot_token: string
+          channel_name: string | null
+          chat_id: string
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          account_name?: string | null
+          bot_token: string
+          channel_name?: string | null
+          chat_id: string
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          account_name?: string | null
+          bot_token?: string
+          channel_name?: string | null
+          chat_id?: string
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      threads_oauth_tokens: {
+        Row: {
+          access_token: string
+          account_name: string | null
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          is_default: boolean | null
+          scope: string | null
+          threads_user_id: string
+          token_type: string | null
+          updated_at: string | null
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          access_token: string
+          account_name?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          scope?: string | null
+          threads_user_id: string
+          token_type?: string | null
+          updated_at?: string | null
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          access_token?: string
+          account_name?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          scope?: string | null
+          threads_user_id?: string
+          token_type?: string | null
+          updated_at?: string | null
+          user_id?: string
+          username?: string | null
         }
         Relationships: []
       }
