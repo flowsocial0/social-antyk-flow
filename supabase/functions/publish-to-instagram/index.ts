@@ -233,24 +233,25 @@ serve(async (req) => {
         }
       }
 
-      // Get media URL - check for video first
+      // Get media URL - check for video first, prefer Supabase Storage over external URLs
       if (!finalVideoUrl && !finalImageUrl) {
         // Check if book has video
         if (book.video_url && isVideoUrl(book.video_url)) {
           finalVideoUrl = book.video_url;
           console.log('Using book.video_url:', finalVideoUrl);
+        } else if (book.storage_path) {
+          // Prefer Supabase Storage - publicly accessible, works with Instagram servers
+          finalImageUrl = getStoragePublicUrl(book.storage_path);
+          console.log('Using storage_path URL (preferred):', finalImageUrl);
         } else if (book.image_url) {
-          // Check if image_url is actually a video
+          // Fallback to external image_url
           if (isVideoUrl(book.image_url)) {
             finalVideoUrl = book.image_url;
             console.log('Using book.image_url as video:', finalVideoUrl);
           } else {
             finalImageUrl = book.image_url;
-            console.log('Using book.image_url:', finalImageUrl);
+            console.log('Using book.image_url (external fallback):', finalImageUrl);
           }
-        } else if (book.storage_path) {
-          finalImageUrl = getStoragePublicUrl(book.storage_path);
-          console.log('Using storage_path URL:', finalImageUrl);
         }
       }
     }
