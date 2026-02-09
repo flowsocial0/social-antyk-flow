@@ -10,6 +10,7 @@ interface Book {
   code: string;
   title: string;
   image_url: string | null;
+  storage_path: string | null;
   sale_price: number | null;
   promotional_price: number | null;
   video_url: string | null;
@@ -135,7 +136,7 @@ Deno.serve(async (req) => {
       .from('campaign_posts')
       .select(`
         *,
-        book:books(id, code, title, image_url, sale_price, promotional_price, video_url, video_storage_path),
+        book:books(id, code, title, image_url, storage_path, sale_price, promotional_price, video_url, video_storage_path),
         campaign:campaigns!inner(id, user_id, target_platforms, status)
       `)
       .lte('scheduled_at', now)
@@ -438,8 +439,12 @@ Deno.serve(async (req) => {
             
             const accountOwnerId = accountData?.user_id || campaignOwnerId;
             
-            // Priority: custom_image_url (from simple campaign) > book.image_url
-            const mediaUrl = post.custom_image_url || post.book?.image_url || null;
+            // Priority: custom_image_url > Supabase Storage > external image_url
+            // Supabase Storage URLs are publicly accessible and work with Instagram/Facebook servers
+            const storageUrl = post.book?.storage_path 
+              ? `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${post.book.storage_path}` 
+              : null;
+            const mediaUrl = post.custom_image_url || storageUrl || post.book?.image_url || null;
             
             // For video: check custom_image_url, then book's video_url/video_storage_path
             const bookVideoUrl = post.book?.video_url || 
