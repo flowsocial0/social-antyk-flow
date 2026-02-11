@@ -38,8 +38,7 @@ serve(async (req) => {
     // TikTok OAuth scopes - video.publish for direct posting, video.upload for drafts
     const scopes = [
       'user.info.basic',
-      'video.publish',
-      'video.upload'
+      'video.publish'
     ].join(',');
 
     // Build TikTok authorization URL
