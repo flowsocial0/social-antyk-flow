@@ -321,12 +321,12 @@ Deno.serve(async (req) => {
 
       // Get image URL from book if not provided
       if (!finalImageUrl) {
-        if (book?.image_url) {
-          finalImageUrl = book.image_url;
-          console.log('Using book.image_url:', finalImageUrl);
-        } else if (book?.storage_path) {
+        if (book?.storage_path) {
           finalImageUrl = getStoragePublicUrl(book.storage_path);
           console.log('Using storage_path URL:', finalImageUrl);
+        } else if (book?.image_url) {
+          finalImageUrl = book.image_url;
+          console.log('Using book.image_url:', finalImageUrl);
         }
       }
     }
@@ -381,12 +381,12 @@ Deno.serve(async (req) => {
 
         // Get image URL from book if not provided
         if (!finalImageUrl && !finalVideoUrl) {
-          if (book.image_url) {
-            finalImageUrl = book.image_url;
-            console.log('Using campaign book.image_url:', finalImageUrl);
-          } else if (book.storage_path) {
+          if (book.storage_path) {
             finalImageUrl = getStoragePublicUrl(book.storage_path);
             console.log('Using campaign book storage_path URL:', finalImageUrl);
+          } else if (book.image_url) {
+            finalImageUrl = book.image_url;
+            console.log('Using campaign book.image_url:', finalImageUrl);
           }
         }
       }

@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     }
 
     if (!effectiveUserId) {
-      throw new Error('User ID is required');
+      return new Response(JSON.stringify({ success: false, error: 'User ID is required' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Get Reddit token(s)
@@ -73,10 +73,14 @@ Deno.serve(async (req) => {
     let bookData: any = null;
     let productUrl: string | null = null;
 
+    const getStoragePublicUrl = (storagePath: string): string => {
+      return `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${storagePath}`;
+    };
+
     if (campaignPostId) {
       const { data: post } = await supabase
         .from('campaign_posts')
-        .select('*, book:books(id, title, image_url, product_url)')
+        .select('*, book:books(id, title, image_url, storage_path, product_url)')
         .eq('id', campaignPostId)
         .single();
 
@@ -84,7 +88,8 @@ Deno.serve(async (req) => {
         text = post.text;
         title = post.text.substring(0, 300);
         bookData = post.book;
-        if (!mediaUrl && bookData?.image_url) mediaUrl = bookData.image_url;
+        if (!mediaUrl && bookData?.storage_path) mediaUrl = getStoragePublicUrl(bookData.storage_path);
+        else if (!mediaUrl && bookData?.image_url) mediaUrl = bookData.image_url;
         productUrl = bookData?.product_url || null;
       }
     } else if (bookId) {
@@ -98,7 +103,8 @@ Deno.serve(async (req) => {
         bookData = book;
         title = book.title;
         productUrl = book.product_url;
-        if (!mediaUrl && book.image_url) mediaUrl = book.image_url;
+        if (!mediaUrl && book.storage_path) mediaUrl = getStoragePublicUrl(book.storage_path);
+        else if (!mediaUrl && book.image_url) mediaUrl = book.image_url;
 
         const { data: content } = await supabase
           .from('book_platform_content')
@@ -191,7 +197,7 @@ Deno.serve(async (req) => {
     console.error('Reddit publish error:', error);
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
