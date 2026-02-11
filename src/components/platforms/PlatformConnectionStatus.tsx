@@ -4,7 +4,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, XCircle, Loader2, RefreshCw, Link as LinkIcon } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, RefreshCw, Link as LinkIcon, Unplug } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface PlatformConnectionStatusProps {
   platform: string;
@@ -118,6 +129,35 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
     },
   });
 
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Musisz być zalogowany');
+
+      const tableName = getTableName(platform);
+      const { error } = await (supabase as any)
+        .from(tableName)
+        .delete()
+        .eq("user_id", session.user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "✅ Rozłączono",
+        description: "Konto zostało rozłączone. Przy ponownym połączeniu zostaniesz poproszony o wszystkie uprawnienia.",
+      });
+      refetch();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "❌ Błąd",
+        description: error.message || "Nie udało się rozłączyć konta",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleConnect = async () => {
     if (onConnect) {
       onConnect();
@@ -214,6 +254,41 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
                 <LinkIcon className="h-4 w-4 mr-2" />
                 Zarządzaj
               </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={disconnectMutation.isPending}
+                  >
+                    {disconnectMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Unplug className="h-4 w-4 mr-2" />
+                    )}
+                    Rozłącz
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Rozłączyć wszystkie konta?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Usunie to wszystkie zapisane tokeny autoryzacji dla tej platformy. 
+                      Przy ponownym połączeniu zostaniesz poproszony o udzielenie wszystkich uprawnień od nowa.
+                      Zaplanowane posty na tę platformę nie będą mogły być opublikowane do czasu ponownego połączenia.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Anuluj</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => disconnectMutation.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Tak, rozłącz
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </>
         ) : (
