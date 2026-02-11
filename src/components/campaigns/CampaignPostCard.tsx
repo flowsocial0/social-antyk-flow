@@ -410,8 +410,13 @@ export const CampaignPostCard = ({ post, userId, onSave, onRegenerate, onDelete,
                       post.status === 'rate_limited' ? 'text-yellow-600/90' : 
                       post.status === 'failed' ? 'text-red-600/90' : 'text-orange-600/90'
                     }`}>
-                      {post.error_message || 'Wystąpił błąd podczas publikacji. Sprawdź połączenie z kontem i spróbuj ponownie.'}
+                    {post.error_message || 'Wystąpił błąd podczas publikacji. Sprawdź połączenie z kontem i spróbuj ponownie.'}
                     </p>
+                    {post.error_message && /permission|granted|unauthorized|auth|token|expired|invalid.*token|access.*denied/i.test(post.error_message) && (
+                      <p className="text-xs font-medium text-orange-600 mt-2 p-2 bg-orange-500/10 rounded">
+                        💡 Wskazówka: Spróbuj rozłączyć i ponownie połączyć konto na stronie danej platformy. Uprawnienia mogły wygasnąć lub nie zostały w pełni zaakceptowane.
+                      </p>
+                    )}
                     {post.error_code && (
                       <p className="text-xs text-muted-foreground mt-1">
                         Kod błędu: {post.error_code}
