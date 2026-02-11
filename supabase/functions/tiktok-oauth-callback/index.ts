@@ -57,6 +57,24 @@ serve(async (req) => {
       throw new Error('Invalid token response from TikTok');
     }
 
+    // Fetch user info to get display name
+    let displayName = '';
+    try {
+      const userInfoResponse = await fetch(
+        'https://open.tiktokapis.com/v2/user/info/?fields=display_name,username',
+        {
+          headers: {
+            'Authorization': `Bearer ${access_token}`,
+          },
+        }
+      );
+      const userInfo = await userInfoResponse.json();
+      console.log('TikTok user info:', JSON.stringify(userInfo));
+      displayName = userInfo?.data?.user?.username || userInfo?.data?.user?.display_name || '';
+    } catch (e) {
+      console.warn('Could not fetch TikTok user info:', e);
+    }
+
     // Calculate expiration time
     const expiresAt = new Date(Date.now() + (expires_in || 86400) * 1000).toISOString();
 
@@ -83,6 +101,7 @@ serve(async (req) => {
           refresh_token,
           scope,
           expires_at: expiresAt,
+          account_name: displayName || undefined,
           updated_at: new Date().toISOString(),
         })
         .eq('id', existingAccount.id);
@@ -104,7 +123,8 @@ serve(async (req) => {
           open_id,
           scope,
           expires_at: expiresAt,
-          is_default: false, // Never set default - we publish to all accounts
+          account_name: displayName || null,
+          is_default: false,
         });
 
       if (insertError) {
