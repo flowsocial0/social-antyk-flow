@@ -125,10 +125,11 @@ serve(async (req) => {
         }
         if (!finalVideoUrl && !finalImageUrl) {
           if (book.video_url && isVideoUrl(book.video_url)) finalVideoUrl = book.video_url;
+          else if (book.storage_path) finalImageUrl = getStoragePublicUrl(book.storage_path);
           else if (book.image_url) {
             if (isVideoUrl(book.image_url)) finalVideoUrl = book.image_url;
             else finalImageUrl = book.image_url;
-          } else if (book.storage_path) finalImageUrl = getStoragePublicUrl(book.storage_path);
+          }
         }
       }
     }

@@ -24,7 +24,9 @@ Deno.serve(async (req) => {
         effectiveUserId = user?.id;
       }
     }
-    if (!effectiveUserId) throw new Error('User ID is required');
+    if (!effectiveUserId) {
+      return new Response(JSON.stringify({ success: false, error: 'User ID is required' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     let query = supabase.from('snapchat_oauth_tokens').select('*').eq('user_id', effectiveUserId);
     if (accountId) query = query.eq('id', accountId);
@@ -55,7 +57,7 @@ Deno.serve(async (req) => {
     console.error('Snapchat publish error:', error);
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

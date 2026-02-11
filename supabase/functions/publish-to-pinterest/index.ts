@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     }
 
     if (!effectiveUserId) {
-      throw new Error('User ID is required');
+      return new Response(JSON.stringify({ success: false, error: 'User ID is required' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Get Pinterest token(s)
@@ -63,6 +63,10 @@ Deno.serve(async (req) => {
       }
     }
 
+    const getStoragePublicUrl = (storagePath: string): string => {
+      return `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${storagePath}`;
+    };
+
     // Get content to publish
     let text = '';
     let mediaUrl = imageUrl || null;
@@ -71,14 +75,15 @@ Deno.serve(async (req) => {
     if (campaignPostId) {
       const { data: post } = await supabase
         .from('campaign_posts')
-        .select('*, book:books(id, title, image_url, product_url)')
+        .select('*, book:books(id, title, image_url, storage_path, product_url)')
         .eq('id', campaignPostId)
         .single();
 
       if (post) {
         text = post.text;
         bookData = post.book;
-        if (!mediaUrl && bookData?.image_url) mediaUrl = bookData.image_url;
+        if (!mediaUrl && bookData?.storage_path) mediaUrl = getStoragePublicUrl(bookData.storage_path);
+        else if (!mediaUrl && bookData?.image_url) mediaUrl = bookData.image_url;
       }
     } else if (bookId) {
       const { data: book } = await supabase
@@ -89,7 +94,8 @@ Deno.serve(async (req) => {
 
       if (book) {
         bookData = book;
-        if (!mediaUrl && book.image_url) mediaUrl = book.image_url;
+        if (!mediaUrl && book.storage_path) mediaUrl = getStoragePublicUrl(book.storage_path);
+        else if (!mediaUrl && book.image_url) mediaUrl = book.image_url;
 
         const { data: content } = await supabase
           .from('book_platform_content')
@@ -171,7 +177,7 @@ Deno.serve(async (req) => {
     console.error('Pinterest publish error:', error);
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

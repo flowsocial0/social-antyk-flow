@@ -24,7 +24,9 @@ Deno.serve(async (req) => {
         effectiveUserId = user?.id;
       }
     }
-    if (!effectiveUserId) throw new Error('User ID is required');
+    if (!effectiveUserId) {
+      return new Response(JSON.stringify({ success: false, error: 'User ID is required' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     let query = supabase.from('google_business_tokens').select('*').eq('user_id', effectiveUserId);
     if (accountId) query = query.eq('id', accountId);
@@ -42,18 +44,28 @@ Deno.serve(async (req) => {
       );
     }
 
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const getStoragePublicUrl = (storagePath: string): string => {
+      return `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${storagePath}`;
+    };
+
     let text = '';
     let mediaUrl = imageUrl || null;
     let bookData: any = null;
 
     if (campaignPostId) {
-      const { data: post } = await supabase.from('campaign_posts').select('*, book:books(id, title, image_url, product_url)').eq('id', campaignPostId).single();
-      if (post) { text = post.text; bookData = post.book; if (!mediaUrl && bookData?.image_url) mediaUrl = bookData.image_url; }
+      const { data: post } = await supabase.from('campaign_posts').select('*, book:books(id, title, image_url, storage_path, product_url)').eq('id', campaignPostId).single();
+      if (post) {
+        text = post.text; bookData = post.book;
+        if (!mediaUrl && bookData?.storage_path) mediaUrl = getStoragePublicUrl(bookData.storage_path);
+        else if (!mediaUrl && bookData?.image_url) mediaUrl = bookData.image_url;
+      }
     } else if (bookId) {
       const { data: book } = await supabase.from('books').select('*').eq('id', bookId).single();
       if (book) {
         bookData = book;
-        if (!mediaUrl && book.image_url) mediaUrl = book.image_url;
+        if (!mediaUrl && book.storage_path) mediaUrl = getStoragePublicUrl(book.storage_path);
+        else if (!mediaUrl && book.image_url) mediaUrl = book.image_url;
         const { data: content } = await supabase.from('book_platform_content').select('*').eq('id', contentId || '').single();
         text = content?.custom_text || content?.ai_generated_text || book.title;
       }
@@ -136,6 +148,6 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ success: results.some(r => r.success), results }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error: any) {
     console.error('Google Business publish error:', error);
-    return new Response(JSON.stringify({ success: false, error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ success: false, error: error.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
