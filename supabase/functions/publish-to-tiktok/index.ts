@@ -279,7 +279,7 @@ serve(async (req) => {
     const initData = await initResponse.json();
     console.log('TikTok video init response:', JSON.stringify(initData, null, 2));
 
-    if (initData.error?.code) {
+    if (initData.error?.code && initData.error.code !== 'ok') {
       const errorCode = initData.error.code;
       const errorMsg = initData.error.message || errorCode;
       
