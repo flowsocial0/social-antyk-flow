@@ -15,20 +15,30 @@ function emailLayout(content: string, footerNote?: string): string {
   <title>Antyk.org.pl</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f8f6f3;font-family:'Georgia','Times New Roman',serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8f6f3;padding:40px 20px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f3f0;padding:40px 20px;">
     <tr>
       <td align="center">
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+          <!-- Polish flag stripe -->
+          <tr>
+            <td>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+                <td style="height:4px;background:#ffffff;"></td>
+              </tr><tr>
+                <td style="height:4px;background:#dc143c;"></td>
+              </tr></table>
+            </td>
+          </tr>
           <!-- Header -->
           <tr>
-            <td style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);padding:32px 40px;text-align:center;">
+            <td style="background:linear-gradient(135deg,#1b1b1b 0%,#2a2a2a 50%,#1b1b1b 100%);padding:32px 40px;text-align:center;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center">
-                    <div style="font-size:28px;font-weight:700;color:#e8d5b7;letter-spacing:2px;font-family:'Georgia',serif;">
+                    <div style="font-size:28px;font-weight:700;color:#ffffff;letter-spacing:2px;font-family:'Georgia',serif;">
                       ✦ ANTYK ✦
                     </div>
-                    <div style="font-size:12px;color:#a89070;letter-spacing:4px;margin-top:6px;text-transform:uppercase;">
+                    <div style="font-size:12px;color:#dc143c;letter-spacing:4px;margin-top:6px;text-transform:uppercase;font-weight:600;">
                       Księgarnia Patriotyczna
                     </div>
                   </td>
@@ -37,10 +47,10 @@ function emailLayout(content: string, footerNote?: string): string {
             </td>
           </tr>
 
-          <!-- Decorative line -->
+          <!-- Decorative line - Polish red -->
           <tr>
             <td style="padding:0 40px;">
-              <div style="height:3px;background:linear-gradient(90deg,transparent,#c9a96e,transparent);margin:0;"></div>
+              <div style="height:3px;background:linear-gradient(90deg,transparent,#dc143c,transparent);margin:0;"></div>
             </td>
           </tr>
 
@@ -62,7 +72,7 @@ function emailLayout(content: string, footerNote?: string): string {
               ${footerNote ? `<p style="font-size:13px;color:#8a7a6a;margin:0 0 16px;font-style:italic;">${footerNote}</p>` : ""}
               <p style="font-size:12px;color:#b0a090;margin:0;">
                 Ta wiadomość została wysłana automatycznie z systemu<br/>
-                <span style="color:#c9a96e;">sklep.antyk.org.pl</span>
+                <span style="color:#dc143c;">sklep.antyk.org.pl</span>
               </p>
             </td>
           </tr>
@@ -77,15 +87,15 @@ function emailLayout(content: string, footerNote?: string): string {
 function infoRow(label: string, value: string): string {
   return `<tr>
     <td style="padding:8px 16px;font-size:13px;color:#8a7a6a;font-weight:600;vertical-align:top;white-space:nowrap;border-bottom:1px solid #f0ebe4;">${label}</td>
-    <td style="padding:8px 16px;font-size:14px;color:#2c2c2c;border-bottom:1px solid #f0ebe4;">${value}</td>
+    <td style="padding:8px 16px;font-size:14px;color:#1b1b1b;border-bottom:1px solid #f0ebe4;">${value}</td>
   </tr>`;
 }
 
 function statusBadge(statusLabel: string, status: string): string {
   const colors: Record<string, { bg: string; fg: string; border: string }> = {
     nowy: { bg: "#eef2ff", fg: "#4338ca", border: "#c7d2fe" },
-    w_trakcie: { bg: "#fef3c7", fg: "#92400e", border: "#fde68a" },
-    potrzebne_informacje: { bg: "#fce7f3", fg: "#9d174d", border: "#fbcfe8" },
+    w_trakcie: { bg: "#fff7ed", fg: "#9a3412", border: "#fed7aa" },
+    potrzebne_informacje: { bg: "#fef3c7", fg: "#92400e", border: "#fde68a" },
     rozwiazany: { bg: "#d1fae5", fg: "#065f46", border: "#a7f3d0" },
     anulowane: { bg: "#f3f4f6", fg: "#6b7280", border: "#e5e7eb" },
   };
@@ -173,14 +183,14 @@ Deno.serve(async (req) => {
 
         if (adminEmails.length > 0) {
           const content = `
-            <h2 style="font-size:22px;color:#1a1a2e;margin:0 0 8px;font-weight:700;">Nowe zgłoszenie błędu</h2>
+            <h2 style="font-size:22px;color:#1b1b1b;margin:0 0 8px;font-weight:700;">Nowe zgłoszenie błędu</h2>
             <p style="font-size:14px;color:#8a7a6a;margin:0 0 24px;">Otrzymano nowe zgłoszenie od użytkownika systemu.</p>
 
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf8f5;border-radius:12px;border:1px solid #ede8e0;margin-bottom:24px;">
               ${infoRow("Temat", `<strong>${report.title}</strong>`)}
               ${infoRow("Zgłosił/a", report.user_email)}
               ${infoRow("Status", statusBadge("Nowy", "nowy"))}
-              ${report.page_url ? infoRow("Strona", `<a href="${report.page_url}" style="color:#0f3460;text-decoration:none;">${report.page_url}</a>`) : ""}
+              ${report.page_url ? infoRow("Strona", `<a href="${report.page_url}" style="color:#dc143c;text-decoration:none;">${report.page_url}</a>`) : ""}
               ${report.screen_size ? infoRow("Rozdzielczość", report.screen_size) : ""}
             </table>
 
@@ -191,7 +201,7 @@ Deno.serve(async (req) => {
 
             ${report.screenshot_url ? `
             <div style="text-align:center;margin-bottom:8px;">
-              <a href="${report.screenshot_url}" style="display:inline-block;padding:12px 28px;background:linear-gradient(135deg,#1a1a2e,#0f3460);color:#e8d5b7;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;letter-spacing:0.5px;">
+              <a href="${report.screenshot_url}" style="display:inline-block;padding:12px 28px;background:linear-gradient(135deg,#1b1b1b,#333333);color:#ffffff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;letter-spacing:0.5px;border:2px solid #dc143c;">
                 📸 Zobacz zrzut ekranu
               </a>
             </div>` : ""}
@@ -207,7 +217,7 @@ Deno.serve(async (req) => {
 
       // Send confirmation to the user
       const userContent = `
-        <h2 style="font-size:22px;color:#1a1a2e;margin:0 0 8px;font-weight:700;">Dziękujemy za zgłoszenie!</h2>
+        <h2 style="font-size:22px;color:#1b1b1b;margin:0 0 8px;font-weight:700;">Dziękujemy za zgłoszenie!</h2>
         <p style="font-size:15px;color:#4a4a4a;margin:0 0 24px;line-height:1.6;">
           Otrzymaliśmy Twoje zgłoszenie i zajmiemy się nim tak szybko, jak to możliwe. Poniżej znajdziesz podsumowanie.
         </p>
@@ -254,7 +264,7 @@ Deno.serve(async (req) => {
       }
 
       const content = `
-        <h2 style="font-size:22px;color:#1a1a2e;margin:0 0 8px;font-weight:700;">Aktualizacja zgłoszenia</h2>
+        <h2 style="font-size:22px;color:#1b1b1b;margin:0 0 8px;font-weight:700;">Aktualizacja zgłoszenia</h2>
         <p style="font-size:15px;color:#4a4a4a;margin:0 0 24px;line-height:1.6;">
           ${statusMessage}
         </p>
@@ -292,7 +302,7 @@ Deno.serve(async (req) => {
       }
 
       const content = `
-        <h2 style="font-size:22px;color:#1a1a2e;margin:0 0 8px;font-weight:700;">Nowy komentarz</h2>
+        <h2 style="font-size:22px;color:#1b1b1b;margin:0 0 8px;font-weight:700;">Nowy komentarz</h2>
         <p style="font-size:14px;color:#8a7a6a;margin:0 0 24px;">Do Twojego zgłoszenia dodano nową odpowiedź.</p>
 
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf8f5;border-radius:12px;border:1px solid #ede8e0;margin-bottom:24px;">
@@ -301,7 +311,7 @@ Deno.serve(async (req) => {
         </table>
 
         <div style="background:#faf8f5;border-radius:12px;border:1px solid #ede8e0;padding:20px;margin-bottom:24px;">
-          <div style="border-left:3px solid #c9a96e;padding-left:16px;">
+          <div style="border-left:3px solid #dc143c;padding-left:16px;">
             <p style="font-size:14px;color:#2c2c2c;margin:0;line-height:1.7;white-space:pre-wrap;">${commentText}</p>
           </div>
         </div>
