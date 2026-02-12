@@ -1,103 +1,104 @@
 
-# Raport z testowania publikowania na wszystkich platformach
 
-## Wyniki testow polaczenia (testConnection)
+# System zgłaszania błędów (Bug Reporter)
 
-Wszystkie 17 edge functions odpowiedzialy poprawnie - zadna nie crashuje. Bledy "User ID required" to oczekiwane zachowanie przy braku autoryzacji.
+## Opis
 
-## Znalezione problemy
+System pozwalający użytkownikom zgłaszać błędy z dowolnego miejsca w aplikacji. Przycisk "Zgłoś błąd" w prawym dolnym rogu robi automatyczny zrzut ekranu, otwiera formularz zgłoszenia i zapisuje wszystko w bazie. Admini zarządzają zgłoszeniami w panelu administracyjnym z możliwością komentowania i zmiany statusu. Powiadomienia email przez Resend.
 
-### Problem 1: HTTP 500 zamiast 200 (5 funkcji)
+## Zakres funkcjonalności
 
-Funkcje **tumblr**, **pinterest**, **reddit**, **snapchat** i **google-business** zwracaja HTTP 500 przy bledach (np. brak user ID), zamiast HTTP 200 z `success: false`. To powoduje bledy CORS i nieczytelne komunikaty w przegladarce.
+1. **Przycisk globalny** - stały w prawym dolnym rogu na każdej stronie (tylko dla zalogowanych)
+2. **Formularz zgłoszenia** - temat, opis, automatyczny screenshot, dodatkowe załączniki
+3. **Automatyczne dane** - email użytkownika, URL strony, user agent, rozmiar ekranu, data/czas
+4. **Panel admina** - lista zgłoszeń, statusy, komentarze z załącznikami
+5. **Powiadomienia email** - przy tworzeniu, zmianie statusu, komentarzach
 
-**Dotyczy:**
-- `publish-to-tumblr` - linia 90: `throw new Error` w glownym bloku, catch zwraca `status: 500`
-- `publish-to-pinterest` - linia 138: to samo
-- `publish-to-reddit` - linia 148: to samo
-- `publish-to-snapchat` - linia 56: to samo
-- `publish-to-google-business` - linia 139: to samo
+## Etapy implementacji
 
-**Rozwiazanie:** Zmienic `status: 500` na `status: 200` w catch block kazdej z tych funkcji, dodac wczesne zwroty z `status: 200` dla brakujacych user ID (przed `throw`).
+### Etap 1: Baza danych
 
-### Problem 2: Zla kolejnosc priorytetow mediow (6 funkcji)
+Nowe tabele:
 
-Wedlug ustalonej zasady: **storage_path** (Supabase Storage) powinien miec priorytet nad **image_url** (zewnetrzny URL), bo serwery platform (Instagram, Facebook) czesto nie moga pobrac zewnetrznych obrazow.
+**`bug_reports`** - główna tabela zgłoszeń
+- id, user_id, user_email, title, description, status (nowy/w_trakcie/potrzebne_informacje/rozwiazany/anulowane), page_url, user_agent, screen_size, screenshot_url, created_at, updated_at
 
-Funkcje z **bledna** kolejnoscia (image_url PRZED storage_path) w sekcji bookId:
-- `publish-to-facebook` (linie 323-331 i 383-391)
-- `publish-to-tumblr` (nie uzywa storage_path wcale)
-- `publish-to-pinterest` (nie uzywa storage_path wcale)
-- `publish-to-reddit` (nie uzywa storage_path wcale)
-- `publish-to-google-business` (nie uzywa storage_path wcale)
-- `publish-to-threads` (linie 127-131 - image_url przed storage_path w sekcji bookId)
+**`bug_report_attachments`** - załączniki (screenshot + dodatkowe pliki)
+- id, bug_report_id, file_url, file_name, file_type, created_at, uploaded_by
 
-Funkcje z **poprawna** kolejnoscia (wg campaign post - storage_path pierwszy):
-- bluesky, mastodon, telegram, discord, gab, threads (w sekcji campaignPostId)
-- linkedin (poprawne)
-- instagram (poprawione w ostatniej zmianie)
+**`bug_report_comments`** - komentarze adminów
+- id, bug_report_id, user_id, user_email, comment_text, created_at
 
-**UWAGA**: Threads, Bluesky, Mastodon, Telegram, Discord, Gab - maja poprawna kolejnosc w kampaniach, ale **bledna w sekcji bookId** (image_url przed storage_path).
+Nowy bucket storage: **`bug-reports`** (publiczny, na screenshoty i załączniki)
 
-### Problem 3: Tumblr, Pinterest, Reddit, Google Business - brak storage_path
+RLS: użytkownicy widzą/tworzą swoje zgłoszenia; admini widzą wszystko i mogą komentować/zmieniać status.
 
-Te 4 funkcje w ogole nie sprawdzaja `storage_path` z tabeli books. Uzywaja tylko `image_url`, co moze powodowac problemy z pobieraniem mediow przez API platform.
+### Etap 2: Komponent globalny - BugReportButton
 
-## Plan napraw
+- Stały przycisk w prawym dolnym rogu (fixed position)
+- Po kliknięciu: zrzut ekranu strony za pomocą biblioteki `html2canvas`
+- Otwarcie dialogu z formularzem:
+  - Temat (wymagany)
+  - Opis (wymagany)
+  - Podgląd automatycznego screenshota
+  - Upload dodatkowych załączników (drag & drop)
+  - Automatycznie zebrane: email, URL, przeglądarka, rozdzielczość
+- Wysłanie: zapis do bazy + upload plików do Storage + wywołanie edge function na email
 
-### Krok 1: Naprawic HTTP 500 -> 200 (5 funkcji)
-W kazdej z 5 funkcji (tumblr, pinterest, reddit, snapchat, google-business):
-- Dodac wczesny return z `status: 200` i `success: false` gdy brak userId (zamiast `throw`)
-- Zmienic catch block z `status: 500` na `status: 200`
+### Etap 3: Panel admina - AdminBugReports
 
-### Krok 2: Ujednolicic priorytet mediow (10 funkcji)
-Zmienic kolejnosc w sekcji bookId na: `storage_path` PRZED `image_url`
+Nowa sekcja w panelu administracyjnym:
+- Lista zgłoszeń z filtrami po statusie
+- Widok szczegółowy zgłoszenia ze screenshotem, danymi technicznymi
+- Zmiana statusu (dropdown)
+- Sekcja komentarzy z możliwością dodawania załączników
+- Licznik nowych zgłoszeń w nagłówku
 
-Dotyczy:
-- **publish-to-facebook** (2 miejsca: bookId i campaignPostId sales)
-- **publish-to-threads** (1 miejsce: bookId)
-- **publish-to-bluesky** (1 miejsce: bookId)
-- **publish-to-mastodon** (1 miejsce: bookId)
-- **publish-to-telegram** (1 miejsce: bookId)
-- **publish-to-discord** (1 miejsce: bookId)
-- **publish-to-gab** (1 miejsce: bookId)
-- **publish-to-tumblr** (dodac obsluge storage_path)
-- **publish-to-pinterest** (dodac obsluge storage_path)
-- **publish-to-reddit** (dodac obsluge storage_path)
-- **publish-to-google-business** (dodac obsluge storage_path)
+### Etap 4: Edge function - send-bug-report-email
 
-### Krok 3: Deploy wszystkich zmienionych funkcji
+Funkcja wysyłająca emaile przez Resend:
+- Nowe zgłoszenie -> email do wszystkich adminów
+- Zmiana statusu -> email do autora zgłoszenia
+- Nowy komentarz -> email do autora zgłoszenia
 
-## Szczegoly techniczne
+Wymaga dodania sekretu **RESEND_API_KEY**.
 
-### Wzorzec poprawnej kolejnosci mediow (bookId):
+### Etap 5: Integracja
+
+- Dodanie `<BugReportButton />` w App.tsx (globalnie)
+- Dodanie `<AdminBugReports />` w Admin.tsx
+- Nowa trasa nie jest potrzebna - wszystko w istniejącym panelu admina
+
+## Nowa zależność
+
+- `html2canvas` - do robienia zrzutów ekranu strony
+
+## Szczegóły techniczne
+
+### Nowe pliki:
+- `src/components/bugs/BugReportButton.tsx` - globalny przycisk + dialog
+- `src/components/bugs/BugReportForm.tsx` - formularz zgłoszenia
+- `src/components/admin/AdminBugReports.tsx` - panel admina
+- `src/components/admin/BugReportDetail.tsx` - widok szczegółowy zgłoszenia
+- `supabase/functions/send-bug-report-email/index.ts` - edge function do emaili
+
+### Modyfikowane pliki:
+- `src/App.tsx` - dodanie BugReportButton
+- `src/pages/Admin.tsx` - dodanie AdminBugReports
+- `supabase/config.toml` - rejestracja nowej edge function
+
+### Schema SQL (migracja):
+
 ```text
-if (book.storage_path) finalImageUrl = getStoragePublicUrl(book.storage_path);
-else if (book.image_url) finalImageUrl = book.image_url;
+-- Enum statusów
+-- Tabela bug_reports z kolumnami: id, user_id, user_email, title, description, 
+--   status, page_url, user_agent, screen_size, screenshot_url, created/updated_at
+-- Tabela bug_report_attachments z FK do bug_reports
+-- Tabela bug_report_comments z FK do bug_reports  
+-- Storage bucket "bug-reports" (public)
+-- RLS: users INSERT+SELECT own, admins ALL
 ```
 
-### Wzorzec poprawnego error handling:
-```text
-if (!effectiveUserId) {
-  return new Response(
-    JSON.stringify({ success: false, error: 'User ID is required' }),
-    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  );
-}
-```
+### Sekret do dodania:
+- **RESEND_API_KEY** - klucz API z resend.com (darmowe konto = 100 emaili/dzień)
 
-### Pliki do zmiany (12 edge functions):
-1. `supabase/functions/publish-to-tumblr/index.ts`
-2. `supabase/functions/publish-to-pinterest/index.ts`
-3. `supabase/functions/publish-to-reddit/index.ts`
-4. `supabase/functions/publish-to-snapchat/index.ts`
-5. `supabase/functions/publish-to-google-business/index.ts`
-6. `supabase/functions/publish-to-facebook/index.ts`
-7. `supabase/functions/publish-to-threads/index.ts`
-8. `supabase/functions/publish-to-bluesky/index.ts`
-9. `supabase/functions/publish-to-mastodon/index.ts`
-10. `supabase/functions/publish-to-telegram/index.ts`
-11. `supabase/functions/publish-to-discord/index.ts`
-12. `supabase/functions/publish-to-gab/index.ts`
-
-Nie wymagaja zmian (juz poprawne): publish-to-x, publish-to-instagram, publish-to-linkedin, publish-to-youtube, publish-to-tiktok.
