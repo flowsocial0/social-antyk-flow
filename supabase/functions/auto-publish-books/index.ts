@@ -663,10 +663,11 @@ Deno.serve(async (req) => {
     console.error('Error in auto-publish function:', error);
     return new Response(
       JSON.stringify({ 
+        success: false,
         error: error instanceof Error ? error.message : 'Unknown error' 
       }),
       {
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );

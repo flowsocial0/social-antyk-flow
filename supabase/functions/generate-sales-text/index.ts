@@ -243,10 +243,11 @@ Wygeneruj TYLKO tekst posta, bez żadnych dodatkowych komentarzy ani linków.`;
     console.error('Error in generate-sales-text function:', error);
     return new Response(
       JSON.stringify({ 
+        success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred' 
       }),
       {
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );

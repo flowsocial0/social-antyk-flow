@@ -142,11 +142,12 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
+        success: false,
         error: errorMessage,
         details: errorDetails,
       }),
       {
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
     );

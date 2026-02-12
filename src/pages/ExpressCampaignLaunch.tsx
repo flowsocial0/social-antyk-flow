@@ -70,6 +70,9 @@ export default function ExpressCampaignLaunch() {
         });
 
         if (structureError) throw structureError;
+        if (structureData?.success === false || structureData?.error) {
+          throw new Error(structureData.error || 'Błąd generowania struktury kampanii');
+        }
 
         setProgress(`Generowanie treści postów dla ${platform.toUpperCase()}...`);
 
@@ -83,6 +86,9 @@ export default function ExpressCampaignLaunch() {
         });
 
         if (postsError) throw postsError;
+        if (postsData?.success === false || postsData?.error) {
+          throw new Error(postsData.error || 'Błąd generowania treści postów');
+        }
 
         setProgress(`Planowanie ${postsData.posts.length} postów dla ${platform.toUpperCase()}...`);
 
