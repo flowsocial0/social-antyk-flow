@@ -45,24 +45,39 @@ export const SimpleCampaignSetup = () => {
     const platforms = getAllPlatforms();
     const connectionStatus: Record<string, boolean> = {};
 
-    // Check all platform connections in parallel
-    const [xResult, fbResult, tiktokResult, ytResult, igResult, linkedinResult] = await Promise.all([
-      (supabase as any).from("twitter_oauth1_tokens").select("id").limit(1).maybeSingle(),
-      (supabase as any).from("facebook_oauth_tokens").select("id").limit(1).maybeSingle(),
-      (supabase as any).from("tiktok_oauth_tokens").select("id").limit(1).maybeSingle(),
-      (supabase as any).from("youtube_oauth_tokens").select("id").limit(1).maybeSingle(),
-      (supabase as any).from("instagram_oauth_tokens").select("id").limit(1).maybeSingle(),
-      (supabase as any).from("linkedin_oauth_tokens").select("id").limit(1).maybeSingle(),
-    ]);
+    // Map platform IDs to their token table names
+    const platformTableMap: Record<string, string> = {
+      x: "twitter_oauth1_tokens",
+      facebook: "facebook_oauth_tokens",
+      tiktok: "tiktok_oauth_tokens",
+      youtube: "youtube_oauth_tokens",
+      instagram: "instagram_oauth_tokens",
+      linkedin: "linkedin_oauth_tokens",
+      telegram: "telegram_tokens",
+      bluesky: "bluesky_tokens",
+      discord: "discord_tokens",
+      threads: "threads_oauth_tokens",
+      pinterest: "pinterest_oauth_tokens",
+      reddit: "reddit_oauth_tokens",
+      mastodon: "mastodon_tokens",
+      gab: "gab_tokens",
+      tumblr: "tumblr_oauth_tokens",
+      snapchat: "snapchat_oauth_tokens",
+      google_business: "google_business_tokens",
+    };
 
-    platforms.forEach((platform) => {
-      if (platform.id === "x") connectionStatus[platform.id] = !!xResult.data;
-      else if (platform.id === "facebook") connectionStatus[platform.id] = !!fbResult.data;
-      else if (platform.id === "tiktok") connectionStatus[platform.id] = !!tiktokResult.data;
-      else if (platform.id === "youtube") connectionStatus[platform.id] = !!ytResult.data;
-      else if (platform.id === "instagram") connectionStatus[platform.id] = !!igResult.data;
-      else if (platform.id === "linkedin") connectionStatus[platform.id] = !!linkedinResult.data;
-      else connectionStatus[platform.id] = false;
+    // Check all platform connections in parallel
+    const results = await Promise.all(
+      platforms.map(async (platform) => {
+        const table = platformTableMap[platform.id];
+        if (!table) return { id: platform.id, connected: false };
+        const { data } = await (supabase as any).from(table).select("id").limit(1).maybeSingle();
+        return { id: platform.id, connected: !!data };
+      })
+    );
+
+    results.forEach((r) => {
+      connectionStatus[r.id] = r.connected;
     });
 
     setConnectedPlatforms(connectionStatus as Record<PlatformId, boolean>);
