@@ -313,7 +313,7 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
               <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" /> Brak: {stats.unmatched}</Badge>
             </div>
 
-            <ScrollArea className="flex-1 border rounded-md" style={{ maxHeight: "50vh" }}>
+            <div className="flex-1 border rounded-md overflow-auto" style={{ maxHeight: "50vh" }}>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -358,7 +358,7 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
                   ))}
                 </TableBody>
               </Table>
-            </ScrollArea>
+            </div>
 
             <div className="flex gap-2 justify-between">
               <Button variant="outline" onClick={() => setStep(1)}>Wstecz</Button>
