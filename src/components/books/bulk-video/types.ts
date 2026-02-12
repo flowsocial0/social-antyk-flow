@@ -1,6 +1,7 @@
 export interface FileMatch {
   file?: File;
   url?: string;
+  megaFile?: any;
   fileName: string;
   bookId: string | null;
   bookTitle: string | null;

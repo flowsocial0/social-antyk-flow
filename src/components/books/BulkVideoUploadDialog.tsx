@@ -8,20 +8,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, CheckCircle, AlertTriangle, XCircle, Loader2, Link, PenLine } from "lucide-react";
+import { Upload, CheckCircle, AlertTriangle, XCircle, Loader2, Link, PenLine, Cloud } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileMatch, UploadResult, BookRecord } from "./bulk-video/types";
 import { normalize, similarity, formatSize } from "./bulk-video/utils";
 import { UrlLinksTab } from "./bulk-video/UrlLinksTab";
 import { ManualAssignTab } from "./bulk-video/ManualAssignTab";
+import { MegaLinksTab } from "./bulk-video/MegaLinksTab";
 
 interface BulkVideoUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-type Mode = "upload" | "urls" | "manual";
+type Mode = "upload" | "urls" | "manual" | "mega";
 
 export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDialogProps) => {
   const { toast } = useToast();
@@ -35,6 +36,7 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
   const [uploadIndex, setUploadIndex] = useState(0);
   const [results, setResults] = useState<UploadResult[]>([]);
   const [uploadDone, setUploadDone] = useState(false);
+  const [megaPhase, setMegaPhase] = useState<string>("");
   const abortRef = useRef(false);
 
   const { data: allBooks } = useQuery({
@@ -91,6 +93,13 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
     setStep(2);
   };
 
+  // --- Mega mode: receive matches from MegaLinksTab ---
+  const handleMegaMatchesReady = (m: FileMatch[]) => {
+    setMode("mega");
+    setMatches(m);
+    setStep(2);
+  };
+
   // --- Shared match editing ---
   const updateMatch = (index: number, bookId: string) => {
     const book = allBooks?.find(b => b.id === bookId);
@@ -127,6 +136,65 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
       }
 
       setResults(newResults);
+      setUploading(false);
+      setUploadDone(true);
+      queryClient.invalidateQueries({ queryKey: ["all-books-for-matching"] });
+      return;
+    }
+
+    if (mode === "mega") {
+      // Mega mode: download from Mega, then upload to Storage
+      setStep(3);
+      setUploading(true);
+      setUploadDone(false);
+      setResults([]);
+      setUploadIndex(0);
+      abortRef.current = false;
+
+      const toUpload = validMatches;
+      const newResults: UploadResult[] = [];
+
+      for (let i = 0; i < toUpload.length; i++) {
+        if (abortRef.current) break;
+        setUploadIndex(i);
+        const match = toUpload[i];
+
+        try {
+          // Phase 1: Download from Mega
+          setMegaPhase("Pobieranie z Mega...");
+          const buffer = await match.megaFile.downloadBuffer();
+          if (abortRef.current) break;
+
+          const ext = match.fileName.split(".").pop() || "mp4";
+          const storagePath = `videos/${match.bookId}.${ext}`;
+          const blob = new Blob([buffer], { type: `video/${ext}` });
+
+          // Phase 2: Upload to Supabase Storage
+          setMegaPhase("Przesyłanie do Storage...");
+          const { error: uploadError } = await supabase.storage
+            .from("ObrazkiKsiazek")
+            .upload(storagePath, blob, { upsert: true });
+          if (uploadError) throw uploadError;
+
+          const { data: urlData } = supabase.storage
+            .from("ObrazkiKsiazek")
+            .getPublicUrl(storagePath);
+
+          const { error: updateError } = await supabase
+            .from("books")
+            .update({ video_storage_path: storagePath, video_url: urlData.publicUrl })
+            .eq("id", match.bookId!);
+          if (updateError) throw updateError;
+
+          newResults.push({ fileName: match.fileName, success: true });
+        } catch (err: any) {
+          console.error(`Mega upload failed for ${match.fileName}:`, err);
+          newResults.push({ fileName: match.fileName, success: false, error: err.message });
+        }
+        setResults([...newResults]);
+      }
+
+      setMegaPhase("");
       setUploading(false);
       setUploadDone(true);
       queryClient.invalidateQueries({ queryKey: ["all-books-for-matching"] });
@@ -228,9 +296,10 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
         {/* Step 1: Choose mode */}
         {step === 1 && (
           <Tabs value={mode} onValueChange={v => setMode(v as Mode)} className="flex flex-col flex-1 min-h-0">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="upload" className="text-xs gap-1"><Upload className="h-3.5 w-3.5" />Upload plików</TabsTrigger>
               <TabsTrigger value="urls" className="text-xs gap-1"><Link className="h-3.5 w-3.5" />Linki URL</TabsTrigger>
+              <TabsTrigger value="mega" className="text-xs gap-1"><Cloud className="h-3.5 w-3.5" />Mega.nz</TabsTrigger>
               <TabsTrigger value="manual" className="text-xs gap-1"><PenLine className="h-3.5 w-3.5" />Przypisz ręcznie</TabsTrigger>
             </TabsList>
 
@@ -255,6 +324,10 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
 
             <TabsContent value="urls" className="flex-1 min-h-0">
               <UrlLinksTab allBooks={allBooks} onMatchesReady={handleUrlMatchesReady} />
+            </TabsContent>
+
+            <TabsContent value="mega" className="flex-1 min-h-0">
+              <MegaLinksTab allBooks={allBooks} onMatchesReady={handleMegaMatchesReady} />
             </TabsContent>
 
             <TabsContent value="manual" className="flex flex-col flex-1 min-h-0">
@@ -321,7 +394,7 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
             <div className="flex gap-2 justify-between">
               <Button variant="outline" onClick={() => setStep(1)}>Wstecz</Button>
               <Button onClick={startSave} disabled={validMatches.length === 0}>
-                {mode === "urls" ? `Zapisz ${validMatches.length} linków` : `Prześlij ${validMatches.length} plików`}
+                {mode === "mega" ? `Pobierz i prześlij ${validMatches.length} plików` : mode === "urls" ? `Zapisz ${validMatches.length} linków` : `Prześlij ${validMatches.length} plików`}
               </Button>
             </div>
           </div>
@@ -343,6 +416,16 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
               <div className="flex items-center gap-2 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" /> Zapisywanie linków...
               </div>
+            )}
+            {uploading && mode === "mega" && (
+              <>
+                <div className="text-sm">
+                  Plik {uploadIndex + 1}/{validMatches.length} —{" "}
+                  <span className="font-medium">{validMatches[uploadIndex]?.fileName}</span>
+                </div>
+                <div className="text-xs text-muted-foreground">{megaPhase}</div>
+                <Progress value={((uploadIndex + 1) / validMatches.length) * 100} />
+              </>
             )}
 
             {uploadDone && (
