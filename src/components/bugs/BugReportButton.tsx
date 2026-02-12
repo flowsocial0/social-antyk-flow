@@ -31,25 +31,37 @@ export const BugReportButton = () => {
       const bugButton = document.querySelector('[data-bug-report-button]') as HTMLElement;
       if (bugButton) bugButton.style.visibility = 'hidden';
 
-      const canvas = await html2canvas(document.documentElement, {
+      // Capture full page first, then crop to visible viewport
+      const fullCanvas = await html2canvas(document.body, {
         logging: false,
         useCORS: true,
         allowTaint: true,
-        scale: window.devicePixelRatio || 1,
-        width: window.innerWidth,
-        height: window.innerHeight,
-        x: window.scrollX,
-        y: window.scrollY,
-        windowWidth: window.innerWidth,
-        windowHeight: window.innerHeight,
-        scrollX: 0,
-        scrollY: 0,
       });
+
+      // Crop to current viewport
+      const cropCanvas = document.createElement('canvas');
+      const dpr = fullCanvas.width / document.body.scrollWidth;
+      cropCanvas.width = window.innerWidth * dpr;
+      cropCanvas.height = window.innerHeight * dpr;
+      const ctx = cropCanvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(
+          fullCanvas,
+          window.scrollX * dpr,
+          window.scrollY * dpr,
+          cropCanvas.width,
+          cropCanvas.height,
+          0,
+          0,
+          cropCanvas.width,
+          cropCanvas.height
+        );
+      }
 
       if (bugButton) bugButton.style.visibility = 'visible';
       
       const blob = await new Promise<Blob | null>((resolve) => {
-        canvas.toBlob(resolve, "image/png", 0.8);
+        cropCanvas.toBlob(resolve, "image/png");
       });
 
       if (blob) {
