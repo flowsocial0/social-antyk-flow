@@ -5,12 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Loader2, Send, Calendar, ExternalLink, Eye, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Undo2, Sparkles } from "lucide-react";
+import { Loader2, Send, Calendar, ExternalLink, Eye, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Undo2, Sparkles, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { ScheduleDialog } from "./ScheduleDialog";
 import { XPostPreviewDialog } from "./XPostPreviewDialog";
 import type { Tables } from "@/integrations/supabase/types";
+import { BulkVideoUploadDialog } from "./BulkVideoUploadDialog";
 
 type SortColumn = "code" | "title" | "stock_status" | "sale_price" | "published";
 type SortDirection = "asc" | "desc";
@@ -33,6 +34,7 @@ export const BooksList = () => {
   const itemsPerPage = 50;
   const [pageInput, setPageInput] = useState<string>("1");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [bulkVideoOpen, setBulkVideoOpen] = useState(false);
   useEffect(() => { setPageInput(String(currentPage)); }, [currentPage]);
   const {
     data: booksData,
@@ -513,7 +515,12 @@ export const BooksList = () => {
             {cancelAllScheduledMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Anuluj wszystkie ({scheduledCount})
           </Button>
+          <Button variant="outline" onClick={() => setBulkVideoOpen(true)} size="sm">
+            <Upload className="mr-2 h-4 w-4" />
+            Masowy upload wideo
+          </Button>
         </div>
+        <BulkVideoUploadDialog open={bulkVideoOpen} onOpenChange={setBulkVideoOpen} />
       </CardHeader>
       <CardContent>
         {isLoading ? <div className="flex justify-center py-8">
