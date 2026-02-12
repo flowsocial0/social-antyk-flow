@@ -1,53 +1,71 @@
 
-# Czytelne komunikaty bledow zamiast "Edge Function non-2xx"
+# Masowy upload filmow do ksiazek
 
 ## Problem
+Ponad 100 filmow na dysku, nazwanych tytulami ksiazek (np. "W obronie wiary katolickiej.mp4"). Trzeba je masowo wrzucic i automatycznie dopasowac do ksiazek w bazie.
 
-Trzy edge functions zwracaja HTTP 500 przy bledach, co powoduje ze klient Supabase wyrzuca ogolny blad "Edge Function returned a non-2xx status code" zamiast konkretnej wiadomosci o problemie. Uzytkownik widzi niezrozumialy komunikat techniczny.
+## Rozwiazanie
 
-Dotyczy to:
-- `generate-campaign` (generowanie kampanii)
-- `generate-sales-text` (generowanie tekstow AI)
-- `auto-publish-books` (zewnetrzny catch)
+Nowy komponent **BulkVideoUploadDialog** dostepny z listy ksiazek, ktory:
 
-Funkcje publikacji (publish-to-x, publish-to-facebook, itd.) sa juz poprawnie zaimplementowane — zwracaja HTTP 200 z `success: false`.
+1. Uzytkownik wybiera wiele plikow wideo naraz (input multiple)
+2. System automatycznie dopasowuje nazwy plikow do tytulow ksiazek (fuzzy matching)
+3. Uzytkownik widzi podglad dopasowan i moze recznie poprawic
+4. Upload przebiega partiami z paskiem postepu
 
-## Plan naprawy
+## Architektura
 
-### 1. Edge function: `generate-campaign`
-Zmiana statusu z 500 na 200 w catch, dodanie `success: false` w odpowiedzi.
+### Frontend: `src/components/books/BulkVideoUploadDialog.tsx`
 
-### 2. Edge function: `generate-sales-text`
-Zmiana statusu z 500 na 200 w catch, dodanie `success: false` i czytelnej wiadomosci.
+Nowy komponent z trzema krokami:
 
-### 3. Edge function: `auto-publish-books`
-Zmiana statusu z 500 na 200 w zewnetrznym catch (linia ~664).
+**Krok 1 - Wybor plikow**
+- Input type="file" z atrybutem `multiple` i `accept="video/*"`
+- Wyswietlenie liczby wybranych plikow i ich lacznego rozmiaru
 
-### 4. Frontend: Lepsze parsowanie bledow
+**Krok 2 - Podglad dopasowan**
+- Tabela z kolumnami: Nazwa pliku | Dopasowana ksiazka | Zgodnosc (%) | Akcja
+- Algorytm dopasowania: normalizacja nazw (usun rozszerzenie, podkreslniki na spacje, lowercase) i porownanie z tytulami ksiazek
+- Trzy stany dopasowania:
+  - Zielony: znaleziono dopasowanie powyzej 70%
+  - Zolty: czesciowe dopasowanie 40-70% - uzytkownik moze potwierdzic lub zmienic
+  - Czerwony: brak dopasowania - uzytkownik moze recznie wybrac ksiazke z listy (select/combobox)
+- Statystyki: "Dopasowano: X / Czesciowo: Y / Niedopasowano: Z"
 
-Wszystkie miejsca w kodzie, ktore uzywaja `supabase.functions.invoke` i wyswietlaja bledy, beda sprawdzac rowniez `data?.error` i `data?.message` obok `error.message`, zeby wyswietlic uzytkownikowi konkretna przyczyne.
+**Krok 3 - Upload z postepem**
+- Sekwencyjny upload plikow (po jednym, zeby nie przeciazyc)
+- Progress bar z informacja: "Przesylanie 15/120 - Patriotyzm, mestwo, prawosc zolnierska.mp4"
+- Po uplaodzie kazdego pliku: aktualizacja `video_storage_path` i `video_url` w tabeli books
+- Podsumowanie na koncu: ile sukces, ile bledow
 
-Dotyczy glownie:
-- `PlatformBooksList.tsx` — onError w mutacjach (generate AI text, publish)
-- `ExpressCampaignLaunch.tsx` — launchAllCampaigns
-- `CampaignDialog.tsx` — generowanie kampanii
-- `PlatformAITextDialog.tsx` — generowanie tekstu AI
+### Algorytm dopasowania nazw plikow do tytulow
 
-### Efekt
+```text
+1. Z nazwy pliku: usun rozszerzenie (.mp4, .mov, .webm)
+2. Zamien podkreslniki i myslniki na spacje
+3. Lowercase + trim
+4. Dla kazdej ksiazki: porownaj z lowercase tytulu
+5. Metryka: najdluzsza wspolna podsekwencja (LCS) / max(dlugosc nazwy, dlugosc tytulu)
+6. Wybierz najlepsze dopasowanie powyzej progu 40%
+```
 
-Zamiast "Edge Function returned a non-2xx status code" uzytkownik zobaczy np.:
-- "Nie udalo sie wygenerowac tekstu: przekroczono limit API"
-- "Blad generowania kampanii: brak klucza API"
-- "Wystapil blad podczas automatycznej publikacji: ..."
+### Integracja
+
+- Nowy przycisk "Masowy upload wideo" w BooksList.tsx (obok istniejacych przyciskow)
+- Upload do bucketu `ObrazkiKsiazek` pod sciezka `videos/{book_id}.{ext}`
+- Aktualizacja pol `video_storage_path` i `video_url` (public URL) w tabeli books
 
 ## Zakres zmian
 
 | Plik | Zmiana |
 |------|--------|
-| `supabase/functions/generate-campaign/index.ts` | status 500 na 200 + success: false |
-| `supabase/functions/generate-sales-text/index.ts` | status 500 na 200 + success: false |
-| `supabase/functions/auto-publish-books/index.ts` | status 500 na 200 + success: false |
-| `src/components/platforms/PlatformBooksList.tsx` | Parsowanie data?.error w onError |
-| `src/components/platforms/PlatformAITextDialog.tsx` | Parsowanie data?.error |
-| `src/pages/ExpressCampaignLaunch.tsx` | Parsowanie data?.error |
-| `src/components/books/CampaignDialog.tsx` | Parsowanie data?.error |
+| `src/components/books/BulkVideoUploadDialog.tsx` | NOWY - caly komponent |
+| `src/components/books/BooksList.tsx` | Dodanie przycisku i importu dialogu |
+
+## Uwagi techniczne
+
+- Pliki wideo sa duze (nawet 100MB+), wiec upload sekwencyjny, nie rownolegle
+- Supabase Storage obsluguje pliki do 5GB per upload
+- Kazdy plik uploadowany bezposrednio z przegladarki do Supabase Storage (bez edge function)
+- Fuzzy matching dziala calkowicie po stronie frontendu - lista ksiazek jest pobierana raz
+- Limit 20MB na plik w Lovable nie dotyczy - upload idzie bezposrednio do Supabase Storage API
