@@ -1,65 +1,77 @@
 
+# Integracja Mega.nz w masowym uploadzie wideo
 
-# Rozszerzenie dialogu masowego wideo o trzy tryby
+## Opis
 
-## Obecny stan
+Dodanie czwartej zakladki "Mega.nz" w dialogu masowego uploadu wideo. Uzytkownik wkleja linki Mega.nz, system pobiera pliki w przegladarce uzywajac biblioteki `megajs`, a nastepnie uploaduje je do Supabase Storage.
 
-Dialog `BulkVideoUploadDialog` ma jeden tryb: upload plikow z dysku z automatycznym dopasowaniem do ksiazek.
+## Flow uzytkownika
 
-## Plan zmian
+1. Uzytkownik otwiera dialog masowego wideo i wybiera zakladke "Mega.nz"
+2. Wkleja linki Mega.nz (jeden na linie)
+3. System waliduje linki (czy pasuja do formatu `mega.nz/file/...`)
+4. Klikniecie "Dalej" - system laczy sie z Mega i pobiera nazwy plikow (loadAttributes)
+5. Dopasowanie do ksiazek (LCS fuzzy matching) - tak jak w zakladce URL
+6. Podglad dopasowan (krok 2) z mozliwoscia korekty
+7. Klikniecie "Pobierz i przeslij" - dla kazdego pliku:
+   - Pobranie z Mega (deszyfrowanie w przegladarce)
+   - Upload do Supabase Storage (bucket ObrazkiKsiazek)
+   - Aktualizacja `video_url` i `video_storage_path` w bazie
+8. Progress bar pokazujacy aktualny plik i postep
 
-Dialog dostanie trzy zakladki (Tabs) w kroku 1:
-
-### Zakladka 1: "Upload plikow" (istniejaca)
-Bez zmian - wybor plikow z dysku, fuzzy matching, upload do Supabase Storage.
-
-### Zakladka 2: "Linki URL" (nowa)
-1. Textarea na wklejenie listy bezposrednich linkow (jeden na linie)
-2. System wyciaga nazwe pliku z URL-a i dopasowuje do ksiazek (LCS)
-3. Podglad dopasowan z mozliwoscia recznej korekty (krok 2)
-4. Zapis: aktualizacja tylko pola `video_url` (bez uploadu)
-
-### Zakladka 3: "Przypisz linki recznie" (nowa)
-Ta zakladka rozwiazuje problem linkow z nic niemowiacymi nazwami (np. `https://cdn.example.com/abc123xyz.mp4`).
-
-Jak dziala:
-1. Wyswietla liste WSZYSTKICH ksiazek z bazy w tabeli
-2. Kazda ksiazka ma pole tekstowe (input) obok tytulu
-3. Uzytkownik po prostu wkleja link do wideo przy odpowiedniej ksiazce
-4. Opcjonalne: filtrowanie/wyszukiwanie ksiazek po tytule (zeby szybko znalezc wlasciwa)
-5. Opcjonalne: pokazanie ikony czy ksiazka juz ma przypisane wideo
-6. Przycisk "Zapisz" aktualizuje pole `video_url` dla wszystkich ksiazek ktore dostaly nowy link
-
-Interfejs zakladki 3 (schemat):
-
-```text
-[Szukaj ksiazki...                    ]
-
-| Tytul ksiazki              | Obecne wideo | Link do wideo              |
-|----------------------------|--------------|----------------------------|
-| Ogniem i Mieczem           | (brak)       | [wklej link tutaj...     ] |
-| Pan Tadeusz                | (jest)       | [wklej link tutaj...     ] |
-| Quo Vadis                  | (brak)       | [wklej link tutaj...     ] |
-
-                                    [Zapisz X zmian]
-```
-
-## Wspolny flow
-
-- Zakladki 2 i 3 NIE przechodza przez krok 3 (progress bar uploadu) - zapis jest natychmiastowy (tylko UPDATE w bazie)
-- Zakladka 1 zachowuje dotychczasowy 3-krokowy flow z progress barem
-
-## Zakres zmian
+## Zakres zmian technicznych
 
 | Plik | Zmiana |
 |------|--------|
-| `src/components/books/BulkVideoUploadDialog.tsx` | Dodanie Tabs z trzema trybami, textarea dla linkow URL, lista ksiazek z inputami dla recznego przypisywania |
+| `package.json` | Dodanie zaleznosci `megajs` |
+| `src/components/books/bulk-video/MegaLinksTab.tsx` | Nowy komponent - textarea na linki Mega, walidacja, pobieranie nazw plikow, matching |
+| `src/components/books/bulk-video/utils.ts` | Dodanie funkcji `isMegaUrl()` do walidacji linkow Mega |
+| `src/components/books/bulk-video/types.ts` | Rozszerzenie `FileMatch` o pole `megaFile` (referencja do obiektu megajs File) |
+| `src/components/books/BulkVideoUploadDialog.tsx` | Dodanie czwartej zakladki "Mega.nz", obsluga trybu "mega" w `startSave` (pobieranie + upload) |
 
 ## Szczegoly techniczne
 
-- Zakladka 3 uzywa tego samego query `all-books-for-matching` co juz istnieje w komponencie
-- Dodanie pola wyszukiwania (filtr po tytule) dla wygody przy duzej liczbie ksiazek
-- Stan zmian w zakladce 3: `Record<string, string>` (bookId -> url) - zapisywane sa tylko te ksiazki ktore dostaly nowy link
-- Przycisk "Zapisz" robi batch update - dla kazdej zmienionej ksiazki osobny `supabase.from('books').update({ video_url }).eq('id', bookId)`
-- Ikona obok tytulu pokazuje czy ksiazka juz ma wideo (zielona kropka lub szara)
-- Walidacja: sprawdzenie czy wklejony link zaczyna sie od `http://` lub `https://`
+### Import megajs w przegladarce
+
+```typescript
+import { File as MegaFile } from 'megajs';
+
+const file = MegaFile.fromURL('https://mega.nz/file/xxx#yyy');
+await file.loadAttributes(); // pobiera nazwe, rozmiar
+const buffer = await file.downloadBuffer(); // pobiera i deszyfruje
+const blob = new Blob([buffer], { type: 'video/mp4' });
+```
+
+### Flow zapisu (tryb mega)
+
+Dla kazdego dopasowanego pliku kolejno:
+1. `file.downloadBuffer()` - pobranie z Mega do pamieci
+2. `supabase.storage.from('ObrazkiKsiazek').upload(path, blob)` - upload do Storage
+3. `supabase.from('books').update({ video_storage_path, video_url })` - zapis w bazie
+
+### Progress
+
+Dwupoziomowy progress:
+- Ktory plik z kolei (np. "3/10")
+- Dla kazdego pliku: faza "Pobieranie z Mega..." / "Przesylanie do Storage..."
+
+### Walidacja linkow Mega
+
+```typescript
+function isMegaUrl(url: string): boolean {
+  return /^https?:\/\/mega\.nz\/(file|folder)\//.test(url);
+}
+```
+
+### Ograniczenia i ostrzezenia w UI
+
+- Informacja ze duze pliki moga zajac duzo pamieci RAM
+- Ostrzezenie jesli laczny rozmiar plikow przekracza np. 1GB
+- Mozliwosc anulowania w trakcie
+
+### Obsluga bledow
+
+- Nieprawidlowy link Mega (brak klucza deszyfrujacego)
+- Plik usuniety z Mega
+- Przekroczenie limitu pamieci przegladarki
+- Blad uploadu do Storage
