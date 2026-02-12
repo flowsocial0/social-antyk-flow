@@ -1,4 +1,38 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { File as MegaFile } from 'https://esm.sh/megajs@1.3.9';
+
+const MEGA_REGEX = /^https?:\/\/mega\.nz\/(file|folder)\//;
+
+async function resolveMegaUrl(
+  videoUrl: string,
+  postId: string,
+  supabase: any,
+  supabaseUrl: string
+): Promise<{ resolvedUrl: string; tempPath: string | null }> {
+  if (!MEGA_REGEX.test(videoUrl)) {
+    return { resolvedUrl: videoUrl, tempPath: null };
+  }
+
+  console.log(`Resolving Mega.nz URL for post ${postId}...`);
+  const tempPath = `temp-videos/${postId}-${Date.now()}.mp4`;
+
+  const file = MegaFile.fromURL(videoUrl);
+  await file.loadAttributes();
+  const buffer = await file.downloadBuffer({});
+  const blob = new Blob([new Uint8Array(buffer)], { type: 'video/mp4' });
+
+  console.log(`Mega file downloaded (${(blob.size / 1024 / 1024).toFixed(1)} MB), uploading to temp storage...`);
+
+  const { error } = await supabase.storage
+    .from('ObrazkiKsiazek')
+    .upload(tempPath, blob, { upsert: true });
+
+  if (error) throw new Error(`Mega temp upload failed: ${error.message}`);
+
+  const publicUrl = `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${tempPath}`;
+  console.log(`Mega resolved to temp URL: ${publicUrl}`);
+  return { resolvedUrl: publicUrl, tempPath };
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -330,6 +364,34 @@ Deno.serve(async (req) => {
         let platformFailCount = 0;
         const platformErrors: string[] = [];
         
+        // Pre-compute video URL once for this post (same across all platforms/accounts)
+        const bookVideoUrlRaw = post.book?.video_url || 
+          (post.book?.video_storage_path ? `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${post.book.video_storage_path}` : null);
+        
+        // Resolve Mega.nz URL once before publishing to any platform
+        let resolvedVideoUrl = bookVideoUrlRaw;
+        let tempMegaPath: string | null = null;
+        if (resolvedVideoUrl && MEGA_REGEX.test(resolvedVideoUrl)) {
+          try {
+            const resolved = await resolveMegaUrl(resolvedVideoUrl, post.id, supabase, supabaseUrl);
+            resolvedVideoUrl = resolved.resolvedUrl;
+            tempMegaPath = resolved.tempPath;
+          } catch (megaErr: any) {
+            console.error(`Mega.nz resolution failed for post ${post.id}:`, megaErr.message);
+            await supabase
+              .from('campaign_posts')
+              .update({
+                status: 'failed',
+                error_message: `Nie udało się pobrać wideo z Mega.nz: ${megaErr.message}. Użyj mniejszego pliku lub bezpośredniego linku .mp4.`,
+                error_code: 'MEGA_DOWNLOAD_FAILED'
+              })
+              .eq('id', post.id);
+            failCount++;
+            results.push({ id: post.id, type: 'campaign_post', success: false, error: megaErr.message });
+            continue; // skip this entire post
+          }
+        }
+        
         for (const platform of platforms) {
           let publishFunctionName = '';
           
@@ -446,15 +508,12 @@ Deno.serve(async (req) => {
               : null;
             const mediaUrl = post.custom_image_url || storageUrl || post.book?.image_url || null;
             
-            // For video: check custom_image_url, then book's video_url/video_storage_path
-            const bookVideoUrl = post.book?.video_url || 
-              (post.book?.video_storage_path ? `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${post.book.video_storage_path}` : null);
-            
+            // For video: use pre-resolved video URL (Mega already handled above)
             // Detect if mediaUrl is a video based on extension
             const isMediaVideo = mediaUrl ? /\.(mp4|mov|webm|avi|mkv|m4v)$/i.test(mediaUrl) : false;
             
-            // Final video URL: if mediaUrl is video use it, otherwise use book's dedicated video_url
-            const videoUrl = isMediaVideo ? mediaUrl : bookVideoUrl;
+            // Final video URL: if mediaUrl is video use it, otherwise use the pre-resolved book video
+            const videoUrl = isMediaVideo ? mediaUrl : resolvedVideoUrl;
             const imageUrl = isMediaVideo ? null : mediaUrl;
             
             console.log(`Media for post ${post.id}: image=${imageUrl ? 'present' : 'none'}, video=${videoUrl ? 'present' : 'none'}`);
@@ -508,6 +567,16 @@ Deno.serve(async (req) => {
             } else {
               platformErrors.push(`${platformName}: Nie udało się opublikować na żadne konto.`);
             }
+          }
+        }
+
+        // Clean up any temp Mega files after all platforms are done
+        if (tempMegaPath) {
+          try {
+            await supabase.storage.from('ObrazkiKsiazek').remove([tempMegaPath]);
+            console.log(`Cleaned up temp Mega file: ${tempMegaPath}`);
+          } catch (cleanupErr) {
+            console.warn(`Failed to cleanup temp Mega file ${tempMegaPath}:`, cleanupErr);
           }
         }
 
