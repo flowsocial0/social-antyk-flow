@@ -1,71 +1,65 @@
 
-# Masowy upload filmow do ksiazek
 
-## Problem
-Ponad 100 filmow na dysku, nazwanych tytulami ksiazek (np. "W obronie wiary katolickiej.mp4"). Trzeba je masowo wrzucic i automatycznie dopasowac do ksiazek w bazie.
+# Rozszerzenie dialogu masowego wideo o trzy tryby
 
-## Rozwiazanie
+## Obecny stan
 
-Nowy komponent **BulkVideoUploadDialog** dostepny z listy ksiazek, ktory:
+Dialog `BulkVideoUploadDialog` ma jeden tryb: upload plikow z dysku z automatycznym dopasowaniem do ksiazek.
 
-1. Uzytkownik wybiera wiele plikow wideo naraz (input multiple)
-2. System automatycznie dopasowuje nazwy plikow do tytulow ksiazek (fuzzy matching)
-3. Uzytkownik widzi podglad dopasowan i moze recznie poprawic
-4. Upload przebiega partiami z paskiem postepu
+## Plan zmian
 
-## Architektura
+Dialog dostanie trzy zakladki (Tabs) w kroku 1:
 
-### Frontend: `src/components/books/BulkVideoUploadDialog.tsx`
+### Zakladka 1: "Upload plikow" (istniejaca)
+Bez zmian - wybor plikow z dysku, fuzzy matching, upload do Supabase Storage.
 
-Nowy komponent z trzema krokami:
+### Zakladka 2: "Linki URL" (nowa)
+1. Textarea na wklejenie listy bezposrednich linkow (jeden na linie)
+2. System wyciaga nazwe pliku z URL-a i dopasowuje do ksiazek (LCS)
+3. Podglad dopasowan z mozliwoscia recznej korekty (krok 2)
+4. Zapis: aktualizacja tylko pola `video_url` (bez uploadu)
 
-**Krok 1 - Wybor plikow**
-- Input type="file" z atrybutem `multiple` i `accept="video/*"`
-- Wyswietlenie liczby wybranych plikow i ich lacznego rozmiaru
+### Zakladka 3: "Przypisz linki recznie" (nowa)
+Ta zakladka rozwiazuje problem linkow z nic niemowiacymi nazwami (np. `https://cdn.example.com/abc123xyz.mp4`).
 
-**Krok 2 - Podglad dopasowan**
-- Tabela z kolumnami: Nazwa pliku | Dopasowana ksiazka | Zgodnosc (%) | Akcja
-- Algorytm dopasowania: normalizacja nazw (usun rozszerzenie, podkreslniki na spacje, lowercase) i porownanie z tytulami ksiazek
-- Trzy stany dopasowania:
-  - Zielony: znaleziono dopasowanie powyzej 70%
-  - Zolty: czesciowe dopasowanie 40-70% - uzytkownik moze potwierdzic lub zmienic
-  - Czerwony: brak dopasowania - uzytkownik moze recznie wybrac ksiazke z listy (select/combobox)
-- Statystyki: "Dopasowano: X / Czesciowo: Y / Niedopasowano: Z"
+Jak dziala:
+1. Wyswietla liste WSZYSTKICH ksiazek z bazy w tabeli
+2. Kazda ksiazka ma pole tekstowe (input) obok tytulu
+3. Uzytkownik po prostu wkleja link do wideo przy odpowiedniej ksiazce
+4. Opcjonalne: filtrowanie/wyszukiwanie ksiazek po tytule (zeby szybko znalezc wlasciwa)
+5. Opcjonalne: pokazanie ikony czy ksiazka juz ma przypisane wideo
+6. Przycisk "Zapisz" aktualizuje pole `video_url` dla wszystkich ksiazek ktore dostaly nowy link
 
-**Krok 3 - Upload z postepem**
-- Sekwencyjny upload plikow (po jednym, zeby nie przeciazyc)
-- Progress bar z informacja: "Przesylanie 15/120 - Patriotyzm, mestwo, prawosc zolnierska.mp4"
-- Po uplaodzie kazdego pliku: aktualizacja `video_storage_path` i `video_url` w tabeli books
-- Podsumowanie na koncu: ile sukces, ile bledow
-
-### Algorytm dopasowania nazw plikow do tytulow
+Interfejs zakladki 3 (schemat):
 
 ```text
-1. Z nazwy pliku: usun rozszerzenie (.mp4, .mov, .webm)
-2. Zamien podkreslniki i myslniki na spacje
-3. Lowercase + trim
-4. Dla kazdej ksiazki: porownaj z lowercase tytulu
-5. Metryka: najdluzsza wspolna podsekwencja (LCS) / max(dlugosc nazwy, dlugosc tytulu)
-6. Wybierz najlepsze dopasowanie powyzej progu 40%
+[Szukaj ksiazki...                    ]
+
+| Tytul ksiazki              | Obecne wideo | Link do wideo              |
+|----------------------------|--------------|----------------------------|
+| Ogniem i Mieczem           | (brak)       | [wklej link tutaj...     ] |
+| Pan Tadeusz                | (jest)       | [wklej link tutaj...     ] |
+| Quo Vadis                  | (brak)       | [wklej link tutaj...     ] |
+
+                                    [Zapisz X zmian]
 ```
 
-### Integracja
+## Wspolny flow
 
-- Nowy przycisk "Masowy upload wideo" w BooksList.tsx (obok istniejacych przyciskow)
-- Upload do bucketu `ObrazkiKsiazek` pod sciezka `videos/{book_id}.{ext}`
-- Aktualizacja pol `video_storage_path` i `video_url` (public URL) w tabeli books
+- Zakladki 2 i 3 NIE przechodza przez krok 3 (progress bar uploadu) - zapis jest natychmiastowy (tylko UPDATE w bazie)
+- Zakladka 1 zachowuje dotychczasowy 3-krokowy flow z progress barem
 
 ## Zakres zmian
 
 | Plik | Zmiana |
 |------|--------|
-| `src/components/books/BulkVideoUploadDialog.tsx` | NOWY - caly komponent |
-| `src/components/books/BooksList.tsx` | Dodanie przycisku i importu dialogu |
+| `src/components/books/BulkVideoUploadDialog.tsx` | Dodanie Tabs z trzema trybami, textarea dla linkow URL, lista ksiazek z inputami dla recznego przypisywania |
 
-## Uwagi techniczne
+## Szczegoly techniczne
 
-- Pliki wideo sa duze (nawet 100MB+), wiec upload sekwencyjny, nie rownolegle
-- Supabase Storage obsluguje pliki do 5GB per upload
-- Kazdy plik uploadowany bezposrednio z przegladarki do Supabase Storage (bez edge function)
-- Fuzzy matching dziala calkowicie po stronie frontendu - lista ksiazek jest pobierana raz
-- Limit 20MB na plik w Lovable nie dotyczy - upload idzie bezposrednio do Supabase Storage API
+- Zakladka 3 uzywa tego samego query `all-books-for-matching` co juz istnieje w komponencie
+- Dodanie pola wyszukiwania (filtr po tytule) dla wygody przy duzej liczbie ksiazek
+- Stan zmian w zakladce 3: `Record<string, string>` (bookId -> url) - zapisywane sa tylko te ksiazki ktore dostaly nowy link
+- Przycisk "Zapisz" robi batch update - dla kazdej zmienionej ksiazki osobny `supabase.from('books').update({ video_url }).eq('id', bookId)`
+- Ikona obok tytulu pokazuje czy ksiazka juz ma wideo (zielona kropka lub szara)
+- Walidacja: sprawdzenie czy wklejony link zaczyna sie od `http://` lub `https://`
