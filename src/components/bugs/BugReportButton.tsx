@@ -31,7 +31,7 @@ export const BugReportButton = () => {
         logging: false,
         useCORS: true,
         allowTaint: true,
-        scale: 0.5,
+        scale: 1,
         windowWidth: window.innerWidth,
         windowHeight: window.innerHeight,
         height: window.innerHeight,
