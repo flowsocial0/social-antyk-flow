@@ -3,10 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, Upload, Calendar, RefreshCw, Download, Sparkles, Share2, ChevronDown, FileDown, Shield, Settings, FileCode } from "lucide-react";
+import { Plus, Upload, Calendar, RefreshCw, Download, Sparkles, Share2, ChevronDown, FileDown, Shield, Settings, FileCode, Video } from "lucide-react";
 import { ImportCSVDialog } from "@/components/books/ImportCSVDialog";
 import { ImportXMLDialog } from "@/components/books/ImportXMLDialog";
 import { AddBookDialog } from "@/components/books/AddBookDialog";
+import { BulkVideoUploadDialog } from "@/components/books/BulkVideoUploadDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -20,6 +21,7 @@ export const QuickActions = () => {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importXMLDialogOpen, setImportXMLDialogOpen] = useState(false);
   const [addBookDialogOpen, setAddBookDialogOpen] = useState(false);
+  const [bulkVideoOpen, setBulkVideoOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -168,6 +170,10 @@ export const QuickActions = () => {
                   Synchronizuj z XML
                 </DropdownMenuItem>
               )}
+              <DropdownMenuItem onClick={() => setBulkVideoOpen(true)}>
+                <Video className="mr-2 h-4 w-4" />
+                Masowy upload wideo
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -211,6 +217,7 @@ export const QuickActions = () => {
         onOpenChange={setAddBookDialogOpen}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ["general-books"] })}
       />
+      <BulkVideoUploadDialog open={bulkVideoOpen} onOpenChange={setBulkVideoOpen} />
     </>
   );
 };
