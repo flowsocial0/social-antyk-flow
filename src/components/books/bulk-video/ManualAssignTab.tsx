@@ -87,7 +87,7 @@ export const ManualAssignTab = ({ allBooks, onDone }: ManualAssignTabProps) => {
         />
       </div>
 
-      <ScrollArea className="flex-1 max-h-[45vh] border rounded-md">
+      <div className="flex-1 max-h-[45vh] border rounded-md overflow-y-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -125,7 +125,7 @@ export const ManualAssignTab = ({ allBooks, onDone }: ManualAssignTabProps) => {
             })}
           </TableBody>
         </Table>
-      </ScrollArea>
+      </div>
 
       <div className="text-sm text-muted-foreground">
         Wyświetlono {filteredBooks.length} z {allBooks.length} książek
