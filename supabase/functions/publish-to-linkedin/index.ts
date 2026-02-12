@@ -375,26 +375,65 @@ Deno.serve(async (req) => {
         if (isVideo) {
           console.log('Waiting for LinkedIn video processing...');
           let assetReady = false;
-          for (let i = 0; i < 60; i++) {
-            const statusResponse = await fetch(
-              `https://api.linkedin.com/v2/assets/${encodeURIComponent(asset)}`,
-              { headers: { 'Authorization': `Bearer ${accessToken}` } }
-            );
-            const statusData = await statusResponse.json();
-            const recipeStatus = statusData.recipes?.[0]?.status;
-            console.log(`Video processing status check ${i + 1}: ${recipeStatus}`);
-            
-            if (recipeStatus === 'AVAILABLE') {
-              assetReady = true;
-              break;
-            }
-            if (recipeStatus === 'PROCESSING_FAILED') {
-              throw new Error('LinkedIn nie mógł przetworzyć wideo. Sprawdź format pliku.');
+          const maxChecks = 20; // ~60 seconds max (20 * 3s)
+          for (let i = 0; i < maxChecks; i++) {
+            try {
+              const statusResponse = await fetch(
+                `https://api.linkedin.com/v2/assets/${encodeURIComponent(asset)}`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+              );
+              
+              if (!statusResponse.ok) {
+                console.error(`Asset status check failed with HTTP ${statusResponse.status}`);
+                // If we can't check status after upload, assume it's ready after a delay
+                if (i >= 5) {
+                  console.log('Cannot verify video status, proceeding with post after delay');
+                  assetReady = true;
+                  break;
+                }
+                await new Promise(r => setTimeout(r, 3000));
+                continue;
+              }
+              
+              const statusData = await statusResponse.json();
+              
+              // LinkedIn API may return status in different paths
+              const recipeStatus = statusData.recipes?.[0]?.status;
+              const serviceStatus = statusData.serviceRelationships?.[0]?.status;
+              const mediaStatus = statusData.mediaTypeFamily;
+              const effectiveStatus = recipeStatus || serviceStatus;
+              
+              console.log(`Video processing check ${i + 1}/${maxChecks}: recipe=${recipeStatus}, service=${serviceStatus}, mediaType=${mediaStatus}`);
+              
+              if (effectiveStatus === 'AVAILABLE' || recipeStatus === 'AVAILABLE') {
+                assetReady = true;
+                break;
+              }
+              if (effectiveStatus === 'PROCESSING_FAILED' || recipeStatus === 'PROCESSING_FAILED') {
+                throw new Error('LinkedIn nie mógł przetworzyć wideo. Sprawdź format pliku.');
+              }
+              
+              // If status is undefined after multiple checks, the upload may already be ready
+              if (!effectiveStatus && i >= 8) {
+                console.log('Video status remains undefined after multiple checks, assuming ready');
+                assetReady = true;
+                break;
+              }
+            } catch (statusError) {
+              if (statusError instanceof Error && statusError.message.includes('przetworzyć')) {
+                throw statusError; // Re-throw processing failed error
+              }
+              console.error(`Status check ${i + 1} error:`, statusError);
+              if (i >= 8) {
+                console.log('Multiple status check failures, proceeding with post attempt');
+                assetReady = true;
+                break;
+              }
             }
             await new Promise(r => setTimeout(r, 3000));
           }
           if (!assetReady) {
-            throw new Error('Przetwarzanie wideo LinkedIn przekroczyło limit czasu (3 minuty)');
+            throw new Error('Przetwarzanie wideo LinkedIn przekroczyło limit czasu (60 sekund)');
           }
           console.log('Video processing complete!');
         }
