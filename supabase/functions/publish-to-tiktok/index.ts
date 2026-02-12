@@ -199,10 +199,12 @@ serve(async (req) => {
       bookData = book;
       console.log('Book data:', { title: bookData.title, hasImage: !!bookData.image_url, hasVideo: !!(bookData as any).video_url });
       
-      // Check book's video_url first
-      if ((bookData as any).video_url) {
+      // Only use book's video_url if no videoUrl was explicitly passed in the request
+      if (!videoUrl && (bookData as any).video_url) {
         videoUrl = (bookData as any).video_url;
         console.log('Using video from book.video_url:', videoUrl);
+      } else if (videoUrl) {
+        console.log('Using video from request body (resolved URL):', videoUrl);
       }
     }
 
