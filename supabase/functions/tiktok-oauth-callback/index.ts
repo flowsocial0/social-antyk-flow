@@ -61,16 +61,19 @@ serve(async (req) => {
     let displayName = '';
     try {
       const userInfoResponse = await fetch(
-        'https://open.tiktokapis.com/v2/user/info/?fields=display_name,username',
+        'https://open.tiktokapis.com/v2/user/info/?fields=display_name,avatar_url',
         {
+          method: 'GET',
           headers: {
             'Authorization': `Bearer ${access_token}`,
           },
         }
       );
-      const userInfo = await userInfoResponse.json();
-      console.log('TikTok user info:', JSON.stringify(userInfo));
-      displayName = userInfo?.data?.user?.username || userInfo?.data?.user?.display_name || '';
+      const userInfoText = await userInfoResponse.text();
+      console.log('TikTok user info raw:', userInfoText);
+      const userInfo = JSON.parse(userInfoText);
+      displayName = userInfo?.data?.user?.display_name || '';
+      console.log('TikTok display name resolved:', displayName);
     } catch (e) {
       console.warn('Could not fetch TikTok user info:', e);
     }
