@@ -16,32 +16,38 @@ export type Database = {
     Tables: {
       admin_ideas: {
         Row: {
+          attachment_url: string | null
           created_at: string
           created_by: string | null
           description: string | null
           id: string
           priority: string | null
           status: string
+          submitted_by_email: string | null
           title: string
           updated_at: string
         }
         Insert: {
+          attachment_url?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           id?: string
           priority?: string | null
           status?: string
+          submitted_by_email?: string | null
           title: string
           updated_at?: string
         }
         Update: {
+          attachment_url?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           id?: string
           priority?: string | null
           status?: string
+          submitted_by_email?: string | null
           title?: string
           updated_at?: string
         }

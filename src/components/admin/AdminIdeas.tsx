@@ -23,6 +23,8 @@ interface Idea {
   priority: string;
   created_at: string;
   updated_at: string;
+  submitted_by_email: string | null;
+  attachment_url: string | null;
 }
 
 const STATUS_OPTIONS = [
@@ -288,6 +290,21 @@ export const AdminIdeas = () => {
                       </div>
                       {idea.description && (
                         <p className="text-sm text-muted-foreground">{idea.description}</p>
+                      )}
+                      {idea.submitted_by_email && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Od: {idea.submitted_by_email}
+                        </p>
+                      )}
+                      {idea.attachment_url && (
+                        <a
+                          href={idea.attachment_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary hover:underline mt-1 inline-block"
+                        >
+                          📎 Załącznik
+                        </a>
                       )}
                     </div>
                     <div className="flex gap-1">
