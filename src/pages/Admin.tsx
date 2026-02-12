@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { PlatformLimitsAdmin } from "@/components/admin/PlatformLimitsAdmin";
 import { AdminIdeas } from "@/components/admin/AdminIdeas";
 import { AdminDefaultSettings } from "@/components/admin/AdminDefaultSettings";
+import { AdminBugReports } from "@/components/admin/AdminBugReports";
 import type { User } from "@supabase/supabase-js";
 
 interface AdminStats {
@@ -343,6 +344,9 @@ const Admin = () => {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Bug Reports */}
+            <AdminBugReports />
 
             {/* Admin Ideas */}
             <AdminIdeas />

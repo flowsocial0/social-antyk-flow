@@ -55,6 +55,7 @@ import Platforms from "./pages/Platforms";
 import ExpressCampaignLaunch from "./pages/ExpressCampaignLaunch";
 import NotFound from "./pages/NotFound";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import { BugReportButton } from "./components/bugs/BugReportButton";
 import TermsOfService from "./pages/TermsOfService";
 import DataDeletion from "./pages/DataDeletion";
 
@@ -106,6 +107,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <BugReportButton />
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
