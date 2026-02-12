@@ -43,3 +43,7 @@ export function extractFilenameFromUrl(url: string): string {
 export function isValidUrl(url: string): boolean {
   return url.startsWith("http://") || url.startsWith("https://");
 }
+
+export function isMegaUrl(url: string): boolean {
+  return /^https?:\/\/mega\.nz\/(file|folder)\//.test(url);
+}
