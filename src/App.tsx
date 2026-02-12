@@ -56,6 +56,7 @@ import ExpressCampaignLaunch from "./pages/ExpressCampaignLaunch";
 import NotFound from "./pages/NotFound";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import { BugReportButton } from "./components/bugs/BugReportButton";
+import { FeatureRequestButton } from "./components/ideas/FeatureRequestButton";
 import TermsOfService from "./pages/TermsOfService";
 import DataDeletion from "./pages/DataDeletion";
 
@@ -108,6 +109,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <BugReportButton />
+        <FeatureRequestButton />
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
