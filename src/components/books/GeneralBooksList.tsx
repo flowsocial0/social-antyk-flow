@@ -134,16 +134,19 @@ export const GeneralBooksList = () => {
   const totalCount = booksData?.totalCount || 0;
   const totalPages = Math.ceil(totalCount / itemsPerPage);
 
-  // Restore focus after data loads if user was typing in search
-  const wasSearchFocused = useRef(false);
-  
+  // Restore focus after data loads if user has search text
   useEffect(() => {
-    if (wasSearchFocused.current && searchInputRef.current && !isLoading) {
-      searchInputRef.current.focus();
-      const length = searchQuery.length;
-      searchInputRef.current.setSelectionRange(length, length);
+    if (searchQuery && searchInputRef.current && !isLoading) {
+      // Use requestAnimationFrame to ensure DOM is settled
+      requestAnimationFrame(() => {
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+          const length = searchQuery.length;
+          searchInputRef.current.setSelectionRange(length, length);
+        }
+      });
     }
-  }, [isLoading, searchQuery.length]);
+  }, [isLoading, searchQuery]);
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -267,8 +270,6 @@ export const GeneralBooksList = () => {
               placeholder="Szukaj po kodzie, tytule, cenie..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => { wasSearchFocused.current = true; }}
-              onBlur={() => { wasSearchFocused.current = false; }}
               className="w-64"
             />
             <Badge variant="secondary">
