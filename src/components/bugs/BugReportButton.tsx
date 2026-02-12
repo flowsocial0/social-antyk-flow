@@ -32,6 +32,10 @@ export const BugReportButton = () => {
         useCORS: true,
         allowTaint: true,
         scale: 0.5,
+        windowWidth: window.innerWidth,
+        windowHeight: window.innerHeight,
+        height: window.innerHeight,
+        y: window.scrollY,
       });
       
       const blob = await new Promise<Blob | null>((resolve) => {
