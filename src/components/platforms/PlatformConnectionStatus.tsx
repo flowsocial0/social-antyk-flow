@@ -227,7 +227,7 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
                 </p>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 size="sm"
