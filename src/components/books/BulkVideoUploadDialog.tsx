@@ -5,7 +5,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload, CheckCircle, AlertTriangle, XCircle, Loader2, Link, PenLine, Cloud } from "lucide-react";
@@ -16,6 +15,7 @@ import { FileMatch, UploadResult, BookRecord } from "./bulk-video/types";
 import { normalize, similarity, formatSize } from "./bulk-video/utils";
 import { UrlLinksTab } from "./bulk-video/UrlLinksTab";
 import { ManualAssignTab } from "./bulk-video/ManualAssignTab";
+import { BookSearchSelect } from "./bulk-video/BookSearchSelect";
 import { MegaLinksTab } from "./bulk-video/MegaLinksTab";
 
 interface BulkVideoUploadDialogProps {
@@ -367,18 +367,11 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {allBooks && (
-                          <Select value={match.bookId || ""} onValueChange={val => updateMatch(idx, val)}>
-                            <SelectTrigger className="h-7 text-xs">
-                              <SelectValue placeholder="Wybierz książkę" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {allBooks.map(book => (
-                                <SelectItem key={book.id} value={book.id}>{book.title}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
+                        <BookSearchSelect
+                          allBooks={allBooks || []}
+                          value={match.bookId || ""}
+                          onChange={val => updateMatch(idx, val)}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
