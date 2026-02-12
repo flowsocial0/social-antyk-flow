@@ -143,58 +143,26 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
     }
 
     if (mode === "mega") {
-      // Mega mode: download from Mega, then upload to Storage
+      // Mega mode: save Mega URL as video_url (no download/upload to Storage)
       setStep(3);
       setUploading(true);
       setUploadDone(false);
       setResults([]);
-      setUploadIndex(0);
-      abortRef.current = false;
-
-      const toUpload = validMatches;
       const newResults: UploadResult[] = [];
 
-      for (let i = 0; i < toUpload.length; i++) {
-        if (abortRef.current) break;
-        setUploadIndex(i);
-        const match = toUpload[i];
-
-        try {
-          // Phase 1: Download from Mega
-          setMegaPhase("Pobieranie z Mega...");
-          const buffer = await match.megaFile.downloadBuffer();
-          if (abortRef.current) break;
-
-          const ext = match.fileName.split(".").pop() || "mp4";
-          const storagePath = `videos/${match.bookId}.${ext}`;
-          const blob = new Blob([buffer], { type: `video/${ext}` });
-
-          // Phase 2: Upload to Supabase Storage
-          setMegaPhase("Przesyłanie do Storage...");
-          const { error: uploadError } = await supabase.storage
-            .from("ObrazkiKsiazek")
-            .upload(storagePath, blob, { upsert: true });
-          if (uploadError) throw uploadError;
-
-          const { data: urlData } = supabase.storage
-            .from("ObrazkiKsiazek")
-            .getPublicUrl(storagePath);
-
-          const { error: updateError } = await supabase
-            .from("books")
-            .update({ video_storage_path: storagePath, video_url: urlData.publicUrl })
-            .eq("id", match.bookId!);
-          if (updateError) throw updateError;
-
-          newResults.push({ fileName: match.fileName, success: true });
-        } catch (err: any) {
-          console.error(`Mega upload failed for ${match.fileName}:`, err);
-          newResults.push({ fileName: match.fileName, success: false, error: err.message });
-        }
-        setResults([...newResults]);
+      for (const match of validMatches) {
+        const { error } = await supabase
+          .from("books")
+          .update({ video_url: match.url })
+          .eq("id", match.bookId!);
+        newResults.push({
+          fileName: match.fileName,
+          success: !error,
+          error: error?.message,
+        });
       }
 
-      setMegaPhase("");
+      setResults(newResults);
       setUploading(false);
       setUploadDone(true);
       queryClient.invalidateQueries({ queryKey: ["all-books-for-matching"] });
@@ -394,7 +362,7 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
             <div className="flex gap-2 justify-between">
               <Button variant="outline" onClick={() => setStep(1)}>Wstecz</Button>
               <Button onClick={startSave} disabled={validMatches.length === 0}>
-                {mode === "mega" ? `Pobierz i prześlij ${validMatches.length} plików` : mode === "urls" ? `Zapisz ${validMatches.length} linków` : `Prześlij ${validMatches.length} plików`}
+                {mode === "mega" ? `Zapisz ${validMatches.length} linków Mega` : mode === "urls" ? `Zapisz ${validMatches.length} linków` : `Prześlij ${validMatches.length} plików`}
               </Button>
             </div>
           </div>
@@ -418,14 +386,9 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
               </div>
             )}
             {uploading && mode === "mega" && (
-              <>
-                <div className="text-sm">
-                  Plik {uploadIndex + 1}/{validMatches.length} —{" "}
-                  <span className="font-medium">{validMatches[uploadIndex]?.fileName}</span>
-                </div>
-                <div className="text-xs text-muted-foreground">{megaPhase}</div>
-                <Progress value={((uploadIndex + 1) / validMatches.length) * 100} />
-              </>
+              <div className="flex items-center gap-2 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" /> Zapisywanie linków Mega...
+              </div>
             )}
 
             {uploadDone && (
