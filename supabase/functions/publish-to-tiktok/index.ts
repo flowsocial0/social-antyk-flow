@@ -58,6 +58,24 @@ async function downloadVideo(videoUrl: string): Promise<{ data: ArrayBuffer; con
   const data = await response.arrayBuffer();
   
   console.log('Video downloaded:', { size: data.byteLength, contentType });
+  
+  // Validate that we actually got a video file, not an HTML page
+  if (contentType.includes('text/html') || contentType.includes('text/plain')) {
+    throw new Error(
+      'Podany link nie zwraca bezpośrednio pliku wideo (otrzymano HTML). ' +
+      'Serwisy jak Mega, Google Drive, Dropbox wymagają specjalnych linków do bezpośredniego pobierania. ' +
+      'Użyj bezpośredniego linku do pliku .mp4.'
+    );
+  }
+  
+  // Also check if the file is suspiciously small (< 10KB is likely not a real video)
+  if (data.byteLength < 10240) {
+    throw new Error(
+      `Pobrane dane są zbyt małe (${data.byteLength} bajtów), prawdopodobnie to nie jest plik wideo. ` +
+      'Sprawdź czy link prowadzi bezpośrednio do pliku wideo.'
+    );
+  }
+  
   return { data, contentType, size: data.byteLength };
 }
 
