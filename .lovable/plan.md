@@ -1,104 +1,53 @@
 
+# Czytelne komunikaty bledow zamiast "Edge Function non-2xx"
 
-# System zgłaszania błędów (Bug Reporter)
+## Problem
 
-## Opis
+Trzy edge functions zwracaja HTTP 500 przy bledach, co powoduje ze klient Supabase wyrzuca ogolny blad "Edge Function returned a non-2xx status code" zamiast konkretnej wiadomosci o problemie. Uzytkownik widzi niezrozumialy komunikat techniczny.
 
-System pozwalający użytkownikom zgłaszać błędy z dowolnego miejsca w aplikacji. Przycisk "Zgłoś błąd" w prawym dolnym rogu robi automatyczny zrzut ekranu, otwiera formularz zgłoszenia i zapisuje wszystko w bazie. Admini zarządzają zgłoszeniami w panelu administracyjnym z możliwością komentowania i zmiany statusu. Powiadomienia email przez Resend.
+Dotyczy to:
+- `generate-campaign` (generowanie kampanii)
+- `generate-sales-text` (generowanie tekstow AI)
+- `auto-publish-books` (zewnetrzny catch)
 
-## Zakres funkcjonalności
+Funkcje publikacji (publish-to-x, publish-to-facebook, itd.) sa juz poprawnie zaimplementowane — zwracaja HTTP 200 z `success: false`.
 
-1. **Przycisk globalny** - stały w prawym dolnym rogu na każdej stronie (tylko dla zalogowanych)
-2. **Formularz zgłoszenia** - temat, opis, automatyczny screenshot, dodatkowe załączniki
-3. **Automatyczne dane** - email użytkownika, URL strony, user agent, rozmiar ekranu, data/czas
-4. **Panel admina** - lista zgłoszeń, statusy, komentarze z załącznikami
-5. **Powiadomienia email** - przy tworzeniu, zmianie statusu, komentarzach
+## Plan naprawy
 
-## Etapy implementacji
+### 1. Edge function: `generate-campaign`
+Zmiana statusu z 500 na 200 w catch, dodanie `success: false` w odpowiedzi.
 
-### Etap 1: Baza danych
+### 2. Edge function: `generate-sales-text`
+Zmiana statusu z 500 na 200 w catch, dodanie `success: false` i czytelnej wiadomosci.
 
-Nowe tabele:
+### 3. Edge function: `auto-publish-books`
+Zmiana statusu z 500 na 200 w zewnetrznym catch (linia ~664).
 
-**`bug_reports`** - główna tabela zgłoszeń
-- id, user_id, user_email, title, description, status (nowy/w_trakcie/potrzebne_informacje/rozwiazany/anulowane), page_url, user_agent, screen_size, screenshot_url, created_at, updated_at
+### 4. Frontend: Lepsze parsowanie bledow
 
-**`bug_report_attachments`** - załączniki (screenshot + dodatkowe pliki)
-- id, bug_report_id, file_url, file_name, file_type, created_at, uploaded_by
+Wszystkie miejsca w kodzie, ktore uzywaja `supabase.functions.invoke` i wyswietlaja bledy, beda sprawdzac rowniez `data?.error` i `data?.message` obok `error.message`, zeby wyswietlic uzytkownikowi konkretna przyczyne.
 
-**`bug_report_comments`** - komentarze adminów
-- id, bug_report_id, user_id, user_email, comment_text, created_at
+Dotyczy glownie:
+- `PlatformBooksList.tsx` — onError w mutacjach (generate AI text, publish)
+- `ExpressCampaignLaunch.tsx` — launchAllCampaigns
+- `CampaignDialog.tsx` — generowanie kampanii
+- `PlatformAITextDialog.tsx` — generowanie tekstu AI
 
-Nowy bucket storage: **`bug-reports`** (publiczny, na screenshoty i załączniki)
+### Efekt
 
-RLS: użytkownicy widzą/tworzą swoje zgłoszenia; admini widzą wszystko i mogą komentować/zmieniać status.
+Zamiast "Edge Function returned a non-2xx status code" uzytkownik zobaczy np.:
+- "Nie udalo sie wygenerowac tekstu: przekroczono limit API"
+- "Blad generowania kampanii: brak klucza API"
+- "Wystapil blad podczas automatycznej publikacji: ..."
 
-### Etap 2: Komponent globalny - BugReportButton
+## Zakres zmian
 
-- Stały przycisk w prawym dolnym rogu (fixed position)
-- Po kliknięciu: zrzut ekranu strony za pomocą biblioteki `html2canvas`
-- Otwarcie dialogu z formularzem:
-  - Temat (wymagany)
-  - Opis (wymagany)
-  - Podgląd automatycznego screenshota
-  - Upload dodatkowych załączników (drag & drop)
-  - Automatycznie zebrane: email, URL, przeglądarka, rozdzielczość
-- Wysłanie: zapis do bazy + upload plików do Storage + wywołanie edge function na email
-
-### Etap 3: Panel admina - AdminBugReports
-
-Nowa sekcja w panelu administracyjnym:
-- Lista zgłoszeń z filtrami po statusie
-- Widok szczegółowy zgłoszenia ze screenshotem, danymi technicznymi
-- Zmiana statusu (dropdown)
-- Sekcja komentarzy z możliwością dodawania załączników
-- Licznik nowych zgłoszeń w nagłówku
-
-### Etap 4: Edge function - send-bug-report-email
-
-Funkcja wysyłająca emaile przez Resend:
-- Nowe zgłoszenie -> email do wszystkich adminów
-- Zmiana statusu -> email do autora zgłoszenia
-- Nowy komentarz -> email do autora zgłoszenia
-
-Wymaga dodania sekretu **RESEND_API_KEY**.
-
-### Etap 5: Integracja
-
-- Dodanie `<BugReportButton />` w App.tsx (globalnie)
-- Dodanie `<AdminBugReports />` w Admin.tsx
-- Nowa trasa nie jest potrzebna - wszystko w istniejącym panelu admina
-
-## Nowa zależność
-
-- `html2canvas` - do robienia zrzutów ekranu strony
-
-## Szczegóły techniczne
-
-### Nowe pliki:
-- `src/components/bugs/BugReportButton.tsx` - globalny przycisk + dialog
-- `src/components/bugs/BugReportForm.tsx` - formularz zgłoszenia
-- `src/components/admin/AdminBugReports.tsx` - panel admina
-- `src/components/admin/BugReportDetail.tsx` - widok szczegółowy zgłoszenia
-- `supabase/functions/send-bug-report-email/index.ts` - edge function do emaili
-
-### Modyfikowane pliki:
-- `src/App.tsx` - dodanie BugReportButton
-- `src/pages/Admin.tsx` - dodanie AdminBugReports
-- `supabase/config.toml` - rejestracja nowej edge function
-
-### Schema SQL (migracja):
-
-```text
--- Enum statusów
--- Tabela bug_reports z kolumnami: id, user_id, user_email, title, description, 
---   status, page_url, user_agent, screen_size, screenshot_url, created/updated_at
--- Tabela bug_report_attachments z FK do bug_reports
--- Tabela bug_report_comments z FK do bug_reports  
--- Storage bucket "bug-reports" (public)
--- RLS: users INSERT+SELECT own, admins ALL
-```
-
-### Sekret do dodania:
-- **RESEND_API_KEY** - klucz API z resend.com (darmowe konto = 100 emaili/dzień)
-
+| Plik | Zmiana |
+|------|--------|
+| `supabase/functions/generate-campaign/index.ts` | status 500 na 200 + success: false |
+| `supabase/functions/generate-sales-text/index.ts` | status 500 na 200 + success: false |
+| `supabase/functions/auto-publish-books/index.ts` | status 500 na 200 + success: false |
+| `src/components/platforms/PlatformBooksList.tsx` | Parsowanie data?.error w onError |
+| `src/components/platforms/PlatformAITextDialog.tsx` | Parsowanie data?.error |
+| `src/pages/ExpressCampaignLaunch.tsx` | Parsowanie data?.error |
+| `src/components/books/CampaignDialog.tsx` | Parsowanie data?.error |
