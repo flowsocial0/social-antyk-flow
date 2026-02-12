@@ -27,6 +27,10 @@ export const BugReportButton = () => {
   const handleClick = async () => {
     setCapturing(true);
     try {
+      // Hide the bug report button before capturing
+      const bugButton = document.querySelector('[data-bug-report-button]') as HTMLElement;
+      if (bugButton) bugButton.style.visibility = 'hidden';
+
       const canvas = await html2canvas(document.body, {
         logging: false,
         useCORS: true,
@@ -37,6 +41,8 @@ export const BugReportButton = () => {
         height: window.innerHeight,
         y: window.scrollY,
       });
+
+      if (bugButton) bugButton.style.visibility = 'visible';
       
       const blob = await new Promise<Blob | null>((resolve) => {
         canvas.toBlob(resolve, "image/png", 0.8);
@@ -68,6 +74,7 @@ export const BugReportButton = () => {
   return (
     <>
       <Button
+        data-bug-report-button
         onClick={handleClick}
         disabled={capturing}
         className="fixed bottom-6 right-6 z-50 shadow-lg gap-2"
