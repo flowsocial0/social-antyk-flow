@@ -31,15 +31,19 @@ export const BugReportButton = () => {
       const bugButton = document.querySelector('[data-bug-report-button]') as HTMLElement;
       if (bugButton) bugButton.style.visibility = 'hidden';
 
-      const canvas = await html2canvas(document.body, {
+      const canvas = await html2canvas(document.documentElement, {
         logging: false,
         useCORS: true,
         allowTaint: true,
-        scale: 1,
+        scale: window.devicePixelRatio || 1,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        x: window.scrollX,
+        y: window.scrollY,
         windowWidth: window.innerWidth,
         windowHeight: window.innerHeight,
-        height: window.innerHeight,
-        y: window.scrollY,
+        scrollX: 0,
+        scrollY: 0,
       });
 
       if (bugButton) bugButton.style.visibility = 'visible';
