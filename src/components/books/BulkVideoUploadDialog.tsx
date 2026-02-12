@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload, CheckCircle, AlertTriangle, XCircle, Loader2, Link, PenLine, Cloud } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileMatch, UploadResult, BookRecord } from "./bulk-video/types";
@@ -37,6 +38,7 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
   const [results, setResults] = useState<UploadResult[]>([]);
   const [uploadDone, setUploadDone] = useState(false);
   const [megaPhase, setMegaPhase] = useState<string>("");
+  const [excludedIndices, setExcludedIndices] = useState<Set<number>>(new Set());
   const abortRef = useRef(false);
 
   const { data: allBooks } = useQuery({
@@ -111,7 +113,24 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
     });
   };
 
-  const validMatches = matches.filter(m => m.bookId);
+  const validMatches = matches.filter((m, idx) => m.bookId && !excludedIndices.has(idx));
+
+  const toggleExclude = (idx: number) => {
+    setExcludedIndices(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      return next;
+    });
+  };
+
+  const allChecked = matches.length > 0 && excludedIndices.size === 0;
+  const toggleAll = () => {
+    if (allChecked) {
+      setExcludedIndices(new Set(matches.map((_, i) => i)));
+    } else {
+      setExcludedIndices(new Set());
+    }
+  };
 
   // --- Save logic ---
   const startSave = async () => {
@@ -233,6 +252,7 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
     setResults([]);
     setUploadDone(false);
     setUploading(false);
+    setExcludedIndices(new Set());
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -317,6 +337,9 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox checked={allChecked} onCheckedChange={toggleAll} aria-label="Zaznacz wszystkie" />
+                    </TableHead>
                     <TableHead>{mode === "urls" ? "URL" : "Plik"}</TableHead>
                     <TableHead>Dopasowana książka</TableHead>
                     <TableHead className="w-20">Zgodność</TableHead>
@@ -325,7 +348,10 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
                 </TableHeader>
                 <TableBody>
                   {matches.map((match, idx) => (
-                    <TableRow key={idx}>
+                    <TableRow key={idx} className={excludedIndices.has(idx) ? "opacity-40" : ""}>
+                      <TableCell>
+                        <Checkbox checked={!excludedIndices.has(idx)} onCheckedChange={() => toggleExclude(idx)} />
+                      </TableCell>
                       <TableCell className="text-xs max-w-[200px] truncate" title={match.url || match.fileName}>
                         {match.fileName}
                       </TableCell>
