@@ -341,9 +341,11 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {(match.status === "partial" || match.status === "unmatched") && allBooks && (
+                        {allBooks && (
                           <Select value={match.bookId || ""} onValueChange={val => updateMatch(idx, val)}>
-                            <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Wybierz książkę" /></SelectTrigger>
+                            <SelectTrigger className="h-7 text-xs">
+                              <SelectValue placeholder="Wybierz książkę" />
+                            </SelectTrigger>
                             <SelectContent>
                               {allBooks.map(book => (
                                 <SelectItem key={book.id} value={book.id}>{book.title}</SelectItem>
@@ -351,7 +353,6 @@ export const BulkVideoUploadDialog = ({ open, onOpenChange }: BulkVideoUploadDia
                             </SelectContent>
                           </Select>
                         )}
-                        {match.status === "matched" && <span className="text-xs text-green-600">✓ OK</span>}
                       </TableCell>
                     </TableRow>
                   ))}
