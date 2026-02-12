@@ -95,6 +95,9 @@ export const PlatformAITextDialog = ({
       });
 
       if (error) throw error;
+      if (data?.success === false || data?.error) {
+        throw new Error(data.error || 'Nieznany błąd generowania');
+      }
       return data;
     },
     onSuccess: (data) => {

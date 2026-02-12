@@ -58,6 +58,9 @@ export const CampaignDialog = ({ open, onOpenChange, bookId, bookData }: Campaig
       });
 
       if (error) throw error;
+      if (data?.success === false || data?.error) {
+        throw new Error(data.error || 'Nieznany błąd generowania kampanii');
+      }
 
       if (data?.posts) {
         setGeneratedPosts(data.posts);
