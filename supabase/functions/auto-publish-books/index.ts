@@ -259,6 +259,9 @@ Deno.serve(async (req) => {
           case 'google_business':
             publishFunctionName = 'publish-to-google-business';
             break;
+          case 'tiktok':
+            publishFunctionName = 'publish-to-tiktok';
+            break;
           default:
             console.error(`No publish function for platform: ${content.platform}`);
             results.push({
@@ -443,6 +446,9 @@ Deno.serve(async (req) => {
               break;
             case 'google_business':
               publishFunctionName = 'publish-to-google-business';
+              break;
+            case 'tiktok':
+              publishFunctionName = 'publish-to-tiktok';
               break;
             default:
               console.error(`No publish function for platform: ${platform}`);
