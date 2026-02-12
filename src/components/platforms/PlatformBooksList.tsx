@@ -303,8 +303,15 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
       );
 
       // Clean up temp Mega file after all publishes complete
+      // Delay cleanup to ensure edge functions have finished downloading the video
       if (megaCleanup) {
-        await megaCleanup();
+        setTimeout(async () => {
+          try {
+            await megaCleanup!();
+          } catch (e) {
+            console.warn('Mega cleanup failed:', e);
+          }
+        }, 60000); // 60s delay to let edge functions finish processing
       }
 
       // Analyze results
