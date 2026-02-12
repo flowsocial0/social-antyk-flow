@@ -12,6 +12,7 @@ import { PlatformScheduleDialog } from "./PlatformScheduleDialog";
 import { XPostPreviewDialog } from "@/components/books/XPostPreviewDialog";
 import { EditBookDialog } from "@/components/books/EditBookDialog";
 import { platformRequiresVideo, PlatformId } from "@/config/platforms";
+import { resolveMegaVideo, isMegaUrl } from "@/lib/megaVideoResolver";
 
 type SortColumn = "code" | "title" | "published";
 type SortDirection = "asc" | "desc";
@@ -272,15 +273,39 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
         throw new Error(`Publikacja na platformie ${platform} nie jest jeszcze obsługiwana`);
       }
 
+      // If book has a Mega.nz video URL, resolve it to a temp Storage URL
+      let megaCleanup: (() => Promise<void>) | null = null;
+      let resolvedVideoUrl: string | undefined;
+      
+      if (book?.video_url && isMegaUrl(book.video_url)) {
+        const { resolvedUrl, cleanup } = await resolveMegaVideo(
+          book.video_url,
+          bookId
+        );
+        resolvedVideoUrl = resolvedUrl;
+        megaCleanup = cleanup;
+      }
+
       // Publish to ALL accounts in parallel
       const results = await Promise.allSettled(
         accounts.map((account: { id: string }) =>
           supabase.functions.invoke(functionName, {
-            body: { contentId, bookId, platform, accountId: account.id },
+            body: { 
+              contentId, 
+              bookId, 
+              platform, 
+              accountId: account.id,
+              ...(resolvedVideoUrl ? { videoUrl: resolvedVideoUrl } : {})
+            },
             headers: { Authorization: `Bearer ${session.access_token}` },
           })
         )
       );
+
+      // Clean up temp Mega file after all publishes complete
+      if (megaCleanup) {
+        await megaCleanup();
+      }
 
       // Analyze results
       const successfulResults = results.filter(
