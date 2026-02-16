@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
       response_type: 'code',
       client_id: PINTEREST_APP_ID,
       redirect_uri: redirectUri,
-      scope: 'boards:read,pins:read,pins:write,boards:write',
+      scope: 'boards:read,pins:read,pins:write,boards:write,user_accounts:read',
       state: `${state}|${userId}`,
     });
 
