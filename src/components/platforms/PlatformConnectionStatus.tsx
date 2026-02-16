@@ -42,6 +42,8 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
     if (platform === "tumblr") return "tumblr_oauth_tokens";
     if (platform === "snapchat") return "snapchat_oauth_tokens";
     if (platform === "google_business") return "google_business_tokens";
+    if (platform === "mastodon") return "mastodon_tokens";
+    if (platform === "gab") return "gab_tokens";
     return `${platform}_oauth_tokens`;
   };
 
@@ -54,10 +56,17 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
       if (!session) return [];
 
       const tableName = getTableName(platform);
-      const { data, error } = await (supabase as any)
+      let query = (supabase as any)
         .from(tableName)
         .select("*")
         .eq("user_id", session.user.id);
+
+      // Filter out pending tokens for mastodon and gab
+      if (platform === "mastodon" || platform === "gab") {
+        query = query.not("access_token", "like", "pending_%");
+      }
+
+      const { data, error } = await query;
 
       if (error && error.code !== "PGRST116") throw error;
       if (!data || data.length === 0) return [];
@@ -80,6 +89,8 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
         else if (platform === "tumblr") name = token.blog_name || token.username || "Blog Tumblr";
         else if (platform === "snapchat") name = token.display_name || "Konto Snapchat";
         else if (platform === "google_business") name = token.business_name || "Firma Google";
+        else if (platform === "mastodon") name = token.username ? `@${token.username}@${(token.server_url || '').replace('https://', '')}` : "Konto Mastodon";
+        else if (platform === "gab") name = token.username ? `@${token.username}` : "Konto Gab";
 
         return {
           id: token.id,
