@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -81,6 +81,19 @@ export default function SocialAccounts() {
       const message = params.get('message');
       toast.error('Błąd połączenia', { description: message || 'Spróbuj ponownie' });
       window.history.replaceState({}, '', '/settings/social-accounts');
+    }
+
+    // Scroll to platform from hash
+    const hash = window.location.hash.replace('#', '');
+    if (hash) {
+      setTimeout(() => {
+        const el = document.getElementById(`platform-${hash}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
+          setTimeout(() => el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2'), 3000);
+        }
+      }, 300);
     }
   }, []);
 
@@ -632,7 +645,7 @@ export default function SocialAccounts() {
             const platformAccounts = accounts[platform.id as keyof PlatformAccounts];
             
             return (
-              <Card key={platform.id} className="p-6">
+              <Card key={platform.id} id={`platform-${platform.id}`} className="p-6 transition-all duration-300">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-4">
                     <div className={`p-3 rounded-lg ${platform.bgColor}`}>

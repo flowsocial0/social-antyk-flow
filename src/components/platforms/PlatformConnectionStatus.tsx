@@ -162,7 +162,7 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
     if (onConnect) {
       onConnect();
     } else if (["x", "facebook", "tiktok", "instagram", "youtube", "linkedin", "threads", "telegram", "bluesky", "pinterest", "reddit", "discord", "tumblr", "snapchat", "google_business"].includes(platform)) {
-      window.location.href = "/settings/social-accounts";
+      window.location.href = `/settings/social-accounts#${platform}`;
     } else {
       toast({
         title: "Wkrótce",
