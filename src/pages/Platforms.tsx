@@ -2,8 +2,8 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft } from "lucide-react";
-import { getPopularPlatforms, getOtherPlatforms, getComingSoonPlatforms, getPlannedPlatforms } from "@/config/platforms";
+import { ArrowLeft, Type, Image, Video } from "lucide-react";
+import { getPopularPlatforms, getOtherPlatforms, getComingSoonPlatforms, getPlannedPlatforms, type MediaType } from "@/config/platforms";
 import { Footer } from "@/components/layout/Footer";
 
 const Platforms = () => {
@@ -13,8 +13,20 @@ const Platforms = () => {
   const comingSoonPlatforms = getComingSoonPlatforms();
   const plannedPlatforms = getPlannedPlatforms();
 
+  const getMediaLabel = (mediaType: MediaType) => {
+    switch (mediaType) {
+      case 'video-only':
+        return { icons: [Video], label: 'Tylko wideo' };
+      case 'image-only':
+        return { icons: [Type, Image], label: 'Tekst + Obrazki' };
+      case 'both':
+        return { icons: [Type, Image, Video], label: 'Tekst + Obrazki + Wideo' };
+    }
+  };
+
   const PlatformCard = ({ platform }: { platform: any }) => {
     const Icon = platform.icon;
+    const media = getMediaLabel(platform.mediaType);
     const statusBadge = platform.status === 'active' 
       ? <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Aktywna</Badge>
       : platform.status === 'coming-soon'
@@ -33,11 +45,17 @@ const Platforms = () => {
           {statusBadge}
         </div>
         <h3 className="text-lg font-semibold mb-1">{platform.name}</h3>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground mb-3">
           {platform.status === 'active' 
             ? 'Zarządzaj publikacjami i harmonogramem'
             : 'Integracja w przygotowaniu'}
         </p>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {media.icons.map((MIcon, i) => (
+            <MIcon key={i} className="h-3.5 w-3.5" />
+          ))}
+          <span>{media.label}</span>
+        </div>
       </Card>
     );
   };
