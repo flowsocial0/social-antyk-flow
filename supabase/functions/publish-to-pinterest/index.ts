@@ -48,19 +48,34 @@ Deno.serve(async (req) => {
     // Test connection mode
     if (testConnection) {
       const token = tokens[0];
-      const response = await fetch('https://api.pinterest.com/v5/user_account', {
-        headers: { 'Authorization': `Bearer ${token.access_token}` },
-      });
+      console.log('Testing Pinterest connection with token ID:', token.id);
+      console.log('Access token length:', token.access_token?.length);
+      
+      try {
+        const response = await fetch('https://api.pinterest.com/v5/user_account', {
+          headers: { 'Authorization': `Bearer ${token.access_token}` },
+        });
 
-      if (response.ok) {
-        const userData = await response.json();
+        const responseText = await response.text();
+        console.log('Pinterest API status:', response.status);
+        console.log('Pinterest API response:', responseText);
+
+        if (response.ok) {
+          const userData = JSON.parse(responseText);
+          return new Response(
+            JSON.stringify({ connected: true, success: true, username: userData.username }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } else {
+          return new Response(
+            JSON.stringify({ connected: false, success: false, error: `Pinterest API error: ${response.status} - ${responseText}` }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      } catch (fetchErr: any) {
+        console.error('Pinterest API fetch error:', fetchErr);
         return new Response(
-          JSON.stringify({ connected: true, username: userData.username }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      } else {
-        return new Response(
-          JSON.stringify({ connected: false, error: 'Token invalid or expired' }),
+          JSON.stringify({ connected: false, success: false, error: fetchErr.message }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
