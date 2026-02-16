@@ -1384,6 +1384,7 @@ export type Database = {
           expires_at: string | null
           id: string
           is_default: boolean | null
+          oauth_token_secret: string | null
           refresh_token: string | null
           scope: string | null
           updated_at: string | null
@@ -1398,6 +1399,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_default?: boolean | null
+          oauth_token_secret?: string | null
           refresh_token?: string | null
           scope?: string | null
           updated_at?: string | null
@@ -1412,11 +1414,42 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_default?: boolean | null
+          oauth_token_secret?: string | null
           refresh_token?: string | null
           scope?: string | null
           updated_at?: string | null
           user_id?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      tumblr_oauth1_requests: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          oauth_token: string
+          oauth_token_secret: string
+          state: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          oauth_token: string
+          oauth_token_secret: string
+          state: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          oauth_token?: string
+          oauth_token_secret?: string
+          state?: string
+          user_id?: string
         }
         Relationships: []
       }

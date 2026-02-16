@@ -472,8 +472,10 @@ export default function SocialAccounts() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { toast.error('Musisz być zalogowany'); return; }
+      const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
+      const redirectUri = `${supabaseUrl}/functions/v1/tumblr-oauth-callback`;
       const { data, error } = await supabase.functions.invoke('tumblr-oauth-start', {
-        body: { userId: session.user.id },
+        body: { redirectUri },
       });
       if (error) throw error;
       if (data?.authUrl) {
