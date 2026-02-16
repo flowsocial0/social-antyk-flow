@@ -224,9 +224,14 @@ Deno.serve(async (req) => {
             let sbBoardId: string | null = null;
             if (sbBoardsRes.ok) {
               const sbData = await sbBoardsRes.json();
+              console.log('Sandbox boards response:', JSON.stringify(sbData));
               if (sbData.items?.length > 0) sbBoardId = sbData.items[0].id;
+            } else {
+              const sbBoardsErr = await sbBoardsRes.text();
+              console.error(`Sandbox boards fetch failed: ${sbBoardsRes.status} - ${sbBoardsErr}`);
             }
             if (!sbBoardId) {
+              console.log('No sandbox boards found, creating one...');
               const createRes = await fetch(`${sandboxBase}/v5/boards`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token.access_token}`, 'Content-Type': 'application/json' },
@@ -236,6 +241,9 @@ Deno.serve(async (req) => {
                 const nb = await createRes.json();
                 sbBoardId = nb.id;
                 console.log(`Created sandbox board: ${nb.name} (${sbBoardId})`);
+              } else {
+                const createErr = await createRes.text();
+                console.error(`Failed to create sandbox board: ${createRes.status} - ${createErr}`);
               }
             }
             if (sbBoardId) {
