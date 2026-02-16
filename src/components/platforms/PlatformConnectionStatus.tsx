@@ -40,7 +40,6 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
     if (platform === "discord") return "discord_tokens";
     if (platform === "tumblr") return "tumblr_oauth_tokens";
     if (platform === "google_business") return "google_business_tokens";
-    if (platform === "google_business") return "google_business_tokens";
     if (platform === "mastodon") return "mastodon_tokens";
     
     return `${platform}_oauth_tokens`;
@@ -85,7 +84,6 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
         
         else if (platform === "discord") name = token.channel_name || "Kanał Discord";
         else if (platform === "tumblr") name = token.blog_name || token.username || "Blog Tumblr";
-        else if (platform === "google_business") name = token.business_name || "Firma Google";
         else if (platform === "google_business") name = token.business_name || "Firma Google";
         else if (platform === "mastodon") name = token.username ? `@${token.username}@${(token.server_url || '').replace('https://', '')}` : "Konto Mastodon";
 
