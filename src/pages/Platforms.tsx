@@ -47,7 +47,7 @@ const Platforms = () => {
         <h3 className="text-lg font-semibold mb-1">{platform.name}</h3>
         <p className="text-sm text-muted-foreground mb-3">
           {platform.status === 'active' 
-            ? 'Zarządzaj publikacjami i harmonogramem'
+            ? (platform.shortDescription || 'Zarządzaj publikacjami i harmonogramem')
             : 'Integracja w przygotowaniu'}
         </p>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">

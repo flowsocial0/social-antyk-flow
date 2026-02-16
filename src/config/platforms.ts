@@ -35,9 +35,10 @@ export interface PlatformConfig {
   gradientTo: string;
   path: string;
   status: 'active' | 'coming-soon' | 'planned';
-  priority: number; // Lower number = higher priority in UI
-  mediaType: MediaType; // What type of media this platform supports
-  popular?: boolean; // Whether this is a popular/mainstream platform
+  priority: number;
+  mediaType: MediaType;
+  popular?: boolean;
+  shortDescription?: string;
 }
 
 export const platformConfigs: Record<PlatformId, PlatformConfig> = {
@@ -53,6 +54,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     priority: 1,
     mediaType: 'both',
     popular: true,
+    shortDescription: 'Posty, obrazki i wideo. Idealne do szybkich ogłoszeń.',
   },
   facebook: {
     id: 'facebook',
@@ -66,6 +68,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     priority: 2,
     mediaType: 'both',
     popular: true,
+    shortDescription: 'Publikuj na stronie/profilu z obrazkami i wideo.',
   },
   instagram: {
     id: 'instagram',
@@ -79,6 +82,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     priority: 3,
     mediaType: 'image-only',
     popular: true,
+    shortDescription: 'Posty ze zdjęciami na feedzie Instagram.',
   },
   youtube: {
     id: 'youtube',
@@ -92,6 +96,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     priority: 4,
     mediaType: 'video-only',
     popular: true,
+    shortDescription: 'Wrzucaj filmy promocyjne na swój kanał.',
   },
   linkedin: {
     id: 'linkedin',
@@ -105,6 +110,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     priority: 5,
     mediaType: 'both',
     popular: true,
+    shortDescription: 'Profesjonalne posty z obrazkami i wideo.',
   },
   tiktok: {
     id: 'tiktok',
@@ -118,6 +124,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     priority: 3,
     mediaType: 'video-only',
     popular: true,
+    shortDescription: 'Publikuj krótkie filmy promocyjne.',
   },
   pinterest: {
     id: 'pinterest',
@@ -130,6 +137,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     status: 'active',
     priority: 8,
     mediaType: 'image-only',
+    shortDescription: 'Przypinaj obrazki jako piny z linkiem do produktu.',
   },
   reddit: {
     id: 'reddit',
@@ -142,6 +150,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     status: 'active',
     priority: 9,
     mediaType: 'both',
+    shortDescription: 'Publikuj posty na wybranym subreddicie.',
   },
   telegram: {
     id: 'telegram',
@@ -154,6 +163,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     status: 'active',
     priority: 7,
     mediaType: 'both',
+    shortDescription: 'Wysyłaj wiadomości na kanał/grupę przez bota.',
   },
   threads: {
     id: 'threads',
@@ -166,6 +176,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     status: 'active',
     priority: 6,
     mediaType: 'both',
+    shortDescription: 'Krótkie posty tekstowe z mediami.',
   },
   bluesky: {
     id: 'bluesky',
@@ -178,6 +189,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     status: 'active',
     priority: 7,
     mediaType: 'image-only',
+    shortDescription: 'Posty z obrazkami na zdecentralizowanej sieci.',
   },
   mastodon: {
     id: 'mastodon',
@@ -190,6 +202,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     status: 'active',
     priority: 10,
     mediaType: 'both',
+    shortDescription: 'Tooty z mediami na wybranej instancji.',
   },
   gab: {
     id: 'gab',
@@ -202,6 +215,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     status: 'active',
     priority: 11,
     mediaType: 'both',
+    shortDescription: 'Posty z obrazkami i wideo na profilu.',
   },
   discord: {
     id: 'discord',
@@ -214,6 +228,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     status: 'active',
     priority: 12,
     mediaType: 'both',
+    shortDescription: 'Wysyłaj posty na kanał przez webhook.',
   },
   tumblr: {
     id: 'tumblr',
@@ -226,6 +241,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     status: 'active',
     priority: 13,
     mediaType: 'both',
+    shortDescription: 'Posty na blogu z obrazkami i wideo.',
   },
   snapchat: {
     id: 'snapchat',
@@ -238,6 +254,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     status: 'active',
     priority: 14,
     mediaType: 'image-only',
+    shortDescription: 'Publikuj obrazki jako Snap Stories.',
   },
   google_business: {
     id: 'google_business',
@@ -250,6 +267,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     status: 'active',
     priority: 15,
     mediaType: 'both',
+    shortDescription: 'Posty w wizytówce Google Maps.',
   },
 };
 
