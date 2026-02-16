@@ -22,7 +22,7 @@ import YouTubeCallback from "./pages/YouTubeCallback";
 import LinkedInCallback from "./pages/LinkedInCallback";
 import ThreadsCallback from "./pages/ThreadsCallback";
 import MastodonCallback from "./pages/MastodonCallback";
-import GabCallback from "./pages/GabCallback";
+
 import PinterestCallback from "./pages/PinterestCallback";
 import RedditCallback from "./pages/RedditCallback";
 import TumblrCallback from "./pages/TumblrCallback";
@@ -50,7 +50,7 @@ import PlatformMastodon from "./pages/platforms/PlatformMastodon";
 import PlatformRumble from "./pages/platforms/PlatformRumble";
 import PlatformOnlyFans from "./pages/platforms/PlatformOnlyFans";
 import PlatformLocals from "./pages/platforms/PlatformLocals";
-import PlatformGab from "./pages/platforms/PlatformGab";
+
 import PlatformDiscord from "./pages/platforms/PlatformDiscord";
 import PlatformTumblr from "./pages/platforms/PlatformTumblr";
 import PlatformSnapchat from "./pages/platforms/PlatformSnapchat";
@@ -134,7 +134,7 @@ const App = () => (
           <Route path="/oauth/linkedin/callback" element={<LinkedInCallback />} />
           <Route path="/oauth/threads/callback" element={<ThreadsCallback />} />
           <Route path="/oauth/mastodon/callback" element={<MastodonCallback />} />
-          <Route path="/oauth/gab/callback" element={<GabCallback />} />
+          
           <Route path="/oauth/pinterest/callback" element={<PinterestCallback />} />
           <Route path="/oauth/reddit/callback" element={<RedditCallback />} />
           <Route path="/oauth/tumblr/callback" element={<TumblrCallback />} />
@@ -172,7 +172,7 @@ const App = () => (
           <Route path="/platforms/rumble" element={<ProtectedRoute><PlatformRumble /></ProtectedRoute>} />
           <Route path="/platforms/onlyfans" element={<ProtectedRoute><PlatformOnlyFans /></ProtectedRoute>} />
           <Route path="/platforms/locals" element={<ProtectedRoute><PlatformLocals /></ProtectedRoute>} />
-          <Route path="/platforms/gab" element={<ProtectedRoute><PlatformGab /></ProtectedRoute>} />
+          
           <Route path="/platforms/discord" element={<ProtectedRoute><PlatformDiscord /></ProtectedRoute>} />
           <Route path="/platforms/tumblr" element={<ProtectedRoute><PlatformTumblr /></ProtectedRoute>} />
           <Route path="/platforms/snapchat" element={<ProtectedRoute><PlatformSnapchat /></ProtectedRoute>} />

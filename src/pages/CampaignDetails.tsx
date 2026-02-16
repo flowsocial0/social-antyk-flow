@@ -298,21 +298,6 @@ const CampaignDetails = () => {
         });
       }
 
-      // Load Gab accounts
-      if (selectedAccounts.gab?.length) {
-        const { data } = await (supabase as any)
-          .from('gab_tokens')
-          .select('id, username, account_name')
-          .in('id', selectedAccounts.gab);
-        data?.forEach((a: any) => {
-          newAccountsMap[a.id] = {
-            id: a.id,
-            display_name: a.username ? `@${a.username}` : (a.account_name || 'Konto Gab'),
-            platform: 'gab'
-          };
-        });
-      }
-
       // Load Pinterest accounts
       if (selectedAccounts.pinterest?.length) {
         const { data } = await (supabase as any)

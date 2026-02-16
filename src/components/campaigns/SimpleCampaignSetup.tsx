@@ -60,7 +60,6 @@ export const SimpleCampaignSetup = () => {
       pinterest: "pinterest_oauth_tokens",
       reddit: "reddit_oauth_tokens",
       mastodon: "mastodon_tokens",
-      gab: "gab_tokens",
       tumblr: "tumblr_oauth_tokens",
       snapchat: "snapchat_oauth_tokens",
       google_business: "google_business_tokens",

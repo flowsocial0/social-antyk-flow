@@ -231,7 +231,6 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
       telegram: 'telegram_tokens',
       discord: 'discord_tokens',
       mastodon: 'mastodon_tokens',
-      gab: 'gab_tokens',
     };
     return specialTables[platform] || `${platform}_oauth_tokens`;
   };
