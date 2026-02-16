@@ -1,5 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+// TODO: Switch to production API (api.pinterest.com) after getting full access approval
+const PINTEREST_API_BASE = 'https://api-sandbox.pinterest.com';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
@@ -52,7 +54,7 @@ Deno.serve(async (req) => {
       console.log('Access token length:', token.access_token?.length);
       
       try {
-        const response = await fetch('https://api.pinterest.com/v5/user_account', {
+        const response = await fetch(`${PINTEREST_API_BASE}/v5/user_account`, {
           headers: { 'Authorization': `Bearer ${token.access_token}` },
         });
 
@@ -147,7 +149,7 @@ Deno.serve(async (req) => {
           pinData.link = bookData.product_url;
         }
 
-        const response = await fetch('https://api.pinterest.com/v5/pins', {
+        const response = await fetch(`${PINTEREST_API_BASE}/v5/pins`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token.access_token}`,
