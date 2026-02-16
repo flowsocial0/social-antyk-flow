@@ -161,7 +161,7 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
   const handleConnect = async () => {
     if (onConnect) {
       onConnect();
-    } else if (["x", "facebook", "tiktok", "instagram", "youtube", "linkedin", "threads", "telegram", "bluesky", "pinterest", "reddit", "discord", "tumblr", "snapchat", "google_business"].includes(platform)) {
+    } else if (["x", "facebook", "tiktok", "instagram", "youtube", "linkedin", "threads", "telegram", "bluesky", "pinterest", "reddit", "discord", "tumblr", "snapchat", "google_business", "mastodon", "gab"].includes(platform)) {
       window.location.href = `/settings/social-accounts#${platform}`;
     } else {
       toast({
