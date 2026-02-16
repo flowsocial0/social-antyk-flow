@@ -31,7 +31,7 @@ export interface PlatformConfig {
   gradientFrom: string;
   gradientTo: string;
   path: string;
-  status: 'active' | 'coming-soon' | 'planned';
+  status: 'active' | 'review' | 'coming-soon' | 'planned';
   priority: number;
   mediaType: MediaType;
   popular?: boolean;
@@ -89,7 +89,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-red-500/20',
     gradientTo: 'to-red-600/20',
     path: '/platforms/youtube',
-    status: 'active',
+    status: 'review',
     priority: 4,
     mediaType: 'video-only',
     popular: true,
@@ -117,7 +117,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-slate-900/20',
     gradientTo: 'to-pink-500/20',
     path: '/platforms/tiktok',
-    status: 'active',
+    status: 'review',
     priority: 3,
     mediaType: 'video-only',
     popular: true,
@@ -131,7 +131,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-red-600/20',
     gradientTo: 'to-red-700/20',
     path: '/platforms/pinterest',
-    status: 'active',
+    status: 'review',
     priority: 8,
     mediaType: 'image-only',
     shortDescription: 'Przypinaj obrazki jako piny z linkiem do produktu.',
@@ -225,7 +225,7 @@ export const getAllPlatforms = (): PlatformConfig[] => {
 };
 
 export const getActivePlatforms = (): PlatformConfig[] => {
-  return getAllPlatforms().filter(p => p.status === 'active');
+  return getAllPlatforms().filter(p => p.status === 'active' || p.status === 'review');
 };
 
 export const getComingSoonPlatforms = (): PlatformConfig[] => {
