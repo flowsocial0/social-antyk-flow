@@ -13,12 +13,20 @@ export default function GabCallback() {
       const params = new URLSearchParams(window.location.search);
       const code = params.get("code");
 
-      const userId = sessionStorage.getItem("gab_user_id");
+      let userId = sessionStorage.getItem("gab_user_id");
 
       if (!code) {
         toast.error("Brak kodu autoryzacji");
         navigate("/settings/social-accounts");
         return;
+      }
+
+      // Fallback: get userId from Supabase auth session
+      if (!userId) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          userId = session.user.id;
+        }
       }
 
       if (!userId) {
@@ -59,7 +67,7 @@ export default function GabCallback() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="text-center space-y-4">
-        <Loader2 className="h-8 w-8 animate-spin mx-auto text-green-700" />
+        <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
         <p className="text-muted-foreground">{status}</p>
       </div>
     </div>
