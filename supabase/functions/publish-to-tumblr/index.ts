@@ -86,15 +86,65 @@ Deno.serve(async (req) => {
 
         let response: Response;
 
-        // Build content blocks - unified JSON path for text, image, and video
-        {
+        if (videoMediaUrl) {
+          // Native video upload requires multipart/form-data with binary
+          // Format matches pytumblr2's _send_multipart_npf exactly
+          console.log(`Downloading video from: ${videoMediaUrl}`);
+          const videoResponse = await fetch(videoMediaUrl);
+          if (!videoResponse.ok) {
+            results.push({ accountId: token.id, success: false, error: `Failed to download video: ${videoResponse.status}` });
+            continue;
+          }
+
+          const videoArrayBuffer = await videoResponse.arrayBuffer();
+          const videoSize = videoArrayBuffer.byteLength;
+          console.log(`Video downloaded: ${(videoSize / 1024 / 1024).toFixed(2)} MB`);
+
+          if (videoSize < 10000) {
+            results.push({ accountId: token.id, success: false, error: 'Video file too small or invalid' });
+            continue;
+          }
+
+          // NPF spec: video media is a SINGLE object, not an array (unlike images)
+          const videoIdentifier = 'video_0';
+          const contentBlocks: any[] = [];
+          if (text) {
+            contentBlocks.push({ type: 'text', text });
+          }
+          contentBlocks.push({
+            type: 'video',
+            media: {
+              type: 'video/mp4',
+              identifier: videoIdentifier,
+              width: 1920,
+              height: 1080,
+            },
+          });
+
+          const jsonPayload = JSON.stringify({ content: contentBlocks, state: 'published' });
+          console.log(`NPF JSON payload: ${jsonPayload}`);
+
+          // pytumblr2 format:
+          // ('json', (None, json_string, 'application/json'))  -> no filename, explicit content-type
+          // (identifier, (str(i), file_data))                  -> numeric filename, NO explicit content-type
+          const formData = new FormData();
+          formData.append('json', new Blob([jsonPayload], { type: 'application/json' }));
+          // Don't set explicit video/mp4 type - let FormData auto-detect (matches pytumblr2)
+          formData.append(videoIdentifier, new Blob([videoArrayBuffer]), '0');
+
+          console.log(`Uploading video to Tumblr blog: ${blogName}`);
+
+          response = await fetch(`https://api.tumblr.com/v2/blog/${blogName}/posts`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token.access_token}`,
+            },
+            body: formData,
+          });
+        } else {
+          // Text + image post (JSON)
           const content: any[] = [{ type: 'text', text: text || '' }];
-          
-          if (videoMediaUrl) {
-            // Video as URL - Tumblr fetches it, same as images
-            console.log(`Publishing video via URL: ${videoMediaUrl}`);
-            content.push({ type: 'video', url: videoMediaUrl });
-          } else if (mediaUrl) {
+          if (mediaUrl) {
             content.push({ type: 'image', media: [{ url: mediaUrl }] });
           }
 
