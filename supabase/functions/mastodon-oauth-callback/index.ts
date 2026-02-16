@@ -12,7 +12,27 @@ serve(async (req) => {
   }
 
   try {
-    const { code, state, serverUrl, userId, redirectUri } = await req.json();
+    const body = await req.json();
+    const { code, state, serverUrl, userId, redirectUri, lookupServerUrl } = body;
+
+    // Handle server URL lookup (fallback when sessionStorage is lost)
+    if (lookupServerUrl && userId) {
+      const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+      const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      
+      const { data: pendingToken } = await supabase
+        .from('mastodon_tokens')
+        .select('server_url')
+        .eq('user_id', userId)
+        .like('access_token', 'pending_%')
+        .limit(1)
+        .maybeSingle();
+      
+      return new Response(JSON.stringify({
+        serverUrl: pendingToken?.server_url || null,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     if (!code || !serverUrl || !userId) {
       throw new Error('Brak wymaganych parametrów (code, serverUrl, userId)');

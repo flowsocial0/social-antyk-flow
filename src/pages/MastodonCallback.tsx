@@ -15,8 +15,8 @@ export default function MastodonCallback() {
       const state = params.get("state");
 
       const savedState = sessionStorage.getItem("mastodon_oauth_state");
-      const serverUrl = sessionStorage.getItem("mastodon_server_url");
-      const userId = sessionStorage.getItem("mastodon_user_id");
+      let serverUrl = sessionStorage.getItem("mastodon_server_url");
+      let userId = sessionStorage.getItem("mastodon_user_id");
 
       if (!code) {
         toast.error("Brak kodu autoryzacji");
@@ -30,8 +30,36 @@ export default function MastodonCallback() {
         return;
       }
 
-      if (!serverUrl || !userId) {
+      // Fallback: get userId from Supabase auth session
+      if (!userId) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          userId = session.user.id;
+        }
+      }
+
+      if (!userId) {
         toast.error("Brak danych sesji - spróbuj ponownie");
+        navigate("/settings/social-accounts");
+        return;
+      }
+
+      // Fallback: get serverUrl from pending token in database
+      if (!serverUrl) {
+        try {
+          const { data: pendingToken } = await supabase.functions.invoke("mastodon-oauth-callback", {
+            body: { lookupServerUrl: true, userId, state },
+          });
+          if (pendingToken?.serverUrl) {
+            serverUrl = pendingToken.serverUrl;
+          }
+        } catch (_) {
+          // ignore, will fail below
+        }
+      }
+
+      if (!serverUrl) {
+        toast.error("Brak danych serwera Mastodon - spróbuj ponownie");
         navigate("/settings/social-accounts");
         return;
       }
@@ -69,7 +97,7 @@ export default function MastodonCallback() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="text-center space-y-4">
-        <Loader2 className="h-8 w-8 animate-spin mx-auto text-purple-600" />
+        <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
         <p className="text-muted-foreground">{status}</p>
       </div>
     </div>
