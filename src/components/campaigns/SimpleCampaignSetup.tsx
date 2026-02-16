@@ -58,7 +58,7 @@ export const SimpleCampaignSetup = () => {
       discord: "discord_tokens",
       threads: "threads_oauth_tokens",
       pinterest: "pinterest_oauth_tokens",
-      reddit: "reddit_oauth_tokens",
+      
       mastodon: "mastodon_tokens",
       tumblr: "tumblr_oauth_tokens",
       snapchat: "snapchat_oauth_tokens",

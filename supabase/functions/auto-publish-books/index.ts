@@ -95,7 +95,7 @@ function getTokenTableName(platform: string): string {
     case 'mastodon': return 'mastodon_tokens';
     case 'gab': return 'gab_tokens';
     case 'pinterest': return 'pinterest_oauth_tokens';
-    case 'reddit': return 'reddit_oauth_tokens';
+    
     case 'discord': return 'discord_tokens';
     case 'tumblr': return 'tumblr_oauth_tokens';
     case 'snapchat': return 'snapchat_oauth_tokens';
@@ -119,7 +119,7 @@ function getPlatformNamePL(platform: string): string {
     case 'mastodon': return 'Mastodon';
     case 'gab': return 'Gab';
     case 'pinterest': return 'Pinterest';
-    case 'reddit': return 'Reddit';
+    
     case 'discord': return 'Discord';
     case 'tumblr': return 'Tumblr';
     case 'snapchat': return 'Snapchat';
@@ -243,9 +243,6 @@ Deno.serve(async (req) => {
             break;
           case 'pinterest':
             publishFunctionName = 'publish-to-pinterest';
-            break;
-          case 'reddit':
-            publishFunctionName = 'publish-to-reddit';
             break;
           case 'discord':
             publishFunctionName = 'publish-to-discord';
@@ -431,9 +428,6 @@ Deno.serve(async (req) => {
               break;
             case 'pinterest':
               publishFunctionName = 'publish-to-pinterest';
-              break;
-            case 'reddit':
-              publishFunctionName = 'publish-to-reddit';
               break;
             case 'discord':
               publishFunctionName = 'publish-to-discord';

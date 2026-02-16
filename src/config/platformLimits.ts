@@ -111,19 +111,6 @@ export const platformLimits: Record<PlatformId, PlatformLimits> = {
     authType: 'oauth2',
     apiDocumentation: 'https://developers.pinterest.com/docs/api/v5/',
   },
-  reddit: {
-    id: 'reddit',
-    textLimit: 40000,
-    mediaRequired: false,
-    supportedMedia: 'all',
-    videoMaxDuration: 15 * 60, // 15 minutes
-    videoMaxSize: 1024, // 1GB
-    imageMaxSize: 20,
-    maxImages: 20,
-    maxVideos: 1,
-    authType: 'oauth2',
-    apiDocumentation: 'https://www.reddit.com/dev/api',
-  },
   telegram: {
     id: 'telegram',
     textLimit: 4096,

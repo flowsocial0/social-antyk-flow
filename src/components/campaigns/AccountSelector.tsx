@@ -69,7 +69,7 @@ export const AccountSelector = ({ selectedPlatforms, selectedAccounts, onChange 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, threadsResult, telegramResult, blueskyResult, mastodonResult, gabResult, pinterestResult, redditResult, discordResult, tumblrResult, snapchatResult, googleBizResult] = await Promise.all([
+    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, threadsResult, telegramResult, blueskyResult, mastodonResult, gabResult, pinterestResult, discordResult, tumblrResult, snapchatResult, googleBizResult] = await Promise.all([
       supabase.from('twitter_oauth1_tokens').select('id, screen_name, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('facebook_oauth_tokens').select('id, page_name, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('instagram_oauth_tokens').select('id, instagram_username, account_name, is_default').eq('user_id', session.user.id),
@@ -82,7 +82,6 @@ export const AccountSelector = ({ selectedPlatforms, selectedAccounts, onChange 
       (supabase as any).from('mastodon_tokens').select('id, username, server_url, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('gab_tokens').select('id, username, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('pinterest_oauth_tokens').select('id, username, account_name, is_default').eq('user_id', session.user.id),
-      (supabase as any).from('reddit_oauth_tokens').select('id, username, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('discord_tokens').select('id, channel_name, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('tumblr_oauth_tokens').select('id, blog_name, username, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('snapchat_oauth_tokens').select('id, display_name, account_name, is_default').eq('user_id', session.user.id),
@@ -149,9 +148,6 @@ export const AccountSelector = ({ selectedPlatforms, selectedAccounts, onChange 
         id: a.id,
         display_name: a.username ? `@${a.username}` : (a.account_name || 'Konto Pinterest'),
         is_default: a.is_default ?? false,
-      })),
-      reddit: (redditResult.data || []).map((a: any) => ({
-        id: a.id, display_name: a.username ? `u/${a.username}` : (a.account_name || 'Konto Reddit'), is_default: a.is_default ?? false,
       })),
       discord: (discordResult.data || []).map((a: any) => ({
         id: a.id, display_name: a.channel_name || (a.account_name || 'Kanał Discord'), is_default: a.is_default ?? false,

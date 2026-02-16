@@ -37,7 +37,7 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
     if (platform === "bluesky") return "bluesky_tokens";
     if (platform === "threads") return "threads_oauth_tokens";
     if (platform === "pinterest") return "pinterest_oauth_tokens";
-    if (platform === "reddit") return "reddit_oauth_tokens";
+    
     if (platform === "discord") return "discord_tokens";
     if (platform === "tumblr") return "tumblr_oauth_tokens";
     if (platform === "snapchat") return "snapchat_oauth_tokens";
@@ -84,7 +84,7 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
         else if (platform === "telegram") name = token.channel_name || token.chat_id || "Kanał Telegram";
         else if (platform === "bluesky") name = token.handle || "Konto Bluesky";
         else if (platform === "pinterest") name = token.username ? `@${token.username}` : "Konto Pinterest";
-        else if (platform === "reddit") name = token.username ? `u/${token.username}` : "Konto Reddit";
+        
         else if (platform === "discord") name = token.channel_name || "Kanał Discord";
         else if (platform === "tumblr") name = token.blog_name || token.username || "Blog Tumblr";
         else if (platform === "snapchat") name = token.display_name || "Konto Snapchat";
@@ -172,7 +172,7 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
   const handleConnect = async () => {
     if (onConnect) {
       onConnect();
-    } else if (["x", "facebook", "tiktok", "instagram", "youtube", "linkedin", "threads", "telegram", "bluesky", "pinterest", "reddit", "discord", "tumblr", "snapchat", "google_business", "mastodon"].includes(platform)) {
+    } else if (["x", "facebook", "tiktok", "instagram", "youtube", "linkedin", "threads", "telegram", "bluesky", "pinterest", "discord", "tumblr", "snapchat", "google_business", "mastodon"].includes(platform)) {
       window.location.href = `/settings/social-accounts#${platform}`;
     } else {
       toast({

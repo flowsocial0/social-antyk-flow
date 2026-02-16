@@ -24,7 +24,7 @@ import ThreadsCallback from "./pages/ThreadsCallback";
 import MastodonCallback from "./pages/MastodonCallback";
 
 import PinterestCallback from "./pages/PinterestCallback";
-import RedditCallback from "./pages/RedditCallback";
+
 import TumblrCallback from "./pages/TumblrCallback";
 import SnapchatCallback from "./pages/SnapchatCallback";
 import GoogleBusinessCallback from "./pages/GoogleBusinessCallback";
@@ -40,7 +40,7 @@ import PlatformYouTube from "./pages/platforms/PlatformYouTube";
 import PlatformLinkedIn from "./pages/platforms/PlatformLinkedIn";
 import PlatformTikTok from "./pages/platforms/PlatformTikTok";
 import PlatformPinterest from "./pages/platforms/PlatformPinterest";
-import PlatformReddit from "./pages/platforms/PlatformReddit";
+
 import PlatformTelegram from "./pages/platforms/PlatformTelegram";
 import PlatformThreads from "./pages/platforms/PlatformThreads";
 import PlatformBeReal from "./pages/platforms/PlatformBeReal";
@@ -136,7 +136,7 @@ const App = () => (
           <Route path="/oauth/mastodon/callback" element={<MastodonCallback />} />
           
           <Route path="/oauth/pinterest/callback" element={<PinterestCallback />} />
-          <Route path="/oauth/reddit/callback" element={<RedditCallback />} />
+          
           <Route path="/oauth/tumblr/callback" element={<TumblrCallback />} />
           <Route path="/oauth/snapchat/callback" element={<SnapchatCallback />} />
           <Route path="/oauth/google-business/callback" element={<GoogleBusinessCallback />} />
@@ -162,7 +162,7 @@ const App = () => (
           <Route path="/platforms/linkedin" element={<ProtectedRoute><PlatformLinkedIn /></ProtectedRoute>} />
           <Route path="/platforms/tiktok" element={<ProtectedRoute><PlatformTikTok /></ProtectedRoute>} />
           <Route path="/platforms/pinterest" element={<ProtectedRoute><PlatformPinterest /></ProtectedRoute>} />
-          <Route path="/platforms/reddit" element={<ProtectedRoute><PlatformReddit /></ProtectedRoute>} />
+          
           <Route path="/platforms/telegram" element={<ProtectedRoute><PlatformTelegram /></ProtectedRoute>} />
           <Route path="/platforms/threads" element={<ProtectedRoute><PlatformThreads /></ProtectedRoute>} />
           <Route path="/platforms/bereal" element={<ProtectedRoute><PlatformBeReal /></ProtectedRoute>} />

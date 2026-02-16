@@ -313,11 +313,6 @@ const CampaignDetails = () => {
         });
       }
 
-      // Load Reddit accounts
-      if (selectedAccounts.reddit?.length) {
-        const { data } = await (supabase as any).from('reddit_oauth_tokens').select('id, username, account_name').in('id', selectedAccounts.reddit);
-        data?.forEach((a: any) => { newAccountsMap[a.id] = { id: a.id, display_name: a.username ? `u/${a.username}` : (a.account_name || 'Konto Reddit'), platform: 'reddit' }; });
-      }
 
       // Load Discord accounts
       if (selectedAccounts.discord?.length) {
