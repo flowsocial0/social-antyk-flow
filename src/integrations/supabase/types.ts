@@ -1207,51 +1207,6 @@ export type Database = {
         }
         Relationships: []
       }
-      snapchat_oauth_tokens: {
-        Row: {
-          access_token: string
-          account_name: string | null
-          created_at: string | null
-          display_name: string | null
-          expires_at: string | null
-          id: string
-          is_default: boolean | null
-          organization_id: string | null
-          refresh_token: string | null
-          scope: string | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          access_token: string
-          account_name?: string | null
-          created_at?: string | null
-          display_name?: string | null
-          expires_at?: string | null
-          id?: string
-          is_default?: boolean | null
-          organization_id?: string | null
-          refresh_token?: string | null
-          scope?: string | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          access_token?: string
-          account_name?: string | null
-          created_at?: string | null
-          display_name?: string | null
-          expires_at?: string | null
-          id?: string
-          is_default?: boolean | null
-          organization_id?: string | null
-          refresh_token?: string | null
-          scope?: string | null
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
       telegram_tokens: {
         Row: {
           account_name: string | null

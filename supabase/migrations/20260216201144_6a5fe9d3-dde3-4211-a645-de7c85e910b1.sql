@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS public.snapchat_oauth_tokens;
