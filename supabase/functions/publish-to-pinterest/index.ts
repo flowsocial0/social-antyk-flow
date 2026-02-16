@@ -210,67 +210,18 @@ Deno.serve(async (req) => {
           body: JSON.stringify(pinData),
         });
 
-        // Auto-retry with sandbox API if Trial access error on production
+        // If Trial access error on production, mark account as sandbox for future
         if (!response.ok) {
           const errorText = await response.text();
+          console.error(`Pinterest publish failed for account ${token.id}:`, errorText);
+          
           if (!isSandbox && errorText.includes('Trial access')) {
-            console.log('Trial access detected, retrying with Sandbox API...');
-            const sandboxBase = PINTEREST_API_SANDBOX;
-            
-            // Re-fetch board from sandbox
-            const sbBoardsRes = await fetch(`${sandboxBase}/v5/boards`, {
-              headers: { 'Authorization': `Bearer ${token.access_token}` },
-            });
-            let sbBoardId: string | null = null;
-            if (sbBoardsRes.ok) {
-              const sbData = await sbBoardsRes.json();
-              console.log('Sandbox boards response:', JSON.stringify(sbData));
-              if (sbData.items?.length > 0) sbBoardId = sbData.items[0].id;
-            } else {
-              const sbBoardsErr = await sbBoardsRes.text();
-              console.error(`Sandbox boards fetch failed: ${sbBoardsRes.status} - ${sbBoardsErr}`);
-            }
-            if (!sbBoardId) {
-              console.log('No sandbox boards found, creating one...');
-              const createRes = await fetch(`${sandboxBase}/v5/boards`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token.access_token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: 'FlowSocial Books', privacy: 'PUBLIC' }),
-              });
-              if (createRes.ok) {
-                const nb = await createRes.json();
-                sbBoardId = nb.id;
-                console.log(`Created sandbox board: ${nb.name} (${sbBoardId})`);
-              } else {
-                const createErr = await createRes.text();
-                console.error(`Failed to create sandbox board: ${createRes.status} - ${createErr}`);
-              }
-            }
-            if (sbBoardId) {
-              pinData.board_id = sbBoardId;
-              response = await fetch(`${sandboxBase}/v5/pins`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token.access_token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(pinData),
-              });
-              if (!response.ok) {
-                const retryErr = await response.text();
-                console.error(`Sandbox retry also failed:`, retryErr);
-                results.push({ accountId: token.id, success: false, error: retryErr });
-                continue;
-              }
-              // Update token to sandbox for future calls
-              await supabase.from('pinterest_oauth_tokens').update({ is_sandbox: true }).eq('id', token.id);
-            } else {
-              console.error(`Pinterest publish failed for account ${token.id}:`, errorText);
-              results.push({ accountId: token.id, success: false, error: errorText });
-              continue;
-            }
-          } else {
-            console.error(`Pinterest publish failed for account ${token.id}:`, errorText);
-            results.push({ accountId: token.id, success: false, error: errorText });
-            continue;
+            console.log('Trial access detected - marking account as sandbox for future. Please use a sandbox token.');
+            await supabase.from('pinterest_oauth_tokens').update({ is_sandbox: true }).eq('id', token.id);
           }
+          
+          results.push({ accountId: token.id, success: false, error: errorText });
+          continue;
         }
 
         const result = await response.json();
