@@ -225,8 +225,15 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
 
   // Helper function to get token table name for platform
   const getTokenTableName = (platform: string): string => {
-    if (platform === 'x') return 'twitter_oauth1_tokens';
-    return `${platform}_oauth_tokens`;
+    const specialTables: Record<string, string> = {
+      x: 'twitter_oauth1_tokens',
+      bluesky: 'bluesky_tokens',
+      telegram: 'telegram_tokens',
+      discord: 'discord_tokens',
+      mastodon: 'mastodon_tokens',
+      gab: 'gab_tokens',
+    };
+    return specialTables[platform] || `${platform}_oauth_tokens`;
   };
 
   const publishMutation = useMutation({
@@ -261,17 +268,7 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
       }
 
       // Select the correct function based on platform
-      const functionName = platform === 'x' ? 'publish-to-x' : 
-                          platform === 'facebook' ? 'publish-to-facebook' : 
-                          platform === 'tiktok' ? 'publish-to-tiktok' :
-                          platform === 'instagram' ? 'publish-to-instagram' :
-                          platform === 'youtube' ? 'publish-to-youtube' :
-                          platform === 'linkedin' ? 'publish-to-linkedin' :
-                          null;
-
-      if (!functionName) {
-        throw new Error(`Publikacja na platformie ${platform} nie jest jeszcze obsługiwana`);
-      }
+      const functionName = `publish-to-${platform}`;
 
       // If book has a Mega.nz video URL, resolve it to a temp Storage URL
       let megaCleanup: (() => Promise<void>) | null = null;
