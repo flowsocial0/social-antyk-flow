@@ -22,12 +22,15 @@ Deno.serve(async (req) => {
     let effectiveUserId = userId;
     if (!effectiveUserId) {
       const authHeader = req.headers.get('Authorization');
+      console.log('Auth header present:', !!authHeader);
       if (authHeader) {
         const token = authHeader.replace('Bearer ', '');
-        const { data: { user } } = await supabase.auth.getUser(token);
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        console.log('getUser result:', { userId: user?.id, error: authError?.message });
         effectiveUserId = user?.id;
       }
     }
+    console.log('Effective user ID:', effectiveUserId);
 
     if (!effectiveUserId) {
       return new Response(JSON.stringify({ success: false, error: 'User ID is required' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
