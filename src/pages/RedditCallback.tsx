@@ -15,7 +15,7 @@ const RedditCallback = () => {
     if (error) {
       navigate(`/settings/social-accounts?error=${error}`);
     } else {
-      navigate('/settings/social-accounts?connected=true&platform=reddit');
+      navigate('/settings/social-accounts#reddit');
     }
   }, [navigate]);
 

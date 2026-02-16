@@ -11,7 +11,7 @@ const GoogleBusinessCallback = () => {
     if (error) {
       navigate(`/settings/social-accounts?error=${error}`);
     } else {
-      navigate('/settings/social-accounts?connected=true&platform=google_business');
+      navigate('/settings/social-accounts#google_business');
     }
   }, [navigate]);
 

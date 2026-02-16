@@ -11,7 +11,7 @@ const SnapchatCallback = () => {
     if (error) {
       navigate(`/settings/social-accounts?error=${error}`);
     } else {
-      navigate('/settings/social-accounts?connected=true&platform=snapchat');
+      navigate('/settings/social-accounts#snapchat');
     }
   }, [navigate]);
 
