@@ -283,6 +283,37 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
         megaCleanup = cleanup;
       }
 
+      // Build the best possible text from book data
+      const SUPABASE_URL = "https://dmrfbokchkxjzslfzeps.supabase.co";
+      const getStorageUrl = (path: string) => `${SUPABASE_URL}/storage/v1/object/public/ObrazkiKsiazek/${path}`;
+
+      // Resolve the best text: platform-specific AI text > general AI text > description > title
+      const platformTextMap: Record<string, string | null | undefined> = {
+        x: book?.ai_text_x,
+        facebook: book?.ai_text_facebook,
+        linkedin: book?.ai_text_linkedin,
+        youtube: book?.ai_text_youtube,
+      };
+      const bestText = platformTextMap[platform] || book?.ai_generated_text || book?.description || `📚 ${book?.title || ''}`;
+
+      // Resolve best image URL
+      let bestImageUrl: string | undefined;
+      if (book?.storage_path) {
+        bestImageUrl = getStorageUrl(book.storage_path);
+      } else if (book?.image_url) {
+        bestImageUrl = book.image_url;
+      }
+
+      // Resolve best video URL
+      let bestVideoUrl: string | undefined = resolvedVideoUrl;
+      if (!bestVideoUrl) {
+        if (book?.video_storage_path) {
+          bestVideoUrl = getStorageUrl(book.video_storage_path);
+        } else if (book?.video_url) {
+          bestVideoUrl = book.video_url;
+        }
+      }
+
       // Publish to ALL accounts in parallel
       const results = await Promise.allSettled(
         accounts.map((account: { id: string }) =>
@@ -292,7 +323,9 @@ export const PlatformBooksList = ({ platform, searchQuery, onSearchChange }: Pla
               bookId, 
               platform, 
               accountId: account.id,
-              ...(resolvedVideoUrl ? { videoUrl: resolvedVideoUrl } : {})
+              text: bestText,
+              imageUrl: bestImageUrl,
+              videoUrl: bestVideoUrl,
             },
             headers: { Authorization: `Bearer ${session.access_token}` },
           })
