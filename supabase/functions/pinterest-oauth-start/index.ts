@@ -15,7 +15,10 @@ Deno.serve(async (req) => {
 
     const PINTEREST_APP_ID = Deno.env.get('PINTEREST_APP_ID');
     if (!PINTEREST_APP_ID) {
-      throw new Error('PINTEREST_APP_ID is not configured');
+      return new Response(
+        JSON.stringify({ success: false, error: 'PINTEREST_APP_ID nie jest skonfigurowany. Skontaktuj się z administratorem.' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -40,8 +43,8 @@ Deno.serve(async (req) => {
   } catch (error: any) {
     console.error('Pinterest OAuth start error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, error: error.message }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
