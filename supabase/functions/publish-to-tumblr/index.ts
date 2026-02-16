@@ -139,49 +139,8 @@ Deno.serve(async (req) => {
         const postUrl = `https://api.tumblr.com/v2/blog/${blogName}/posts`;
         let response: Response;
 
-        if (videoMediaUrl && tokenSecret) {
-          // OAuth1 binary video upload via multipart/form-data
-          console.log(`Downloading video from: ${videoMediaUrl}`);
-          const videoResponse = await fetch(videoMediaUrl);
-          if (!videoResponse.ok) {
-            results.push({ accountId: token.id, success: false, error: `Failed to download video: ${videoResponse.status}` });
-            continue;
-          }
-          const contentType = videoResponse.headers.get('content-type');
-          console.log(`Video content-type from source: ${contentType}`);
-          const videoArrayBuffer = await videoResponse.arrayBuffer();
-          console.log(`Video size: ${(videoArrayBuffer.byteLength / 1024 / 1024).toFixed(2)} MB`);
-
-          if (videoArrayBuffer.byteLength < 10000) {
-            results.push({ accountId: token.id, success: false, error: 'Video file too small or invalid' });
-            continue;
-          }
-
-          const videoIdentifier = 'video_0';
-          const contentBlocks: any[] = [];
-          if (text) contentBlocks.push({ type: 'text', text });
-          contentBlocks.push({
-            type: 'video',
-            media: { type: 'video/mp4', identifier: videoIdentifier },
-          });
-
-          const jsonPayload = JSON.stringify({ content: contentBlocks, state: 'published' });
-          console.log(`NPF payload: ${jsonPayload}`);
-
-          const formData = new FormData();
-          formData.append('json', new Blob([jsonPayload], { type: 'application/json' }));
-          formData.append(videoIdentifier, new Blob([videoArrayBuffer], { type: 'video/mp4' }), 'video.mp4');
-
-          const authHeader = buildOAuth1Header('POST', postUrl, token.access_token, tokenSecret);
-          console.log(`Uploading video to Tumblr blog: ${blogName} (OAuth1)`);
-
-          response = await fetch(postUrl, {
-            method: 'POST',
-            headers: { Authorization: authHeader },
-            body: formData,
-          });
-        } else {
-          // JSON post: text + optional video URL or image
+        {
+          // JSON post: text + optional video URL or image (OAuth1 signed)
           const content: any[] = [{ type: 'text', text: text || '' }];
           if (videoMediaUrl) {
             console.log(`Publishing video via URL: ${videoMediaUrl}`);
