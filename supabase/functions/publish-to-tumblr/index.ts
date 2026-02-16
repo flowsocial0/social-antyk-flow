@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
         text = post.text; bookData = post.book;
         if (!mediaUrl && bookData?.storage_path) mediaUrl = getStoragePublicUrl(bookData.storage_path);
         else if (!mediaUrl && bookData?.image_url) mediaUrl = bookData.image_url;
-        if (!videoMediaUrl && bookData?.video_storage_path) videoMediaUrl = `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${bookData.video_storage_path}`;
+        if (!videoMediaUrl && bookData?.video_storage_path) videoMediaUrl = getStoragePublicUrl(bookData.video_storage_path);
         else if (!videoMediaUrl && bookData?.video_url) videoMediaUrl = bookData.video_url;
       }
     } else if (bookId) {
@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
         bookData = book;
         if (!mediaUrl && book.storage_path) mediaUrl = getStoragePublicUrl(book.storage_path);
         else if (!mediaUrl && book.image_url) mediaUrl = book.image_url;
-        if (!videoMediaUrl && book.video_storage_path) videoMediaUrl = `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${book.video_storage_path}`;
+        if (!videoMediaUrl && book.video_storage_path) videoMediaUrl = getStoragePublicUrl(book.video_storage_path);
         else if (!videoMediaUrl && book.video_url) videoMediaUrl = book.video_url;
         const { data: content } = await supabase.from('book_platform_content').select('*').eq('id', contentId || '').single();
         text = content?.custom_text || content?.ai_generated_text || book.title;
@@ -84,10 +84,10 @@ Deno.serve(async (req) => {
         const blogName = token.blog_name || token.username;
         if (!blogName) { results.push({ accountId: token.id, success: false, error: 'No blog name' }); continue; }
 
-        // Tumblr NPF requires multipart/form-data for native video uploads
-        // External URLs only work for images, not videos
+        let response: Response;
+
         if (videoMediaUrl) {
-          // Download the video and upload via multipart/form-data
+          // Tumblr NPF requires uploading video as binary via multipart/form-data
           console.log(`Downloading video from: ${videoMediaUrl}`);
           const videoResponse = await fetch(videoMediaUrl);
           if (!videoResponse.ok) {
@@ -95,47 +95,67 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          const videoBlob = await videoResponse.blob();
-          const videoSize = videoBlob.size;
-          console.log(`Video downloaded: ${(videoSize / 1024 / 1024).toFixed(2)} MB`);
+          const videoBytes = new Uint8Array(await videoResponse.arrayBuffer());
+          console.log(`Video downloaded: ${(videoBytes.length / 1024 / 1024).toFixed(2)} MB`);
 
-          if (videoSize < 10000) {
+          if (videoBytes.length < 10000) {
             results.push({ accountId: token.id, success: false, error: 'Video file too small or invalid' });
             continue;
           }
 
-          // Build multipart form data with NPF content referencing the video identifier
-          const contentBlocks: any[] = [{ type: 'text', text: text || '' }];
-          contentBlocks.push({ type: 'video', media: [{ type: 'video/mp4', identifier: 'tumblr-video-0', width: 1280, height: 720 }] });
+          // Detect content type from response or default to mp4
+          const contentType = videoResponse.headers.get('content-type') || 'video/mp4';
 
-          const formData = new FormData();
-          formData.append('json', JSON.stringify({ content: contentBlocks, state: 'published' }));
-          formData.append('tumblr-video-0', videoBlob, 'video.mp4');
-
-          const response = await fetch(`https://api.tumblr.com/v2/blog/${blogName}/posts`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token.access_token}` },
-            body: formData,
+          // Build NPF content blocks referencing the identifier
+          const contentBlocks: any[] = [];
+          if (text) {
+            contentBlocks.push({ type: 'text', text });
+          }
+          contentBlocks.push({
+            type: 'video',
+            media: [{
+              type: contentType,
+              identifier: 'tumblr-video-upload',
+            }],
           });
 
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`Tumblr video publish failed for ${token.id}:`, errorText);
-            results.push({ accountId: token.id, success: false, error: errorText });
-            continue;
+          const jsonPayload = JSON.stringify({ content: contentBlocks, state: 'published' });
+
+          // Build multipart/form-data manually for better control
+          const boundary = '----TumblrBoundary' + Date.now();
+          const encoder = new TextEncoder();
+
+          const parts: Uint8Array[] = [];
+
+          // JSON part
+          const jsonPart = `--${boundary}\r\nContent-Disposition: form-data; name="json"\r\nContent-Type: application/json\r\n\r\n${jsonPayload}\r\n`;
+          parts.push(encoder.encode(jsonPart));
+
+          // Video file part
+          const filePart = `--${boundary}\r\nContent-Disposition: form-data; name="tumblr-video-upload"; filename="video.mp4"\r\nContent-Type: ${contentType}\r\n\r\n`;
+          parts.push(encoder.encode(filePart));
+          parts.push(videoBytes);
+          parts.push(encoder.encode(`\r\n--${boundary}--\r\n`));
+
+          // Combine all parts
+          const totalLength = parts.reduce((sum, p) => sum + p.length, 0);
+          const bodyBytes = new Uint8Array(totalLength);
+          let offset = 0;
+          for (const part of parts) {
+            bodyBytes.set(part, offset);
+            offset += part.length;
           }
 
-          const result = await response.json();
-          const postId = result.response?.id;
+          console.log(`Uploading to Tumblr blog: ${blogName}, multipart size: ${(bodyBytes.length / 1024 / 1024).toFixed(2)} MB`);
 
-          await supabase.from('platform_publications').insert({
-            user_id: effectiveUserId, platform: 'tumblr', account_id: token.id,
-            post_id: String(postId || ''), book_id: bookData?.id || null,
-            campaign_post_id: campaignPostId || null, published_at: new Date().toISOString(),
-            source: campaignPostId ? 'campaign' : 'manual',
+          response = await fetch(`https://api.tumblr.com/v2/blog/${blogName}/posts`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token.access_token}`,
+              'Content-Type': `multipart/form-data; boundary=${boundary}`,
+            },
+            body: bodyBytes,
           });
-
-          results.push({ accountId: token.id, success: true, postId });
         } else {
           // Text + image post (JSON)
           const content: any[] = [{ type: 'text', text: text || '' }];
@@ -143,32 +163,33 @@ Deno.serve(async (req) => {
             content.push({ type: 'image', media: [{ url: mediaUrl }] });
           }
 
-          const response = await fetch(`https://api.tumblr.com/v2/blog/${blogName}/posts`, {
+          response = await fetch(`https://api.tumblr.com/v2/blog/${blogName}/posts`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token.access_token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ content, state: 'published' }),
           });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`Tumblr publish failed for ${token.id}:`, errorText);
-            results.push({ accountId: token.id, success: false, error: errorText });
-            continue;
-          }
-
-          const result = await response.json();
-          const postId = result.response?.id;
-
-          await supabase.from('platform_publications').insert({
-            user_id: effectiveUserId, platform: 'tumblr', account_id: token.id,
-            post_id: String(postId || ''), book_id: bookData?.id || null,
-            campaign_post_id: campaignPostId || null, published_at: new Date().toISOString(),
-            source: campaignPostId ? 'campaign' : 'manual',
-          });
-
-          results.push({ accountId: token.id, success: true, postId });
         }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Tumblr publish failed for ${token.id}:`, errorText);
+          results.push({ accountId: token.id, success: false, error: errorText });
+          continue;
+        }
+
+        const result = await response.json();
+        const postId = result.response?.id;
+
+        await supabase.from('platform_publications').insert({
+          user_id: effectiveUserId, platform: 'tumblr', account_id: token.id,
+          post_id: String(postId || ''), book_id: bookData?.id || null,
+          campaign_post_id: campaignPostId || null, published_at: new Date().toISOString(),
+          source: campaignPostId ? 'campaign' : 'manual',
+        });
+
+        results.push({ accountId: token.id, success: true, postId });
       } catch (err: any) {
+        console.error(`Tumblr error for account ${token.id}:`, err);
         results.push({ accountId: token.id, success: false, error: err.message });
       }
     }
