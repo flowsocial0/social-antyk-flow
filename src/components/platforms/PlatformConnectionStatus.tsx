@@ -43,7 +43,7 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
     if (platform === "snapchat") return "snapchat_oauth_tokens";
     if (platform === "google_business") return "google_business_tokens";
     if (platform === "mastodon") return "mastodon_tokens";
-    if (platform === "gab") return "gab_tokens";
+    
     return `${platform}_oauth_tokens`;
   };
 
@@ -61,8 +61,8 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
         .select("*")
         .eq("user_id", session.user.id);
 
-      // Filter out pending tokens for mastodon and gab
-      if (platform === "mastodon" || platform === "gab") {
+      // Filter out pending tokens for mastodon
+      if (platform === "mastodon") {
         query = query.not("access_token", "like", "pending_%");
       }
 
@@ -90,7 +90,7 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
         else if (platform === "snapchat") name = token.display_name || "Konto Snapchat";
         else if (platform === "google_business") name = token.business_name || "Firma Google";
         else if (platform === "mastodon") name = token.username ? `@${token.username}@${(token.server_url || '').replace('https://', '')}` : "Konto Mastodon";
-        else if (platform === "gab") name = token.username ? `@${token.username}` : "Konto Gab";
+
 
         return {
           id: token.id,
@@ -172,7 +172,7 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
   const handleConnect = async () => {
     if (onConnect) {
       onConnect();
-    } else if (["x", "facebook", "tiktok", "instagram", "youtube", "linkedin", "threads", "telegram", "bluesky", "pinterest", "reddit", "discord", "tumblr", "snapchat", "google_business", "mastodon", "gab"].includes(platform)) {
+    } else if (["x", "facebook", "tiktok", "instagram", "youtube", "linkedin", "threads", "telegram", "bluesky", "pinterest", "reddit", "discord", "tumblr", "snapchat", "google_business", "mastodon"].includes(platform)) {
       window.location.href = `/settings/social-accounts#${platform}`;
     } else {
       toast({

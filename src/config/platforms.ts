@@ -18,7 +18,6 @@ export type PlatformId =
   | 'threads' 
   | 'bluesky' 
   | 'mastodon' 
-  | 'gab'
   | 'discord'
   | 'tumblr'
   | 'snapchat'
@@ -203,19 +202,6 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     priority: 10,
     mediaType: 'both',
     shortDescription: 'Tooty z mediami na wybranej instancji.',
-  },
-  gab: {
-    id: 'gab',
-    name: 'Gab',
-    icon: MessageCircle,
-    color: 'text-green-700',
-    gradientFrom: 'from-green-700/20',
-    gradientTo: 'to-green-800/20',
-    path: '/platforms/gab',
-    status: 'active',
-    priority: 11,
-    mediaType: 'both',
-    shortDescription: 'Posty z obrazkami i wideo na profilu.',
   },
   discord: {
     id: 'discord',

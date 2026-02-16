@@ -39,7 +39,6 @@ interface PlatformAccounts {
   telegram: SocialAccount[];
   bluesky: SocialAccount[];
   mastodon: SocialAccount[];
-  gab: SocialAccount[];
   pinterest: SocialAccount[];
   reddit: SocialAccount[];
   discord: SocialAccount[];
@@ -53,7 +52,7 @@ export default function SocialAccounts() {
   const [isLoading, setIsLoading] = useState<Record<string, boolean>>({});
   const [accounts, setAccounts] = useState<PlatformAccounts>({
     x: [], facebook: [], instagram: [], tiktok: [], youtube: [], linkedin: [],
-    threads: [], telegram: [], bluesky: [], mastodon: [], gab: [],
+    threads: [], telegram: [], bluesky: [], mastodon: [],
     pinterest: [], reddit: [], discord: [], tumblr: [], snapchat: [], google_business: [],
   });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; platform: string; accountId: string; accountName: string }>({
@@ -108,7 +107,7 @@ export default function SocialAccounts() {
     if (!session) return;
 
     // Load all accounts for each platform
-    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, threadsResult, telegramResult, blueskyResult, mastodonResult, gabResult, pinterestResult, redditResult, discordResult, tumblrResult, snapchatResult, googleBizResult] = await Promise.all([
+    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, threadsResult, telegramResult, blueskyResult, mastodonResult, pinterestResult, redditResult, discordResult, tumblrResult, snapchatResult, googleBizResult] = await Promise.all([
       supabase.from('twitter_oauth1_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('facebook_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('instagram_oauth_tokens').select('*').eq('user_id', session.user.id),
@@ -119,7 +118,6 @@ export default function SocialAccounts() {
       (supabase as any).from('telegram_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('bluesky_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('mastodon_tokens').select('*').eq('user_id', session.user.id).not('access_token', 'like', 'pending_%'),
-      (supabase as any).from('gab_tokens').select('*').eq('user_id', session.user.id).not('access_token', 'like', 'pending_%'),
       (supabase as any).from('pinterest_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('reddit_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('discord_tokens').select('*').eq('user_id', session.user.id),
@@ -178,11 +176,6 @@ export default function SocialAccounts() {
         id: a.id,
         account_name: a.account_name,
         display_name: a.username ? `@${a.username}@${new URL(a.server_url).hostname}` : a.server_url,
-      })),
-      gab: (gabResult.data || []).map((a: any) => ({
-        id: a.id,
-        account_name: a.account_name,
-        display_name: a.username ? `@${a.username}` : 'Konto Gab',
       })),
       pinterest: (pinterestResult.data || []).map((a: any) => ({
         id: a.id,
@@ -435,35 +428,6 @@ export default function SocialAccounts() {
     setMastodonDialogOpen(true);
   };
 
-  const connectGab = async () => {
-    setLoading('gab', true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('Musisz być zalogowany');
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke('gab-oauth-start', {
-        body: { userId: session.user.id },
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      if (data?.url) {
-        if (data.state) sessionStorage.setItem('gab_oauth_state', data.state);
-        sessionStorage.setItem('gab_user_id', session.user.id);
-        window.location.href = data.url;
-      } else {
-        throw new Error('Nie otrzymano URL autoryzacji z Gab');
-      }
-    } catch (error: any) {
-      toast.error('Nie udało się połączyć z Gab', { description: error.message });
-    } finally {
-      setLoading('gab', false);
-    }
-  };
 
   const connectPinterest = async () => {
     setLoading('pinterest', true);
@@ -592,7 +556,7 @@ export default function SocialAccounts() {
         youtube: 'youtube_oauth_tokens', linkedin: 'linkedin_oauth_tokens',
         threads: 'threads_oauth_tokens', telegram: 'telegram_tokens',
         bluesky: 'bluesky_tokens', mastodon: 'mastodon_tokens',
-        gab: 'gab_tokens', pinterest: 'pinterest_oauth_tokens',
+        pinterest: 'pinterest_oauth_tokens',
         reddit: 'reddit_oauth_tokens', discord: 'discord_tokens',
         tumblr: 'tumblr_oauth_tokens', snapchat: 'snapchat_oauth_tokens',
         google_business: 'google_business_tokens',
@@ -630,7 +594,7 @@ export default function SocialAccounts() {
     { id: 'telegram', name: 'Telegram', icon: Send, color: 'text-sky-500', bgColor: 'bg-sky-500/10', connect: connectTelegram, formType: 'telegram' as const },
     { id: 'bluesky', name: 'Bluesky', icon: Globe, color: 'text-sky-600', bgColor: 'bg-sky-600/10', connect: connectBluesky, formType: 'bluesky' as const },
     { id: 'mastodon', name: 'Mastodon', icon: Globe, color: 'text-purple-600', bgColor: 'bg-purple-600/10', connect: connectMastodon, formType: 'mastodon' as const },
-    { id: 'gab', name: 'Gab', icon: MessageCircle, color: 'text-green-700', bgColor: 'bg-green-700/10', connect: connectGab },
+    
     { id: 'pinterest', name: 'Pinterest', icon: Image, color: 'text-red-600', bgColor: 'bg-red-600/10', connect: connectPinterest },
     { id: 'reddit', name: 'Reddit', icon: MessageCircle, color: 'text-orange-500', bgColor: 'bg-orange-500/10', connect: connectReddit },
     { id: 'discord', name: 'Discord', icon: MessageCircle, color: 'text-indigo-500', bgColor: 'bg-indigo-500/10', connect: connectDiscord, formType: 'discord' as const },
