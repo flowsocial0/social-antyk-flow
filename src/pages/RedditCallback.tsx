@@ -13,9 +13,9 @@ const RedditCallback = () => {
     const error = params.get('error');
 
     if (error) {
-      navigate(`/settings/social-accounts?error=${error}`);
+      navigate('/platforms/reddit');
     } else {
-      navigate('/settings/social-accounts#reddit');
+      navigate('/platforms/reddit');
     }
   }, [navigate]);
 

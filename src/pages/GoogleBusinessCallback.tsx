@@ -9,9 +9,9 @@ const GoogleBusinessCallback = () => {
     const params = new URLSearchParams(window.location.search);
     const error = params.get('error');
     if (error) {
-      navigate(`/settings/social-accounts?error=${error}`);
+      navigate('/platforms/google-business');
     } else {
-      navigate('/settings/social-accounts#google_business');
+      navigate('/platforms/google-business');
     }
   }, [navigate]);
 

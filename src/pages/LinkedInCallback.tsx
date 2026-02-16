@@ -48,7 +48,7 @@ export default function LinkedInCallback() {
         sessionStorage.removeItem("linkedin_state");
         sessionStorage.removeItem("linkedin_user_id");
         
-        setTimeout(() => navigate("/settings/social-accounts#linkedin"), 2000);
+        setTimeout(() => navigate("/platforms/linkedin"), 2000);
       } catch (err: any) {
         console.error("LinkedIn callback error:", err);
         setStatus("error");

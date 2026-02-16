@@ -18,18 +18,18 @@ export default function ThreadsCallback() {
     if (threadsStatus === 'connected') {
       setStatus('success');
       setMessage('Konto Threads zostało połączone!');
-      setTimeout(() => navigate('/settings/social-accounts#threads'), 2000);
+      setTimeout(() => navigate('/platforms/threads'), 2000);
     } else if (threadsStatus === 'error') {
       setStatus('error');
       setMessage(errorMessage || 'Wystąpił błąd podczas łączenia z Threads');
-      setTimeout(() => navigate('/settings/social-accounts'), 3000);
+      setTimeout(() => navigate('/platforms/threads'), 3000);
     } else if (threadsStatus === 'cancelled') {
       setStatus('error');
       setMessage('Autoryzacja Threads została anulowana');
-      setTimeout(() => navigate('/settings/social-accounts'), 3000);
+      setTimeout(() => navigate('/platforms/threads'), 3000);
     } else {
       // If no status params, redirect to social accounts
-      setTimeout(() => navigate('/settings/social-accounts'), 2000);
+      setTimeout(() => navigate('/platforms/threads'), 2000);
     }
   }, [searchParams, navigate]);
 

@@ -68,10 +68,18 @@ export default function SocialAccounts() {
   const [sourcePlatform] = useState(() => window.location.hash.replace('#', ''));
   const scrollAfterLoadRef = useRef<(() => void) | null>(null);
   useEffect(() => {
+    // If redirected from edge function OAuth callback with platform info, go directly to platform page
+    const params = new URLSearchParams(window.location.search);
+    const connectedPlatform = params.get('platform');
+    if (params.get('connected') === 'true' && connectedPlatform) {
+      const platformRoute = connectedPlatform === 'google_business' ? 'google-business' : connectedPlatform;
+      navigate(`/platforms/${platformRoute}`, { replace: true });
+      return;
+    }
+
     loadAllAccounts();
     
     // Auto-refresh after OAuth callback
-    const params = new URLSearchParams(window.location.search);
     if (params.get('connected') === 'true' || params.get('success') || params.get('instagram') === 'connected' || params.get('youtube') === 'connected') {
       loadAllAccounts();
       window.history.replaceState({}, '', '/settings/social-accounts');

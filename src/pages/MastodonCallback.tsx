@@ -20,13 +20,13 @@ export default function MastodonCallback() {
 
       if (!code) {
         toast.error("Brak kodu autoryzacji");
-        navigate("/settings/social-accounts");
+        navigate("/platforms/mastodon");
         return;
       }
 
       if (state && savedState && state !== savedState) {
         toast.error("Nieprawidłowy state - spróbuj ponownie");
-        navigate("/settings/social-accounts");
+        navigate("/platforms/mastodon");
         return;
       }
 
@@ -40,7 +40,7 @@ export default function MastodonCallback() {
 
       if (!userId) {
         toast.error("Brak danych sesji - spróbuj ponownie");
-        navigate("/settings/social-accounts");
+        navigate("/platforms/mastodon");
         return;
       }
 
@@ -60,7 +60,7 @@ export default function MastodonCallback() {
 
       if (!serverUrl) {
         toast.error("Brak danych serwera Mastodon - spróbuj ponownie");
-        navigate("/settings/social-accounts");
+        navigate("/platforms/mastodon");
         return;
       }
 
@@ -87,7 +87,7 @@ export default function MastodonCallback() {
         sessionStorage.removeItem("mastodon_oauth_state");
         sessionStorage.removeItem("mastodon_server_url");
         sessionStorage.removeItem("mastodon_user_id");
-        navigate("/settings/social-accounts#mastodon");
+        navigate("/platforms/mastodon");
       }
     };
 

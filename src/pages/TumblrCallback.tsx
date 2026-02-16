@@ -9,9 +9,9 @@ const TumblrCallback = () => {
     const params = new URLSearchParams(window.location.search);
     const error = params.get('error');
     if (error) {
-      navigate(`/settings/social-accounts?error=${error}`);
+      navigate('/platforms/tumblr');
     } else {
-      navigate('/settings/social-accounts#tumblr');
+      navigate('/platforms/tumblr');
     }
   }, [navigate]);
 

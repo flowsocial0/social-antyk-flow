@@ -21,13 +21,13 @@ export default function TikTokCallback() {
         toast.error("Błąd autoryzacji TikTok", {
           description: errorDescription || error,
         });
-        navigate("/settings/social-accounts");
+        navigate("/platforms/tiktok");
         return;
       }
 
       if (!code) {
         toast.error("Brak kodu autoryzacji");
-        navigate("/settings/social-accounts");
+        navigate("/platforms/tiktok");
         return;
       }
 
@@ -36,7 +36,7 @@ export default function TikTokCallback() {
       if (state !== savedState) {
         console.error("State mismatch:", { received: state, saved: savedState });
         toast.error("Błąd weryfikacji stanu OAuth");
-        navigate("/settings/social-accounts");
+        navigate("/platforms/tiktok");
         return;
       }
 
@@ -47,7 +47,7 @@ export default function TikTokCallback() {
 
       if (!codeVerifier || !userId) {
         toast.error("Brak danych sesji OAuth");
-        navigate("/settings/social-accounts");
+        navigate("/platforms/tiktok");
         return;
       }
 
@@ -70,7 +70,7 @@ export default function TikTokCallback() {
           sessionStorage.removeItem("tiktok_user_id");
 
           toast.success("TikTok połączony pomyślnie!");
-          navigate("/settings/social-accounts#tiktok");
+          navigate("/platforms/tiktok");
         } else {
           throw new Error(data?.error || "Nieznany błąd");
         }
@@ -79,7 +79,7 @@ export default function TikTokCallback() {
         toast.error("Błąd połączenia z TikTok", {
           description: error.message,
         });
-        navigate("/settings/social-accounts");
+        navigate("/platforms/tiktok");
       }
     };
 
