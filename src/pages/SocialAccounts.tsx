@@ -449,11 +449,14 @@ export default function SocialAccounts() {
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       if (data?.url) {
         if (data.state) sessionStorage.setItem('gab_oauth_state', data.state);
         sessionStorage.setItem('gab_user_id', session.user.id);
         window.location.href = data.url;
+      } else {
+        throw new Error('Nie otrzymano URL autoryzacji z Gab');
       }
     } catch (error: any) {
       toast.error('Nie udało się połączyć z Gab', { description: error.message });
