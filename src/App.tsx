@@ -51,6 +51,10 @@ import PlatformRumble from "./pages/platforms/PlatformRumble";
 import PlatformOnlyFans from "./pages/platforms/PlatformOnlyFans";
 import PlatformLocals from "./pages/platforms/PlatformLocals";
 import PlatformGab from "./pages/platforms/PlatformGab";
+import PlatformDiscord from "./pages/platforms/PlatformDiscord";
+import PlatformTumblr from "./pages/platforms/PlatformTumblr";
+import PlatformSnapchat from "./pages/platforms/PlatformSnapchat";
+import PlatformGoogleBusiness from "./pages/platforms/PlatformGoogleBusiness";
 import PlatformParler from "./pages/platforms/PlatformParler";
 import ScheduleOverview from "./pages/ScheduleOverview";
 import Platforms from "./pages/Platforms";
@@ -169,6 +173,10 @@ const App = () => (
           <Route path="/platforms/onlyfans" element={<ProtectedRoute><PlatformOnlyFans /></ProtectedRoute>} />
           <Route path="/platforms/locals" element={<ProtectedRoute><PlatformLocals /></ProtectedRoute>} />
           <Route path="/platforms/gab" element={<ProtectedRoute><PlatformGab /></ProtectedRoute>} />
+          <Route path="/platforms/discord" element={<ProtectedRoute><PlatformDiscord /></ProtectedRoute>} />
+          <Route path="/platforms/tumblr" element={<ProtectedRoute><PlatformTumblr /></ProtectedRoute>} />
+          <Route path="/platforms/snapchat" element={<ProtectedRoute><PlatformSnapchat /></ProtectedRoute>} />
+          <Route path="/platforms/google-business" element={<ProtectedRoute><PlatformGoogleBusiness /></ProtectedRoute>} />
           <Route path="/platforms/parler" element={<ProtectedRoute><PlatformParler /></ProtectedRoute>} />
           <Route path="/schedule-overview" element={<ProtectedRoute><ScheduleOverview /></ProtectedRoute>} />
 
