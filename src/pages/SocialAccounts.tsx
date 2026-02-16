@@ -65,6 +65,7 @@ export default function SocialAccounts() {
   const [blueskyDialogOpen, setBlueskyDialogOpen] = useState(false);
   const [mastodonDialogOpen, setMastodonDialogOpen] = useState(false);
   const [discordDialogOpen, setDiscordDialogOpen] = useState(false);
+  const [sourcePlatform] = useState(() => window.location.hash.replace('#', ''));
   const scrollAfterLoadRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     loadAllAccounts();
@@ -609,7 +610,13 @@ export default function SocialAccounts() {
         <div className="mb-8">
           <Button 
             variant="ghost" 
-            onClick={() => navigate('/platforms')} 
+            onClick={() => {
+              if (sourcePlatform && ['x','facebook','instagram','tiktok','youtube','linkedin','threads','telegram','bluesky','mastodon','pinterest','reddit','discord','tumblr','snapchat','google_business'].includes(sourcePlatform)) {
+                navigate(`/platforms/${sourcePlatform}`);
+              } else {
+                navigate('/platforms');
+              }
+            }} 
             className="mb-4 gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
