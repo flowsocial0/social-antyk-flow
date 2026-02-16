@@ -37,6 +37,7 @@ export interface PlatformConfig {
   status: 'active' | 'coming-soon' | 'planned';
   priority: number; // Lower number = higher priority in UI
   mediaType: MediaType; // What type of media this platform supports
+  popular?: boolean; // Whether this is a popular/mainstream platform
 }
 
 export const platformConfigs: Record<PlatformId, PlatformConfig> = {
@@ -51,6 +52,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     status: 'active',
     priority: 1,
     mediaType: 'both',
+    popular: true,
   },
   facebook: {
     id: 'facebook',
@@ -63,6 +65,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     status: 'active',
     priority: 2,
     mediaType: 'both',
+    popular: true,
   },
   instagram: {
     id: 'instagram',
@@ -74,7 +77,8 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     path: '/platforms/instagram',
     status: 'active',
     priority: 3,
-    mediaType: 'image-only', // Instagram requires image, text-only not allowed
+    mediaType: 'image-only',
+    popular: true,
   },
   youtube: {
     id: 'youtube',
@@ -87,6 +91,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     status: 'active',
     priority: 4,
     mediaType: 'video-only',
+    popular: true,
   },
   linkedin: {
     id: 'linkedin',
@@ -99,6 +104,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     status: 'active',
     priority: 5,
     mediaType: 'both',
+    popular: true,
   },
   tiktok: {
     id: 'tiktok',
@@ -111,6 +117,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     status: 'active',
     priority: 3,
     mediaType: 'video-only',
+    popular: true,
   },
   pinterest: {
     id: 'pinterest',
@@ -281,4 +288,12 @@ export const platformRequiresVideo = (platformId: PlatformId): boolean => {
 export const platformSupportsVideo = (platformId: PlatformId): boolean => {
   const mediaType = platformConfigs[platformId]?.mediaType;
   return mediaType === 'video-only' || mediaType === 'both';
+};
+
+export const getPopularPlatforms = (): PlatformConfig[] => {
+  return getAllPlatforms().filter(p => p.popular);
+};
+
+export const getOtherPlatforms = (): PlatformConfig[] => {
+  return getAllPlatforms().filter(p => !p.popular);
 };
