@@ -140,13 +140,14 @@ Deno.serve(async (req) => {
         let response: Response;
 
         {
-          // JSON post: text + optional video URL or image (OAuth1 signed)
+          // Tumblr doesn't reliably support video uploads - use text + image only
           const content: any[] = [{ type: 'text', text: text || '' }];
-          if (videoMediaUrl) {
-            console.log(`Publishing video via URL: ${videoMediaUrl}`);
-            content.push({ type: 'video', url: videoMediaUrl });
-          } else if (mediaUrl) {
+          // Always prefer image (book cover) over video for Tumblr
+          if (mediaUrl) {
             content.push({ type: 'image', media: [{ url: mediaUrl }] });
+          }
+          if (videoMediaUrl) {
+            console.log(`Skipping video for Tumblr (not supported), using image instead`);
           }
 
           const headers: Record<string, string> = { 'Content-Type': 'application/json' };
