@@ -83,17 +83,25 @@ export default function SocialAccounts() {
       window.history.replaceState({}, '', '/settings/social-accounts');
     }
 
-    // Scroll to platform from hash
+    // Scroll to platform from hash - poll until element exists
     const hash = window.location.hash.replace('#', '');
     if (hash) {
-      setTimeout(() => {
-        const el = document.getElementById(`platform-${hash}`);
+      const targetId = `platform-${hash}`;
+      let attempts = 0;
+      const maxAttempts = 30;
+      const tryScroll = () => {
+        const el = document.getElementById(targetId);
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
           el.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
           setTimeout(() => el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2'), 3000);
+        } else if (attempts < maxAttempts) {
+          attempts++;
+          requestAnimationFrame(tryScroll);
         }
-      }, 300);
+      };
+      // Start polling after a short initial delay for render
+      setTimeout(tryScroll, 100);
     }
   }, []);
 
