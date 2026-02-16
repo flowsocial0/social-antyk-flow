@@ -154,12 +154,37 @@ Deno.serve(async (req) => {
             boardId = boardsData.items[0].id;
             console.log(`Using board: ${boardsData.items[0].name} (${boardId})`);
           }
+        } else {
+          const boardsError = await boardsResponse.text();
+          console.error(`Failed to fetch boards: ${boardsResponse.status} - ${boardsError}`);
         }
 
+        // If no boards found, create one automatically
         if (!boardId) {
-          console.error('No Pinterest boards found for account', token.id);
-          results.push({ accountId: token.id, success: false, error: 'No Pinterest boards found. Please create a board on Pinterest first.' });
-          continue;
+          console.log('No boards found, creating default board...');
+          const createBoardResponse = await fetch(`${apiBase}/v5/boards`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              name: 'FlowSocial Books',
+              description: 'Automatycznie utworzony board do publikacji ksiazek',
+              privacy: 'PUBLIC',
+            }),
+          });
+
+          if (createBoardResponse.ok) {
+            const newBoard = await createBoardResponse.json();
+            boardId = newBoard.id;
+            console.log(`Created new board: ${newBoard.name} (${boardId})`);
+          } else {
+            const errorText = await createBoardResponse.text();
+            console.error('Failed to create board:', errorText);
+            results.push({ accountId: token.id, success: false, error: `Cannot create board: ${errorText}` });
+            continue;
+          }
         }
 
         const pinData: any = {
