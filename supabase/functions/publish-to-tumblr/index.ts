@@ -1,9 +1,47 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createHmac } from "node:crypto";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const CONSUMER_KEY = Deno.env.get('TUMBLR_API_KEY')?.trim();
+const CONSUMER_SECRET = Deno.env.get('TUMBLR_API_SECRET')?.trim();
+
+function generateOAuthSignature(
+  method: string,
+  url: string,
+  params: Record<string, string>,
+  consumerSecret: string,
+  tokenSecret: string
+): string {
+  const signatureBaseString = `${method}&${encodeURIComponent(url)}&${encodeURIComponent(
+    Object.entries(params)
+      .sort()
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+      .join('&')
+  )}`;
+  const signingKey = `${encodeURIComponent(consumerSecret)}&${encodeURIComponent(tokenSecret)}`;
+  return createHmac('sha1', signingKey).update(signatureBaseString).digest('base64');
+}
+
+function buildOAuth1Header(method: string, url: string, accessToken: string, tokenSecret: string): string {
+  const oauthParams: Record<string, string> = {
+    oauth_consumer_key: CONSUMER_KEY!,
+    oauth_nonce: Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2),
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+    oauth_token: accessToken,
+    oauth_version: '1.0',
+  };
+  const signature = generateOAuthSignature(method, url, oauthParams, CONSUMER_SECRET!, tokenSecret);
+  const signedParams = { ...oauthParams, oauth_signature: signature };
+  return 'OAuth ' + Object.entries(signedParams)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([k, v]) => `${encodeURIComponent(k)}="${encodeURIComponent(v)}"`)
+    .join(', ');
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -37,12 +75,25 @@ Deno.serve(async (req) => {
 
     if (testConnection) {
       const token = tokens[0];
-      const response = await fetch('https://api.tumblr.com/v2/user/info', {
-        headers: { 'Authorization': `Bearer ${token.access_token}` },
-      });
-      if (response.ok) {
-        const userData = await response.json();
-        return new Response(JSON.stringify({ connected: true, username: userData.response?.user?.name }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      const tokenSecret = token.oauth_token_secret || '';
+      if (tokenSecret) {
+        // OAuth1 test
+        const testUrl = 'https://api.tumblr.com/v2/user/info';
+        const authHeader = buildOAuth1Header('GET', testUrl, token.access_token, tokenSecret);
+        const response = await fetch(testUrl, { headers: { Authorization: authHeader } });
+        if (response.ok) {
+          const userData = await response.json();
+          return new Response(JSON.stringify({ connected: true, username: userData.response?.user?.name }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+      } else {
+        // Legacy OAuth2 test
+        const response = await fetch('https://api.tumblr.com/v2/user/info', {
+          headers: { 'Authorization': `Bearer ${token.access_token}` },
+        });
+        if (response.ok) {
+          const userData = await response.json();
+          return new Response(JSON.stringify({ connected: true, username: userData.response?.user?.name }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
       }
       return new Response(JSON.stringify({ connected: false, error: 'Token invalid' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -84,10 +135,53 @@ Deno.serve(async (req) => {
         const blogName = token.blog_name || token.username;
         if (!blogName) { results.push({ accountId: token.id, success: false, error: 'No blog name' }); continue; }
 
+        const tokenSecret = token.oauth_token_secret || '';
+        const postUrl = `https://api.tumblr.com/v2/blog/${blogName}/posts`;
         let response: Response;
 
-        {
-          // Unified JSON post: text + optional video URL or image URL
+        if (videoMediaUrl && tokenSecret) {
+          // OAuth1 binary video upload via multipart/form-data
+          console.log(`Downloading video from: ${videoMediaUrl}`);
+          const videoResponse = await fetch(videoMediaUrl);
+          if (!videoResponse.ok) {
+            results.push({ accountId: token.id, success: false, error: `Failed to download video: ${videoResponse.status}` });
+            continue;
+          }
+          const contentType = videoResponse.headers.get('content-type');
+          console.log(`Video content-type from source: ${contentType}`);
+          const videoArrayBuffer = await videoResponse.arrayBuffer();
+          console.log(`Video size: ${(videoArrayBuffer.byteLength / 1024 / 1024).toFixed(2)} MB`);
+
+          if (videoArrayBuffer.byteLength < 10000) {
+            results.push({ accountId: token.id, success: false, error: 'Video file too small or invalid' });
+            continue;
+          }
+
+          const videoIdentifier = 'video_0';
+          const contentBlocks: any[] = [];
+          if (text) contentBlocks.push({ type: 'text', text });
+          contentBlocks.push({
+            type: 'video',
+            media: { type: 'video/mp4', identifier: videoIdentifier },
+          });
+
+          const jsonPayload = JSON.stringify({ content: contentBlocks, state: 'published' });
+          console.log(`NPF payload: ${jsonPayload}`);
+
+          const formData = new FormData();
+          formData.append('json', new Blob([jsonPayload], { type: 'application/json' }));
+          formData.append(videoIdentifier, new Blob([videoArrayBuffer], { type: 'video/mp4' }), 'video.mp4');
+
+          const authHeader = buildOAuth1Header('POST', postUrl, token.access_token, tokenSecret);
+          console.log(`Uploading video to Tumblr blog: ${blogName} (OAuth1)`);
+
+          response = await fetch(postUrl, {
+            method: 'POST',
+            headers: { Authorization: authHeader },
+            body: formData,
+          });
+        } else {
+          // JSON post: text + optional video URL or image
           const content: any[] = [{ type: 'text', text: text || '' }];
           if (videoMediaUrl) {
             console.log(`Publishing video via URL: ${videoMediaUrl}`);
@@ -96,9 +190,16 @@ Deno.serve(async (req) => {
             content.push({ type: 'image', media: [{ url: mediaUrl }] });
           }
 
-          response = await fetch(`https://api.tumblr.com/v2/blog/${blogName}/posts`, {
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (tokenSecret) {
+            headers['Authorization'] = buildOAuth1Header('POST', postUrl, token.access_token, tokenSecret);
+          } else {
+            headers['Authorization'] = `Bearer ${token.access_token}`;
+          }
+
+          response = await fetch(postUrl, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token.access_token}`, 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ content, state: 'published' }),
           });
         }
