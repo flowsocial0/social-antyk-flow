@@ -1,0 +1,1 @@
+ALTER TABLE public.pinterest_oauth_tokens ADD COLUMN is_sandbox boolean NOT NULL DEFAULT false;

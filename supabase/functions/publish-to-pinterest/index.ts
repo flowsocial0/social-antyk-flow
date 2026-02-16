@@ -1,13 +1,18 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// Pinterest API - production endpoint for all operations
-// Trial access: pins are created but visible only to app owner
-// After full review approval, pins become public automatically
-const PINTEREST_API = 'https://api.pinterest.com';
+// Production API for connection test & reads (OAuth token works here)
+const PINTEREST_API_PROD = 'https://api.pinterest.com';
+// Sandbox API for pin creation during Trial access (requires sandbox token)
+const PINTEREST_API_SANDBOX = 'https://api-sandbox.pinterest.com';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
+
+function getApiBase(isSandbox: boolean): string {
+  return isSandbox ? PINTEREST_API_SANDBOX : PINTEREST_API_PROD;
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -26,15 +31,12 @@ Deno.serve(async (req) => {
     let effectiveUserId = userId;
     if (!effectiveUserId) {
       const authHeader = req.headers.get('Authorization');
-      console.log('Auth header present:', !!authHeader);
       if (authHeader) {
         const token = authHeader.replace('Bearer ', '');
-        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-        console.log('getUser result:', { userId: user?.id, error: authError?.message });
+        const { data: { user } } = await supabase.auth.getUser(token);
         effectiveUserId = user?.id;
       }
     }
-    console.log('Effective user ID:', effectiveUserId);
 
     if (!effectiveUserId) {
       return new Response(JSON.stringify({ success: false, error: 'User ID is required' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -52,17 +54,17 @@ Deno.serve(async (req) => {
     // Test connection mode
     if (testConnection) {
       const token = tokens[0];
-      console.log('Testing Pinterest connection with token ID:', token.id);
-      console.log('Access token length:', token.access_token?.length);
-      
+      const isSandbox = token.is_sandbox === true;
+      const apiBase = getApiBase(isSandbox);
+      console.log(`Testing Pinterest connection (sandbox=${isSandbox}) with token ID:`, token.id);
+
       try {
-        const response = await fetch(`${PINTEREST_API}/v5/user_account`, {
+        const response = await fetch(`${apiBase}/v5/user_account`, {
           headers: { 'Authorization': `Bearer ${token.access_token}` },
         });
 
         const responseText = await response.text();
         console.log('Pinterest API status:', response.status);
-        console.log('Pinterest API response:', responseText);
 
         if (response.ok) {
           const userData = JSON.parse(responseText);
@@ -77,7 +79,6 @@ Deno.serve(async (req) => {
           );
         }
       } catch (fetchErr: any) {
-        console.error('Pinterest API fetch error:', fetchErr);
         return new Response(
           JSON.stringify({ connected: false, success: false, error: fetchErr.message }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -137,7 +138,10 @@ Deno.serve(async (req) => {
     const results = [];
     for (const token of tokens) {
       try {
-        // Create a pin
+        const isSandbox = token.is_sandbox === true;
+        const apiBase = getApiBase(isSandbox);
+        console.log(`Publishing pin (sandbox=${isSandbox}) to account ${token.id}`);
+
         const pinData: any = {
           title: text.substring(0, 100),
           description: text.substring(0, 500),
@@ -151,7 +155,7 @@ Deno.serve(async (req) => {
           pinData.link = bookData.product_url;
         }
 
-        const response = await fetch(`${PINTEREST_API}/v5/pins`, {
+        const response = await fetch(`${apiBase}/v5/pins`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token.access_token}`,
@@ -170,7 +174,6 @@ Deno.serve(async (req) => {
         const result = await response.json();
         console.log(`Published pin ${result.id} to Pinterest account ${token.id}`);
 
-        // Record publication
         await supabase.from('platform_publications').insert({
           user_id: effectiveUserId,
           platform: 'pinterest',

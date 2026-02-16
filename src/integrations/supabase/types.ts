@@ -1011,6 +1011,7 @@ export type Database = {
           expires_at: string | null
           id: string
           is_default: boolean | null
+          is_sandbox: boolean
           refresh_token: string | null
           scope: string | null
           updated_at: string | null
@@ -1024,6 +1025,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_default?: boolean | null
+          is_sandbox?: boolean
           refresh_token?: string | null
           scope?: string | null
           updated_at?: string | null
@@ -1037,6 +1039,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_default?: boolean | null
+          is_sandbox?: boolean
           refresh_token?: string | null
           scope?: string | null
           updated_at?: string | null
