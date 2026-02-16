@@ -534,21 +534,21 @@ export default function SocialAccounts() {
   // All connected accounts receive publications simultaneously
 
   const platformConfig = [
-    { id: 'x', name: 'X (Twitter)', icon: Twitter, color: 'text-blue-500', bgColor: 'bg-blue-500/10', connect: connectX },
-    { id: 'facebook', name: 'Facebook', icon: Facebook, color: 'text-blue-600', bgColor: 'bg-blue-600/10', connect: connectFacebook },
-    { id: 'instagram', name: 'Instagram', icon: Instagram, color: 'text-pink-500', bgColor: 'bg-pink-500/10', connect: connectInstagram },
-    { id: 'tiktok', name: 'TikTok', icon: Video, color: 'text-black dark:text-white', bgColor: 'bg-black/10 dark:bg-white/10', connect: connectTikTok },
-    { id: 'youtube', name: 'YouTube', icon: Youtube, color: 'text-red-500', bgColor: 'bg-red-500/10', connect: connectYouTube },
-    { id: 'linkedin', name: 'LinkedIn', icon: Linkedin, color: 'text-blue-700', bgColor: 'bg-blue-700/10', connect: connectLinkedIn },
-    { id: 'telegram', name: 'Telegram', icon: Send, color: 'text-sky-500', bgColor: 'bg-sky-500/10', connect: connectTelegram, formType: 'telegram' as const },
-    { id: 'bluesky', name: 'Bluesky', icon: Globe, color: 'text-sky-600', bgColor: 'bg-sky-600/10', connect: connectBluesky, formType: 'bluesky' as const },
-    { id: 'mastodon', name: 'Mastodon', icon: Globe, color: 'text-purple-600', bgColor: 'bg-purple-600/10', connect: connectMastodon, formType: 'mastodon' as const },
+    { id: 'x', name: 'X (Twitter)', icon: Twitter, color: 'text-blue-500', bgColor: 'bg-blue-500/10', connect: connectX, status: 'active' as const },
+    { id: 'facebook', name: 'Facebook', icon: Facebook, color: 'text-blue-600', bgColor: 'bg-blue-600/10', connect: connectFacebook, status: 'active' as const },
+    { id: 'instagram', name: 'Instagram', icon: Instagram, color: 'text-pink-500', bgColor: 'bg-pink-500/10', connect: connectInstagram, status: 'active' as const },
+    { id: 'tiktok', name: 'TikTok', icon: Video, color: 'text-black dark:text-white', bgColor: 'bg-black/10 dark:bg-white/10', connect: connectTikTok, status: 'review' as const },
+    { id: 'youtube', name: 'YouTube', icon: Youtube, color: 'text-red-500', bgColor: 'bg-red-500/10', connect: connectYouTube, status: 'review' as const },
+    { id: 'linkedin', name: 'LinkedIn', icon: Linkedin, color: 'text-blue-700', bgColor: 'bg-blue-700/10', connect: connectLinkedIn, status: 'active' as const },
+    { id: 'telegram', name: 'Telegram', icon: Send, color: 'text-sky-500', bgColor: 'bg-sky-500/10', connect: connectTelegram, formType: 'telegram' as const, status: 'active' as const },
+    { id: 'bluesky', name: 'Bluesky', icon: Globe, color: 'text-sky-600', bgColor: 'bg-sky-600/10', connect: connectBluesky, formType: 'bluesky' as const, status: 'active' as const },
+    { id: 'mastodon', name: 'Mastodon', icon: Globe, color: 'text-purple-600', bgColor: 'bg-purple-600/10', connect: connectMastodon, formType: 'mastodon' as const, status: 'active' as const },
     
-    { id: 'pinterest', name: 'Pinterest', icon: Image, color: 'text-red-600', bgColor: 'bg-red-600/10', connect: connectPinterest },
+    { id: 'pinterest', name: 'Pinterest', icon: Image, color: 'text-red-600', bgColor: 'bg-red-600/10', connect: connectPinterest, status: 'review' as const },
     
-    { id: 'discord', name: 'Discord', icon: MessageCircle, color: 'text-indigo-500', bgColor: 'bg-indigo-500/10', connect: connectDiscord, formType: 'discord' as const },
-    { id: 'tumblr', name: 'Tumblr', icon: Globe, color: 'text-blue-900', bgColor: 'bg-blue-900/10', connect: connectTumblr },
-    { id: 'google_business', name: 'Google Business', icon: Map, color: 'text-blue-500', bgColor: 'bg-blue-500/10', connect: connectGoogleBusiness },
+    { id: 'discord', name: 'Discord', icon: MessageCircle, color: 'text-indigo-500', bgColor: 'bg-indigo-500/10', connect: connectDiscord, formType: 'discord' as const, status: 'active' as const },
+    { id: 'tumblr', name: 'Tumblr', icon: Globe, color: 'text-blue-900', bgColor: 'bg-blue-900/10', connect: connectTumblr, status: 'active' as const },
+    { id: 'google_business', name: 'Google Business', icon: Map, color: 'text-blue-500', bgColor: 'bg-blue-500/10', connect: connectGoogleBusiness, status: 'active' as const },
   ];
 
   return (
@@ -590,6 +590,11 @@ export default function SocialAccounts() {
                     <div>
                       <h3 className="font-semibold flex items-center gap-2">
                         {platform.name}
+                        {platform.status === 'review' && (
+                          <Badge variant="outline" className="text-xs text-amber-600 border-amber-400 bg-amber-50 dark:bg-amber-950/30">
+                            ⏳ In Review
+                          </Badge>
+                        )}
                         {platformAccounts.length > 0 && (
                           <Badge variant="secondary" className="text-xs">
                             {platformAccounts.length} {platformAccounts.length === 1 ? 'konto' : 'kont'}
