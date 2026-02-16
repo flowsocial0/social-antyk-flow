@@ -73,7 +73,7 @@ serve(async (req) => {
     const msg = error instanceof Error ? error.message : 'Nieznany błąd';
     console.error('gab-oauth-start error:', error);
     return new Response(JSON.stringify({ error: msg }), {
-      status: 400,
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
