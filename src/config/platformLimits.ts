@@ -124,19 +124,6 @@ export const platformLimits: Record<PlatformId, PlatformLimits> = {
     authType: 'api-key',
     apiDocumentation: 'https://core.telegram.org/bots/api',
   },
-  threads: {
-    id: 'threads',
-    textLimit: 500,
-    mediaRequired: false,
-    supportedMedia: 'all',
-    videoMaxDuration: 5 * 60, // 5 minutes
-    videoMaxSize: 1024, // 1GB
-    imageMaxSize: 8,
-    maxImages: 10,
-    maxVideos: 1,
-    authType: 'oauth2',
-    apiDocumentation: 'https://developers.facebook.com/docs/threads',
-  },
   bluesky: {
     id: 'bluesky',
     textLimit: 300,

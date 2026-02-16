@@ -15,8 +15,7 @@ export type PlatformId =
   | 'pinterest' 
    
   | 'telegram' 
-  | 'threads' 
-  | 'bluesky' 
+  | 'bluesky'
   | 'mastodon' 
   | 'discord'
   | 'tumblr'
@@ -149,19 +148,6 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     priority: 7,
     mediaType: 'both',
     shortDescription: 'Wysyłaj wiadomości na kanał/grupę przez bota.',
-  },
-  threads: {
-    id: 'threads',
-    name: 'Threads',
-    icon: MessageCircle,
-    color: 'text-slate-800',
-    gradientFrom: 'from-slate-800/20',
-    gradientTo: 'to-slate-900/20',
-    path: '/platforms/threads',
-    status: 'active',
-    priority: 6,
-    mediaType: 'both',
-    shortDescription: 'Krótkie posty tekstowe z mediami.',
   },
   bluesky: {
     id: 'bluesky',

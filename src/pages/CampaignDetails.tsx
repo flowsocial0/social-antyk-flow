@@ -238,21 +238,6 @@ const CampaignDetails = () => {
         });
       }
 
-      // Load Threads accounts
-      if (selectedAccounts.threads?.length) {
-        const { data } = await (supabase as any)
-          .from('threads_oauth_tokens')
-          .select('id, username, account_name')
-          .in('id', selectedAccounts.threads);
-        data?.forEach((a: any) => {
-          newAccountsMap[a.id] = {
-            id: a.id,
-            display_name: a.username ? `@${a.username}` : (a.account_name || 'Konto Threads'),
-            platform: 'threads'
-          };
-        });
-      }
-
       // Load Telegram accounts
       if (selectedAccounts.telegram?.length) {
         const { data } = await (supabase as any)
