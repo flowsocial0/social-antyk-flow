@@ -142,7 +142,28 @@ Deno.serve(async (req) => {
         const apiBase = getApiBase(isSandbox);
         console.log(`Publishing pin (sandbox=${isSandbox}) to account ${token.id}`);
 
+        // Get first available board
+        const boardsResponse = await fetch(`${apiBase}/v5/boards`, {
+          headers: { 'Authorization': `Bearer ${token.access_token}` },
+        });
+
+        let boardId: string | null = null;
+        if (boardsResponse.ok) {
+          const boardsData = await boardsResponse.json();
+          if (boardsData.items && boardsData.items.length > 0) {
+            boardId = boardsData.items[0].id;
+            console.log(`Using board: ${boardsData.items[0].name} (${boardId})`);
+          }
+        }
+
+        if (!boardId) {
+          console.error('No Pinterest boards found for account', token.id);
+          results.push({ accountId: token.id, success: false, error: 'No Pinterest boards found. Please create a board on Pinterest first.' });
+          continue;
+        }
+
         const pinData: any = {
+          board_id: boardId,
           title: text.substring(0, 100),
           description: text.substring(0, 500),
           media_source: {
