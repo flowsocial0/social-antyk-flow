@@ -155,8 +155,37 @@ serve(async (req) => {
 
       if (uploadResponse.ok) {
         const uploadData = await uploadResponse.json();
-        mediaIds.push(uploadData.id);
-        console.log('Media uploaded, id:', uploadData.id);
+        const mediaId = uploadData.id;
+        console.log('Media uploaded, id:', mediaId);
+
+        // API v2 is async — poll until media is processed
+        let processed = !!uploadData.url; // v2 returns null url until processed
+        let pollAttempts = 0;
+        const maxPollAttempts = 30; // max ~30 seconds
+
+        while (!processed && pollAttempts < maxPollAttempts) {
+          await new Promise(r => setTimeout(r, 1000));
+          pollAttempts++;
+          const checkRes = await fetch(`${server_url}/api/v1/media/${mediaId}`, {
+            headers: { 'Authorization': `Bearer ${access_token}` },
+          });
+          if (checkRes.status === 200) {
+            const checkData = await checkRes.json();
+            if (checkData.url) {
+              processed = true;
+              console.log(`Media processed after ${pollAttempts}s`);
+            }
+          } else if (checkRes.status === 206) {
+            // 206 = still processing
+            console.log(`Media still processing (attempt ${pollAttempts}/${maxPollAttempts})`);
+          }
+        }
+
+        if (!processed) {
+          console.warn('Media processing timeout, attempting to post anyway');
+        }
+
+        mediaIds.push(mediaId);
       } else {
         console.warn('Media upload failed, posting text only');
       }
