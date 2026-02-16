@@ -87,7 +87,8 @@ Deno.serve(async (req) => {
         let response: Response;
 
         if (videoMediaUrl) {
-          // Tumblr NPF requires uploading video as binary via multipart/form-data
+          // Tumblr NPF requires uploading video binary via multipart/form-data
+          // Matching pytumblr2's _send_multipart_npf format exactly
           console.log(`Downloading video from: ${videoMediaUrl}`);
           const videoResponse = await fetch(videoMediaUrl);
           if (!videoResponse.ok) {
@@ -95,18 +96,16 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          const videoBytes = new Uint8Array(await videoResponse.arrayBuffer());
-          console.log(`Video downloaded: ${(videoBytes.length / 1024 / 1024).toFixed(2)} MB`);
+          const videoArrayBuffer = await videoResponse.arrayBuffer();
+          console.log(`Video downloaded: ${(videoArrayBuffer.byteLength / 1024 / 1024).toFixed(2)} MB`);
 
-          if (videoBytes.length < 10000) {
+          if (videoArrayBuffer.byteLength < 10000) {
             results.push({ accountId: token.id, success: false, error: 'Video file too small or invalid' });
             continue;
           }
 
-          // Detect content type from response or default to mp4
-          const contentType = videoResponse.headers.get('content-type') || 'video/mp4';
-
-          // Build NPF content blocks referencing the identifier
+          // Build content blocks with identifier for the video
+          const videoIdentifier = 'my_video';
           const contentBlocks: any[] = [];
           if (text) {
             contentBlocks.push({ type: 'text', text });
@@ -114,47 +113,34 @@ Deno.serve(async (req) => {
           contentBlocks.push({
             type: 'video',
             media: [{
-              type: contentType,
-              identifier: 'tumblr-video-upload',
+              type: 'video/mp4',
+              identifier: videoIdentifier,
             }],
           });
 
           const jsonPayload = JSON.stringify({ content: contentBlocks, state: 'published' });
 
-          // Build multipart/form-data manually for better control
-          const boundary = '----TumblrBoundary' + Date.now();
-          const encoder = new TextEncoder();
+          // Use FormData matching pytumblr2's format:
+          // ('json', (None, json_string, 'application/json'))  -> Blob with type
+          // (identifier, (filename, file_data))                -> File with numeric name
+          const formData = new FormData();
+          
+          // JSON part: no filename, application/json content type
+          const jsonBlob = new Blob([jsonPayload], { type: 'application/json' });
+          formData.append('json', jsonBlob);
+          
+          // Video part: identifier as field name, numeric filename (matching pytumblr2)
+          const videoFile = new File([videoArrayBuffer], '0', { type: 'video/mp4' });
+          formData.append(videoIdentifier, videoFile, '0');
 
-          const parts: Uint8Array[] = [];
-
-          // JSON part
-          const jsonPart = `--${boundary}\r\nContent-Disposition: form-data; name="json"\r\nContent-Type: application/json\r\n\r\n${jsonPayload}\r\n`;
-          parts.push(encoder.encode(jsonPart));
-
-          // Video file part
-          const filePart = `--${boundary}\r\nContent-Disposition: form-data; name="tumblr-video-upload"; filename="video.mp4"\r\nContent-Type: ${contentType}\r\n\r\n`;
-          parts.push(encoder.encode(filePart));
-          parts.push(videoBytes);
-          parts.push(encoder.encode(`\r\n--${boundary}--\r\n`));
-
-          // Combine all parts
-          const totalLength = parts.reduce((sum, p) => sum + p.length, 0);
-          const bodyBytes = new Uint8Array(totalLength);
-          let offset = 0;
-          for (const part of parts) {
-            bodyBytes.set(part, offset);
-            offset += part.length;
-          }
-
-          console.log(`Uploading to Tumblr blog: ${blogName}, multipart size: ${(bodyBytes.length / 1024 / 1024).toFixed(2)} MB`);
+          console.log(`Uploading to Tumblr blog: ${blogName}`);
 
           response = await fetch(`https://api.tumblr.com/v2/blog/${blogName}/posts`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token.access_token}`,
-              'Content-Type': `multipart/form-data; boundary=${boundary}`,
             },
-            body: bodyBytes,
+            body: formData,
           });
         } else {
           // Text + image post (JSON)
