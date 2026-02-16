@@ -70,7 +70,7 @@ export default function TikTokCallback() {
           sessionStorage.removeItem("tiktok_user_id");
 
           toast.success("TikTok połączony pomyślnie!");
-          navigate("/settings/social-accounts");
+          navigate("/settings/social-accounts#tiktok");
         } else {
           throw new Error(data?.error || "Nieznany błąd");
         }

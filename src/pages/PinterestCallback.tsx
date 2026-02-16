@@ -15,7 +15,7 @@ const PinterestCallback = () => {
     if (error) {
       navigate(`/settings/social-accounts?error=${error}`);
     } else {
-      navigate('/settings/social-accounts?connected=true&platform=pinterest');
+      navigate('/settings/social-accounts#pinterest');
     }
   }, [navigate]);
 

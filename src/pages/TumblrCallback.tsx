@@ -11,7 +11,7 @@ const TumblrCallback = () => {
     if (error) {
       navigate(`/settings/social-accounts?error=${error}`);
     } else {
-      navigate('/settings/social-accounts?connected=true&platform=tumblr');
+      navigate('/settings/social-accounts#tumblr');
     }
   }, [navigate]);
 

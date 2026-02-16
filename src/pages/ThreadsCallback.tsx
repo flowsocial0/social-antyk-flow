@@ -18,7 +18,7 @@ export default function ThreadsCallback() {
     if (threadsStatus === 'connected') {
       setStatus('success');
       setMessage('Konto Threads zostało połączone!');
-      setTimeout(() => navigate('/settings/social-accounts?threads=connected'), 2000);
+      setTimeout(() => navigate('/settings/social-accounts#threads'), 2000);
     } else if (threadsStatus === 'error') {
       setStatus('error');
       setMessage(errorMessage || 'Wystąpił błąd podczas łączenia z Threads');

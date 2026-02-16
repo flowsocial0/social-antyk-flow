@@ -61,7 +61,7 @@ const YouTubeCallback = () => {
 
         // Redirect after short delay
         setTimeout(() => {
-          navigate("/settings/social-accounts?youtube=connected");
+          navigate("/settings/social-accounts#youtube");
         }, 2000);
       } catch (err) {
         console.error("YouTube callback error:", err);

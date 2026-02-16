@@ -59,7 +59,7 @@ export default function MastodonCallback() {
         sessionStorage.removeItem("mastodon_oauth_state");
         sessionStorage.removeItem("mastodon_server_url");
         sessionStorage.removeItem("mastodon_user_id");
-        navigate("/settings/social-accounts?connected=true");
+        navigate("/settings/social-accounts#mastodon");
       }
     };
 

@@ -49,7 +49,7 @@ export default function GabCallback() {
       } finally {
         sessionStorage.removeItem("gab_user_id");
         sessionStorage.removeItem("gab_oauth_state");
-        navigate("/settings/social-accounts?connected=true");
+        navigate("/settings/social-accounts#gab");
       }
     };
 
