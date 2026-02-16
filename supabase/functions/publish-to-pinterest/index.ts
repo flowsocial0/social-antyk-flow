@@ -1,10 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// Production API for read operations (account verification) - tokens work here
-const PINTEREST_API_READ = 'https://api.pinterest.com';
-// Sandbox API for write operations (creating pins) - required while app has Trial access
-// TODO: After full access approval, change PINTEREST_API_WRITE to 'https://api.pinterest.com'
-const PINTEREST_API_WRITE = 'https://api-sandbox.pinterest.com';
+// Pinterest API - production endpoint for all operations
+// Trial access: pins are created but visible only to app owner
+// After full review approval, pins become public automatically
+const PINTEREST_API = 'https://api.pinterest.com';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
@@ -57,7 +56,7 @@ Deno.serve(async (req) => {
       console.log('Access token length:', token.access_token?.length);
       
       try {
-        const response = await fetch(`${PINTEREST_API_READ}/v5/user_account`, {
+        const response = await fetch(`${PINTEREST_API}/v5/user_account`, {
           headers: { 'Authorization': `Bearer ${token.access_token}` },
         });
 
@@ -152,7 +151,7 @@ Deno.serve(async (req) => {
           pinData.link = bookData.product_url;
         }
 
-        const response = await fetch(`${PINTEREST_API_WRITE}/v5/pins`, {
+        const response = await fetch(`${PINTEREST_API}/v5/pins`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token.access_token}`,
