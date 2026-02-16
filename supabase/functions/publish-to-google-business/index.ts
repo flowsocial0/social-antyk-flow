@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 async function refreshAccessToken(supabase: any, token: any): Promise<string> {
@@ -57,22 +57,28 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const { testConnection, bookId, contentId, campaignPostId, userId, accountId, imageUrl } = body;
+    console.log('Request body:', JSON.stringify({ testConnection, bookId, contentId, campaignPostId, userId, accountId }));
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
     let effectiveUserId = userId;
     if (!effectiveUserId) {
       const authHeader = req.headers.get('Authorization');
+      console.log('Auth header present:', !!authHeader);
       if (authHeader) {
-        const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        console.log('Auth result:', user?.id, 'error:', authError?.message);
         effectiveUserId = user?.id;
       }
     }
     if (!effectiveUserId) {
+      console.log('No effective user ID found');
       return new Response(JSON.stringify({ success: false, error: 'User ID is required' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    console.log('Effective user ID:', effectiveUserId);
 
     let query = supabase.from('google_business_tokens').select('*').eq('user_id', effectiveUserId);
     if (accountId) query = query.eq('id', accountId);
