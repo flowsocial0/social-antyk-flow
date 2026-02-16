@@ -40,7 +40,7 @@ interface PlatformAccounts {
   bluesky: SocialAccount[];
   mastodon: SocialAccount[];
   pinterest: SocialAccount[];
-  reddit: SocialAccount[];
+  
   discord: SocialAccount[];
   tumblr: SocialAccount[];
   snapchat: SocialAccount[];
@@ -53,7 +53,7 @@ export default function SocialAccounts() {
   const [accounts, setAccounts] = useState<PlatformAccounts>({
     x: [], facebook: [], instagram: [], tiktok: [], youtube: [], linkedin: [],
     threads: [], telegram: [], bluesky: [], mastodon: [],
-    pinterest: [], reddit: [], discord: [], tumblr: [], snapchat: [], google_business: [],
+    pinterest: [], discord: [], tumblr: [], snapchat: [], google_business: [],
   });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; platform: string; accountId: string; accountName: string }>({
     open: false,
@@ -116,7 +116,7 @@ export default function SocialAccounts() {
     if (!session) return;
 
     // Load all accounts for each platform
-    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, threadsResult, telegramResult, blueskyResult, mastodonResult, pinterestResult, redditResult, discordResult, tumblrResult, snapchatResult, googleBizResult] = await Promise.all([
+    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, threadsResult, telegramResult, blueskyResult, mastodonResult, pinterestResult, discordResult, tumblrResult, snapchatResult, googleBizResult] = await Promise.all([
       supabase.from('twitter_oauth1_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('facebook_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('instagram_oauth_tokens').select('*').eq('user_id', session.user.id),
@@ -128,7 +128,6 @@ export default function SocialAccounts() {
       (supabase as any).from('bluesky_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('mastodon_tokens').select('*').eq('user_id', session.user.id).not('access_token', 'like', 'pending_%'),
       (supabase as any).from('pinterest_oauth_tokens').select('*').eq('user_id', session.user.id),
-      (supabase as any).from('reddit_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('discord_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('tumblr_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('snapchat_oauth_tokens').select('*').eq('user_id', session.user.id),
@@ -190,10 +189,6 @@ export default function SocialAccounts() {
         id: a.id,
         account_name: a.account_name,
         display_name: a.username ? `@${a.username}` : 'Konto Pinterest',
-      })),
-      reddit: (redditResult.data || []).map((a: any) => ({
-        id: a.id, account_name: a.account_name,
-        display_name: a.username ? `u/${a.username}` : 'Konto Reddit',
       })),
       discord: (discordResult.data || []).map((a: any) => ({
         id: a.id, account_name: a.account_name,
@@ -465,32 +460,8 @@ export default function SocialAccounts() {
     }
   };
 
-  const connectReddit = async () => {
-    setLoading('reddit', true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('Musisz być zalogowany');
-        return;
-      }
 
-      const { data, error } = await supabase.functions.invoke('reddit-oauth-start', {
-        body: { userId: session.user.id },
-      });
 
-      if (error) throw error;
-
-      if (data?.url) {
-        if (data.state) sessionStorage.setItem('reddit_oauth_state', data.state);
-        sessionStorage.setItem('reddit_user_id', session.user.id);
-        window.location.href = data.url;
-      }
-    } catch (error: any) {
-      toast.error('Nie udało się połączyć z Reddit', { description: error.message });
-    } finally {
-      setLoading('reddit', false);
-    }
-  };
 
   const connectDiscord = () => {
     setDiscordDialogOpen(true);
@@ -566,7 +537,7 @@ export default function SocialAccounts() {
         threads: 'threads_oauth_tokens', telegram: 'telegram_tokens',
         bluesky: 'bluesky_tokens', mastodon: 'mastodon_tokens',
         pinterest: 'pinterest_oauth_tokens',
-        reddit: 'reddit_oauth_tokens', discord: 'discord_tokens',
+        discord: 'discord_tokens',
         tumblr: 'tumblr_oauth_tokens', snapchat: 'snapchat_oauth_tokens',
         google_business: 'google_business_tokens',
       };
@@ -605,7 +576,7 @@ export default function SocialAccounts() {
     { id: 'mastodon', name: 'Mastodon', icon: Globe, color: 'text-purple-600', bgColor: 'bg-purple-600/10', connect: connectMastodon, formType: 'mastodon' as const },
     
     { id: 'pinterest', name: 'Pinterest', icon: Image, color: 'text-red-600', bgColor: 'bg-red-600/10', connect: connectPinterest },
-    { id: 'reddit', name: 'Reddit', icon: MessageCircle, color: 'text-orange-500', bgColor: 'bg-orange-500/10', connect: connectReddit },
+    
     { id: 'discord', name: 'Discord', icon: MessageCircle, color: 'text-indigo-500', bgColor: 'bg-indigo-500/10', connect: connectDiscord, formType: 'discord' as const },
     { id: 'tumblr', name: 'Tumblr', icon: Globe, color: 'text-blue-900', bgColor: 'bg-blue-900/10', connect: connectTumblr },
     { id: 'snapchat', name: 'Snapchat', icon: Camera, color: 'text-yellow-500', bgColor: 'bg-yellow-500/10', connect: connectSnapchat },
@@ -619,7 +590,7 @@ export default function SocialAccounts() {
           <Button 
             variant="ghost" 
             onClick={() => {
-              if (sourcePlatform && ['x','facebook','instagram','tiktok','youtube','linkedin','threads','telegram','bluesky','mastodon','pinterest','reddit','discord','tumblr','snapchat','google_business'].includes(sourcePlatform)) {
+              if (sourcePlatform && ['x','facebook','instagram','tiktok','youtube','linkedin','threads','telegram','bluesky','mastodon','pinterest','discord','tumblr','snapchat','google_business'].includes(sourcePlatform)) {
                 navigate(`/platforms/${sourcePlatform}`);
               } else {
                 navigate('/platforms');

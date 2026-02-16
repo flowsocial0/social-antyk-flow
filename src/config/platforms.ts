@@ -13,7 +13,7 @@ export type PlatformId =
   | 'tiktok'
   | 'linkedin' 
   | 'pinterest' 
-  | 'reddit' 
+   
   | 'telegram' 
   | 'threads' 
   | 'bluesky' 
@@ -137,19 +137,6 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     priority: 8,
     mediaType: 'image-only',
     shortDescription: 'Przypinaj obrazki jako piny z linkiem do produktu.',
-  },
-  reddit: {
-    id: 'reddit',
-    name: 'Reddit',
-    icon: MessageCircle,
-    color: 'text-orange-500',
-    gradientFrom: 'from-orange-500/20',
-    gradientTo: 'to-orange-600/20',
-    path: '/platforms/reddit',
-    status: 'active',
-    priority: 9,
-    mediaType: 'both',
-    shortDescription: 'Publikuj posty na wybranym subreddicie.',
   },
   telegram: {
     id: 'telegram',
