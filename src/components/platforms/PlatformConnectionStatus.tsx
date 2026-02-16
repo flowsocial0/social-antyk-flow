@@ -104,7 +104,8 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
 
       // Test connection for all accounts by calling the function
       // The function will report how many accounts are connected
-      const functionName = platform === "x" ? "publish-to-x" : `publish-to-${platform}`;
+      const platformSlug = platform.replace(/_/g, '-');
+      const functionName = platform === "x" ? "publish-to-x" : `publish-to-${platformSlug}`;
       const { data, error } = await supabase.functions.invoke(functionName, {
         body: { testConnection: true },
         headers: { Authorization: `Bearer ${session.access_token}` }
