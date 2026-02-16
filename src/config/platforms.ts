@@ -213,8 +213,8 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     path: '/platforms/tumblr',
     status: 'active',
     priority: 13,
-    mediaType: 'both',
-    shortDescription: 'Posty na blogu z obrazkami i wideo.',
+    mediaType: 'image-only',
+    shortDescription: 'Posty na blogu z obrazkami.',
   },
   snapchat: {
     id: 'snapchat',
