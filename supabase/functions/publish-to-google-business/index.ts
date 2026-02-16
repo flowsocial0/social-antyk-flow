@@ -91,12 +91,16 @@ Deno.serve(async (req) => {
 
     if (testConnection) {
       const token = tokens[0];
+      console.log('Testing connection, token id:', token.id, 'expires_at:', token.expires_at);
       try {
         const accessToken = await getValidAccessToken(supabase, token);
+        console.log('Got valid access token, calling Google API...');
         const response = await fetch('https://mybusinessaccountmanagement.googleapis.com/v1/accounts', {
           headers: { 'Authorization': `Bearer ${accessToken}` },
         });
-        const responseData = response.ok ? await response.json() : null;
+        const responseText = await response.text();
+        console.log('Google API response status:', response.status, 'body:', responseText.substring(0, 500));
+        const responseData = response.ok ? JSON.parse(responseText) : null;
         const accountCount = responseData?.accounts?.length || 0;
         return new Response(
           JSON.stringify({
@@ -104,10 +108,12 @@ Deno.serve(async (req) => {
             success: response.ok,
             business_name: token.business_name,
             accounts_count: accountCount,
+            ...(response.ok ? {} : { error: responseText.substring(0, 300) }),
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       } catch (err: any) {
+        console.error('Test connection error:', err.message);
         return new Response(
           JSON.stringify({ connected: false, success: false, error: err.message }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
