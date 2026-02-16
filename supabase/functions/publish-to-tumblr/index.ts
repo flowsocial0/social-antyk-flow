@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { testConnection, bookId, contentId, campaignPostId, userId, accountId, imageUrl } = body;
+    const { testConnection, bookId, contentId, campaignPostId, userId, accountId, imageUrl, videoUrl } = body;
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
@@ -53,14 +53,17 @@ Deno.serve(async (req) => {
 
     let text = '';
     let mediaUrl = imageUrl || null;
+    let videoMediaUrl = videoUrl || null;
     let bookData: any = null;
 
     if (campaignPostId) {
-      const { data: post } = await supabase.from('campaign_posts').select('*, book:books(id, title, image_url, storage_path, product_url)').eq('id', campaignPostId).single();
+      const { data: post } = await supabase.from('campaign_posts').select('*, book:books(id, title, image_url, storage_path, product_url, video_url, video_storage_path)').eq('id', campaignPostId).single();
       if (post) {
         text = post.text; bookData = post.book;
         if (!mediaUrl && bookData?.storage_path) mediaUrl = getStoragePublicUrl(bookData.storage_path);
         else if (!mediaUrl && bookData?.image_url) mediaUrl = bookData.image_url;
+        if (!videoMediaUrl && bookData?.video_storage_path) videoMediaUrl = `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${bookData.video_storage_path}`;
+        else if (!videoMediaUrl && bookData?.video_url) videoMediaUrl = bookData.video_url;
       }
     } else if (bookId) {
       const { data: book } = await supabase.from('books').select('*').eq('id', bookId).single();
@@ -68,6 +71,8 @@ Deno.serve(async (req) => {
         bookData = book;
         if (!mediaUrl && book.storage_path) mediaUrl = getStoragePublicUrl(book.storage_path);
         else if (!mediaUrl && book.image_url) mediaUrl = book.image_url;
+        if (!videoMediaUrl && book.video_storage_path) videoMediaUrl = `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${book.video_storage_path}`;
+        else if (!videoMediaUrl && book.video_url) videoMediaUrl = book.video_url;
         const { data: content } = await supabase.from('book_platform_content').select('*').eq('id', contentId || '').single();
         text = content?.custom_text || content?.ai_generated_text || book.title;
       }
@@ -81,7 +86,9 @@ Deno.serve(async (req) => {
 
         // Build NPF (Neue Post Format) content
         const content: any[] = [{ type: 'text', text: text || '' }];
-        if (mediaUrl) {
+        if (videoMediaUrl) {
+          content.push({ type: 'video', media: [{ url: videoMediaUrl }] });
+        } else if (mediaUrl) {
           content.push({ type: 'image', media: [{ url: mediaUrl }] });
         }
 
