@@ -56,7 +56,6 @@ export const SimpleCampaignSetup = () => {
       telegram: "telegram_tokens",
       bluesky: "bluesky_tokens",
       discord: "discord_tokens",
-      threads: "threads_oauth_tokens",
       pinterest: "pinterest_oauth_tokens",
       
       mastodon: "mastodon_tokens",

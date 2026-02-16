@@ -35,7 +35,6 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
     if (platform === "x") return "twitter_oauth1_tokens";
     if (platform === "telegram") return "telegram_tokens";
     if (platform === "bluesky") return "bluesky_tokens";
-    if (platform === "threads") return "threads_oauth_tokens";
     if (platform === "pinterest") return "pinterest_oauth_tokens";
     
     if (platform === "discord") return "discord_tokens";
@@ -80,7 +79,6 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
         else if (platform === "tiktok") name = token.account_name || token.open_id?.substring(0, 8) || "Konto TikTok";
         else if (platform === "youtube") name = token.channel_title || "Kanał YouTube";
         else if (platform === "linkedin") name = token.display_name || "Profil LinkedIn";
-        else if (platform === "threads") name = token.username ? `@${token.username}` : "Konto Threads";
         else if (platform === "telegram") name = token.channel_name || token.chat_id || "Kanał Telegram";
         else if (platform === "bluesky") name = token.handle || "Konto Bluesky";
         else if (platform === "pinterest") name = token.username ? `@${token.username}` : "Konto Pinterest";
@@ -172,7 +170,7 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
   const handleConnect = async () => {
     if (onConnect) {
       onConnect();
-    } else if (["x", "facebook", "tiktok", "instagram", "youtube", "linkedin", "threads", "telegram", "bluesky", "pinterest", "discord", "tumblr", "google_business", "mastodon"].includes(platform)) {
+    } else if (["x", "facebook", "tiktok", "instagram", "youtube", "linkedin", "telegram", "bluesky", "pinterest", "discord", "tumblr", "google_business", "mastodon"].includes(platform)) {
       window.location.href = `/settings/social-accounts#${platform}`;
     } else {
       toast({

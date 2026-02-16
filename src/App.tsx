@@ -20,7 +20,6 @@ import FacebookCallback from "./pages/FacebookCallback";
 import TikTokCallback from "./pages/TikTokCallback";
 import YouTubeCallback from "./pages/YouTubeCallback";
 import LinkedInCallback from "./pages/LinkedInCallback";
-import ThreadsCallback from "./pages/ThreadsCallback";
 import MastodonCallback from "./pages/MastodonCallback";
 
 import PinterestCallback from "./pages/PinterestCallback";
@@ -42,7 +41,6 @@ import PlatformTikTok from "./pages/platforms/PlatformTikTok";
 import PlatformPinterest from "./pages/platforms/PlatformPinterest";
 
 import PlatformTelegram from "./pages/platforms/PlatformTelegram";
-import PlatformThreads from "./pages/platforms/PlatformThreads";
 import PlatformBeReal from "./pages/platforms/PlatformBeReal";
 import PlatformMeWe from "./pages/platforms/PlatformMeWe";
 import PlatformBluesky from "./pages/platforms/PlatformBluesky";
@@ -132,7 +130,6 @@ const App = () => (
           <Route path="/oauth/tiktok/callback" element={<TikTokCallback />} />
           <Route path="/oauth/youtube/callback" element={<YouTubeCallback />} />
           <Route path="/oauth/linkedin/callback" element={<LinkedInCallback />} />
-          <Route path="/oauth/threads/callback" element={<ThreadsCallback />} />
           <Route path="/oauth/mastodon/callback" element={<MastodonCallback />} />
           
           <Route path="/oauth/pinterest/callback" element={<PinterestCallback />} />
@@ -164,7 +161,6 @@ const App = () => (
           <Route path="/platforms/pinterest" element={<ProtectedRoute><PlatformPinterest /></ProtectedRoute>} />
           
           <Route path="/platforms/telegram" element={<ProtectedRoute><PlatformTelegram /></ProtectedRoute>} />
-          <Route path="/platforms/threads" element={<ProtectedRoute><PlatformThreads /></ProtectedRoute>} />
           <Route path="/platforms/bereal" element={<ProtectedRoute><PlatformBeReal /></ProtectedRoute>} />
           <Route path="/platforms/mewe" element={<ProtectedRoute><PlatformMeWe /></ProtectedRoute>} />
           <Route path="/platforms/bluesky" element={<ProtectedRoute><PlatformBluesky /></ProtectedRoute>} />

@@ -1243,51 +1243,6 @@ export type Database = {
         }
         Relationships: []
       }
-      threads_oauth_tokens: {
-        Row: {
-          access_token: string
-          account_name: string | null
-          created_at: string | null
-          expires_at: string | null
-          id: string
-          is_default: boolean | null
-          scope: string | null
-          threads_user_id: string
-          token_type: string | null
-          updated_at: string | null
-          user_id: string
-          username: string | null
-        }
-        Insert: {
-          access_token: string
-          account_name?: string | null
-          created_at?: string | null
-          expires_at?: string | null
-          id?: string
-          is_default?: boolean | null
-          scope?: string | null
-          threads_user_id: string
-          token_type?: string | null
-          updated_at?: string | null
-          user_id: string
-          username?: string | null
-        }
-        Update: {
-          access_token?: string
-          account_name?: string | null
-          created_at?: string | null
-          expires_at?: string | null
-          id?: string
-          is_default?: boolean | null
-          scope?: string | null
-          threads_user_id?: string
-          token_type?: string | null
-          updated_at?: string | null
-          user_id?: string
-          username?: string | null
-        }
-        Relationships: []
-      }
       tiktok_oauth_tokens: {
         Row: {
           access_token: string

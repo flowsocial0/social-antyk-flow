@@ -69,14 +69,13 @@ export const AccountSelector = ({ selectedPlatforms, selectedAccounts, onChange 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, threadsResult, telegramResult, blueskyResult, mastodonResult, gabResult, pinterestResult, discordResult, tumblrResult, googleBizResult] = await Promise.all([
+    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, telegramResult, blueskyResult, mastodonResult, gabResult, pinterestResult, discordResult, tumblrResult, googleBizResult] = await Promise.all([
       supabase.from('twitter_oauth1_tokens').select('id, screen_name, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('facebook_oauth_tokens').select('id, page_name, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('instagram_oauth_tokens').select('id, instagram_username, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('tiktok_oauth_tokens').select('id, open_id, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('youtube_oauth_tokens').select('id, channel_title, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('linkedin_oauth_tokens').select('id, display_name, account_name, is_default').eq('user_id', session.user.id),
-      (supabase as any).from('threads_oauth_tokens').select('id, username, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('telegram_tokens').select('id, channel_name, chat_id, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('bluesky_tokens').select('id, handle, account_name, is_default').eq('user_id', session.user.id),
       (supabase as any).from('mastodon_tokens').select('id, username, server_url, account_name, is_default').eq('user_id', session.user.id),
@@ -116,11 +115,6 @@ export const AccountSelector = ({ selectedPlatforms, selectedAccounts, onChange 
       linkedin: (linkedinResult.data || []).map((a: any) => ({
         id: a.id,
         display_name: a.display_name || a.account_name || 'Profil LinkedIn',
-        is_default: a.is_default ?? false,
-      })),
-      threads: (threadsResult.data || []).map((a: any) => ({
-        id: a.id,
-        display_name: a.username ? `@${a.username}` : (a.account_name || 'Konto Threads'),
         is_default: a.is_default ?? false,
       })),
       telegram: (telegramResult.data || []).map((a: any) => ({

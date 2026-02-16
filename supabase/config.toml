@@ -33,8 +33,6 @@ verify_jwt = false
 [functions.publish-to-linkedin]
 verify_jwt = false
 
-[functions.publish-to-threads]
-verify_jwt = false
 
 [functions.publish-to-telegram]
 verify_jwt = false
@@ -93,11 +91,6 @@ verify_jwt = false
 [functions.youtube-oauth-callback]
 verify_jwt = false
 
-[functions.threads-oauth-start]
-verify_jwt = false
-
-[functions.threads-oauth-callback]
-verify_jwt = false
 
 [functions.sync-books-from-xml]
 verify_jwt = false

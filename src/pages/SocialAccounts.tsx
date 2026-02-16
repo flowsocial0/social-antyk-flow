@@ -35,7 +35,6 @@ interface PlatformAccounts {
   tiktok: SocialAccount[];
   youtube: SocialAccount[];
   linkedin: SocialAccount[];
-  threads: SocialAccount[];
   telegram: SocialAccount[];
   bluesky: SocialAccount[];
   mastodon: SocialAccount[];
@@ -51,7 +50,7 @@ export default function SocialAccounts() {
   const [isLoading, setIsLoading] = useState<Record<string, boolean>>({});
   const [accounts, setAccounts] = useState<PlatformAccounts>({
     x: [], facebook: [], instagram: [], tiktok: [], youtube: [], linkedin: [],
-    threads: [], telegram: [], bluesky: [], mastodon: [],
+    telegram: [], bluesky: [], mastodon: [],
     pinterest: [], discord: [], tumblr: [], google_business: [],
   });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; platform: string; accountId: string; accountName: string }>({
@@ -115,14 +114,13 @@ export default function SocialAccounts() {
     if (!session) return;
 
     // Load all accounts for each platform
-    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, threadsResult, telegramResult, blueskyResult, mastodonResult, pinterestResult, discordResult, tumblrResult, googleBizResult] = await Promise.all([
+    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, telegramResult, blueskyResult, mastodonResult, pinterestResult, discordResult, tumblrResult, googleBizResult] = await Promise.all([
       supabase.from('twitter_oauth1_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('facebook_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('instagram_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('tiktok_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('youtube_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('linkedin_oauth_tokens').select('*').eq('user_id', session.user.id),
-      (supabase as any).from('threads_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('telegram_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('bluesky_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('mastodon_tokens').select('*').eq('user_id', session.user.id).not('access_token', 'like', 'pending_%'),
@@ -162,11 +160,6 @@ export default function SocialAccounts() {
         id: a.id,
         account_name: a.account_name,
         display_name: a.display_name || 'Profil LinkedIn',
-      })),
-      threads: (threadsResult.data || []).map((a: any) => ({
-        id: a.id,
-        account_name: a.account_name,
-        display_name: a.username ? `@${a.username}` : 'Konto Threads',
       })),
       telegram: (telegramResult.data || []).map((a: any) => ({
         id: a.id,
@@ -511,7 +504,7 @@ export default function SocialAccounts() {
         x: 'twitter_oauth1_tokens', facebook: 'facebook_oauth_tokens',
         instagram: 'instagram_oauth_tokens', tiktok: 'tiktok_oauth_tokens',
         youtube: 'youtube_oauth_tokens', linkedin: 'linkedin_oauth_tokens',
-        threads: 'threads_oauth_tokens', telegram: 'telegram_tokens',
+        telegram: 'telegram_tokens',
         bluesky: 'bluesky_tokens', mastodon: 'mastodon_tokens',
         pinterest: 'pinterest_oauth_tokens',
         discord: 'discord_tokens',
@@ -547,7 +540,6 @@ export default function SocialAccounts() {
     { id: 'tiktok', name: 'TikTok', icon: Video, color: 'text-black dark:text-white', bgColor: 'bg-black/10 dark:bg-white/10', connect: connectTikTok },
     { id: 'youtube', name: 'YouTube', icon: Youtube, color: 'text-red-500', bgColor: 'bg-red-500/10', connect: connectYouTube },
     { id: 'linkedin', name: 'LinkedIn', icon: Linkedin, color: 'text-blue-700', bgColor: 'bg-blue-700/10', connect: connectLinkedIn },
-    { id: 'threads', name: 'Threads', icon: MessageCircle, color: 'text-slate-800', bgColor: 'bg-slate-800/10', connect: connectThreads },
     { id: 'telegram', name: 'Telegram', icon: Send, color: 'text-sky-500', bgColor: 'bg-sky-500/10', connect: connectTelegram, formType: 'telegram' as const },
     { id: 'bluesky', name: 'Bluesky', icon: Globe, color: 'text-sky-600', bgColor: 'bg-sky-600/10', connect: connectBluesky, formType: 'bluesky' as const },
     { id: 'mastodon', name: 'Mastodon', icon: Globe, color: 'text-purple-600', bgColor: 'bg-purple-600/10', connect: connectMastodon, formType: 'mastodon' as const },

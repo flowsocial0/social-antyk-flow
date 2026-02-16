@@ -89,7 +89,6 @@ function getTokenTableName(platform: string): string {
     case 'youtube': return 'youtube_oauth_tokens';
     case 'linkedin': return 'linkedin_oauth_tokens';
     case 'tiktok': return 'tiktok_oauth_tokens';
-    case 'threads': return 'threads_oauth_tokens';
     case 'telegram': return 'telegram_tokens';
     case 'bluesky': return 'bluesky_tokens';
     case 'mastodon': return 'mastodon_tokens';
@@ -113,7 +112,6 @@ function getPlatformNamePL(platform: string): string {
     case 'youtube': return 'YouTube';
     case 'linkedin': return 'LinkedIn';
     case 'tiktok': return 'TikTok';
-    case 'threads': return 'Threads';
     case 'telegram': return 'Telegram';
     case 'bluesky': return 'Bluesky';
     case 'mastodon': return 'Mastodon';
@@ -225,9 +223,6 @@ Deno.serve(async (req) => {
             break;
           case 'linkedin':
             publishFunctionName = 'publish-to-linkedin';
-            break;
-          case 'threads':
-            publishFunctionName = 'publish-to-threads';
             break;
           case 'telegram':
             publishFunctionName = 'publish-to-telegram';
@@ -407,9 +402,6 @@ Deno.serve(async (req) => {
               break;
             case 'linkedin':
               publishFunctionName = 'publish-to-linkedin';
-              break;
-            case 'threads':
-              publishFunctionName = 'publish-to-threads';
               break;
             case 'telegram':
               publishFunctionName = 'publish-to-telegram';
