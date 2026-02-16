@@ -13,9 +13,9 @@ const PinterestCallback = () => {
     const error = params.get('error');
 
     if (error) {
-      navigate(`/settings/social-accounts?error=${error}`);
+      navigate('/platforms/pinterest');
     } else {
-      navigate('/settings/social-accounts#pinterest');
+      navigate('/platforms/pinterest');
     }
   }, [navigate]);
 

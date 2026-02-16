@@ -9,9 +9,9 @@ const SnapchatCallback = () => {
     const params = new URLSearchParams(window.location.search);
     const error = params.get('error');
     if (error) {
-      navigate(`/settings/social-accounts?error=${error}`);
+      navigate('/platforms/snapchat');
     } else {
-      navigate('/settings/social-accounts#snapchat');
+      navigate('/platforms/snapchat');
     }
   }, [navigate]);
 

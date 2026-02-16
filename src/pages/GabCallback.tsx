@@ -17,7 +17,7 @@ export default function GabCallback() {
 
       if (!code) {
         toast.error("Brak kodu autoryzacji");
-        navigate("/settings/social-accounts");
+        navigate("/platforms/gab");
         return;
       }
 
@@ -31,7 +31,7 @@ export default function GabCallback() {
 
       if (!userId) {
         toast.error("Brak danych sesji - spróbuj ponownie");
-        navigate("/settings/social-accounts");
+        navigate("/platforms/gab");
         return;
       }
 
@@ -57,7 +57,7 @@ export default function GabCallback() {
       } finally {
         sessionStorage.removeItem("gab_user_id");
         sessionStorage.removeItem("gab_oauth_state");
-        navigate("/settings/social-accounts#gab");
+        navigate("/platforms/gab");
       }
     };
 
