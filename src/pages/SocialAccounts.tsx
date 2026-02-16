@@ -66,7 +66,7 @@ export default function SocialAccounts() {
   const [blueskyDialogOpen, setBlueskyDialogOpen] = useState(false);
   const [mastodonDialogOpen, setMastodonDialogOpen] = useState(false);
   const [discordDialogOpen, setDiscordDialogOpen] = useState(false);
-
+  const scrollAfterLoadRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     loadAllAccounts();
     
@@ -83,25 +83,23 @@ export default function SocialAccounts() {
       window.history.replaceState({}, '', '/settings/social-accounts');
     }
 
-    // Scroll to platform from hash - poll until element exists
+    // Scroll to platform from hash - wait for accounts to load first
     const hash = window.location.hash.replace('#', '');
     if (hash) {
       const targetId = `platform-${hash}`;
-      let attempts = 0;
-      const maxAttempts = 30;
-      const tryScroll = () => {
+      const scrollToTarget = () => {
         const el = document.getElementById(targetId);
         if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
-          setTimeout(() => el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2'), 3000);
-        } else if (attempts < maxAttempts) {
-          attempts++;
-          requestAnimationFrame(tryScroll);
+          // Use setTimeout to ensure layout is stable after data load
+          setTimeout(() => {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
+            setTimeout(() => el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2'), 3000);
+          }, 100);
         }
       };
-      // Start polling after a short initial delay for render
-      setTimeout(tryScroll, 100);
+      // Store scroll handler to call after accounts load
+      scrollAfterLoadRef.current = scrollToTarget;
     }
   }, []);
 
@@ -212,6 +210,15 @@ export default function SocialAccounts() {
         display_name: a.business_name || 'Firma Google',
       })),
     });
+
+    // Trigger scroll to target platform after data is loaded and rendered
+    if (scrollAfterLoadRef.current) {
+      // Wait for next render cycle so DOM reflects the new data
+      setTimeout(() => {
+        scrollAfterLoadRef.current?.();
+        scrollAfterLoadRef.current = null;
+      }, 200);
+    }
   };
 
   const setLoading = (key: string, value: boolean) => {
