@@ -96,6 +96,8 @@ Deno.serve(async (req) => {
             continue;
           }
 
+          const contentType = videoResponse.headers.get('content-type');
+          console.log(`Video content-type from source: ${contentType}`);
           const videoArrayBuffer = await videoResponse.arrayBuffer();
           const videoSize = videoArrayBuffer.byteLength;
           console.log(`Video downloaded: ${(videoSize / 1024 / 1024).toFixed(2)} MB`);
@@ -116,8 +118,6 @@ Deno.serve(async (req) => {
             media: {
               type: 'video/mp4',
               identifier: videoIdentifier,
-              width: 1920,
-              height: 1080,
             },
           });
 
@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
           const formData = new FormData();
           formData.append('json', new Blob([jsonPayload], { type: 'application/json' }));
           // Don't set explicit video/mp4 type - let FormData auto-detect (matches pytumblr2)
-          formData.append(videoIdentifier, new Blob([videoArrayBuffer]), '0');
+          formData.append(videoIdentifier, new Blob([videoArrayBuffer], { type: 'video/mp4' }), 'video.mp4');
 
           console.log(`Uploading video to Tumblr blog: ${blogName}`);
 
