@@ -29,6 +29,8 @@ const Platforms = () => {
     const media = getMediaLabel(platform.mediaType);
     const statusBadge = platform.status === 'active' 
       ? <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Aktywna</Badge>
+      : platform.status === 'review'
+      ? <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20">⏳ In Review</Badge>
       : platform.status === 'coming-soon'
       ? <Badge variant="outline">Wkrótce</Badge>
       : <Badge variant="secondary">Planowana</Badge>;
@@ -46,7 +48,7 @@ const Platforms = () => {
         </div>
         <h3 className="text-lg font-semibold mb-1">{platform.name}</h3>
         <p className="text-sm text-muted-foreground mb-3">
-          {platform.status === 'active' 
+          {platform.status === 'active' || platform.status === 'review'
             ? (platform.shortDescription || 'Zarządzaj publikacjami i harmonogramem')
             : 'Integracja w przygotowaniu'}
         </p>
