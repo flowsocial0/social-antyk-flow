@@ -3,12 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft } from "lucide-react";
-import { getAllPlatforms, getActivePlatforms, getComingSoonPlatforms, getPlannedPlatforms } from "@/config/platforms";
+import { getPopularPlatforms, getOtherPlatforms, getComingSoonPlatforms, getPlannedPlatforms } from "@/config/platforms";
 import { Footer } from "@/components/layout/Footer";
 
 const Platforms = () => {
   const navigate = useNavigate();
-  const activePlatforms = getActivePlatforms();
+  const popularPlatforms = getPopularPlatforms();
+  const otherPlatforms = getOtherPlatforms();
   const comingSoonPlatforms = getComingSoonPlatforms();
   const plannedPlatforms = getPlannedPlatforms();
 
@@ -58,12 +59,24 @@ const Platforms = () => {
           </Button>
         </div>
 
-        {/* Active Platforms */}
-        {activePlatforms.length > 0 && (
+        {/* Popular Platforms */}
+        {popularPlatforms.length > 0 && (
           <div>
-            <h2 className="text-2xl font-semibold mb-4">Aktywne platformy</h2>
+            <h2 className="text-2xl font-semibold mb-4">🔥 Najpopularniejsze</h2>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {activePlatforms.map((platform) => (
+              {popularPlatforms.map((platform) => (
+                <PlatformCard key={platform.id} platform={platform} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Other Platforms */}
+        {otherPlatforms.length > 0 && (
+          <div>
+            <h2 className="text-2xl font-semibold mb-4">Pozostałe platformy</h2>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {otherPlatforms.map((platform) => (
                 <PlatformCard key={platform.id} platform={platform} />
               ))}
             </div>
