@@ -61,7 +61,6 @@ export const SimpleCampaignSetup = () => {
       
       mastodon: "mastodon_tokens",
       tumblr: "tumblr_oauth_tokens",
-      snapchat: "snapchat_oauth_tokens",
       google_business: "google_business_tokens",
     };
 

@@ -326,11 +326,6 @@ const CampaignDetails = () => {
         data?.forEach((a: any) => { newAccountsMap[a.id] = { id: a.id, display_name: a.blog_name || a.username || (a.account_name || 'Blog Tumblr'), platform: 'tumblr' }; });
       }
 
-      // Load Snapchat accounts
-      if (selectedAccounts.snapchat?.length) {
-        const { data } = await (supabase as any).from('snapchat_oauth_tokens').select('id, display_name, account_name').in('id', selectedAccounts.snapchat);
-        data?.forEach((a: any) => { newAccountsMap[a.id] = { id: a.id, display_name: a.display_name || (a.account_name || 'Konto Snapchat'), platform: 'snapchat' }; });
-      }
 
       // Load Google Business accounts
       if (selectedAccounts.google_business?.length) {

@@ -26,7 +26,7 @@ import MastodonCallback from "./pages/MastodonCallback";
 import PinterestCallback from "./pages/PinterestCallback";
 
 import TumblrCallback from "./pages/TumblrCallback";
-import SnapchatCallback from "./pages/SnapchatCallback";
+
 import GoogleBusinessCallback from "./pages/GoogleBusinessCallback";
 import BookPreview from "./pages/BookPreview";
 import BookRedirect from "./pages/BookRedirect";
@@ -53,7 +53,7 @@ import PlatformLocals from "./pages/platforms/PlatformLocals";
 
 import PlatformDiscord from "./pages/platforms/PlatformDiscord";
 import PlatformTumblr from "./pages/platforms/PlatformTumblr";
-import PlatformSnapchat from "./pages/platforms/PlatformSnapchat";
+
 import PlatformGoogleBusiness from "./pages/platforms/PlatformGoogleBusiness";
 import PlatformParler from "./pages/platforms/PlatformParler";
 import ScheduleOverview from "./pages/ScheduleOverview";
@@ -138,7 +138,7 @@ const App = () => (
           <Route path="/oauth/pinterest/callback" element={<PinterestCallback />} />
           
           <Route path="/oauth/tumblr/callback" element={<TumblrCallback />} />
-          <Route path="/oauth/snapchat/callback" element={<SnapchatCallback />} />
+          
           <Route path="/oauth/google-business/callback" element={<GoogleBusinessCallback />} />
 
           {/* Protected routes */}
@@ -175,7 +175,7 @@ const App = () => (
           
           <Route path="/platforms/discord" element={<ProtectedRoute><PlatformDiscord /></ProtectedRoute>} />
           <Route path="/platforms/tumblr" element={<ProtectedRoute><PlatformTumblr /></ProtectedRoute>} />
-          <Route path="/platforms/snapchat" element={<ProtectedRoute><PlatformSnapchat /></ProtectedRoute>} />
+          
           <Route path="/platforms/google-business" element={<ProtectedRoute><PlatformGoogleBusiness /></ProtectedRoute>} />
           <Route path="/platforms/parler" element={<ProtectedRoute><PlatformParler /></ProtectedRoute>} />
           <Route path="/schedule-overview" element={<ProtectedRoute><ScheduleOverview /></ProtectedRoute>} />

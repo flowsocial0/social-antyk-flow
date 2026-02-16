@@ -20,7 +20,6 @@ export type PlatformId =
   | 'mastodon' 
   | 'discord'
   | 'tumblr'
-  | 'snapchat'
   | 'google_business';
 
 export type MediaType = 'video-only' | 'image-only' | 'both';
@@ -215,19 +214,6 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     priority: 13,
     mediaType: 'image-only',
     shortDescription: 'Posty na blogu z obrazkami.',
-  },
-  snapchat: {
-    id: 'snapchat',
-    name: 'Snapchat',
-    icon: Camera,
-    color: 'text-yellow-500',
-    gradientFrom: 'from-yellow-500/20',
-    gradientTo: 'to-yellow-600/20',
-    path: '/platforms/snapchat',
-    status: 'active',
-    priority: 14,
-    mediaType: 'image-only',
-    shortDescription: 'Publikuj obrazki jako Snap Stories.',
   },
   google_business: {
     id: 'google_business',

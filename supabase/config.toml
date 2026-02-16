@@ -162,15 +162,6 @@ verify_jwt = false
 [functions.publish-to-tumblr]
 verify_jwt = false
 
-[functions.snapchat-oauth-start]
-verify_jwt = false
-
-[functions.snapchat-oauth-callback]
-verify_jwt = false
-
-[functions.publish-to-snapchat]
-verify_jwt = false
-
 [functions.google-business-oauth-start]
 verify_jwt = false
 

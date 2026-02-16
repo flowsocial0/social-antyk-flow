@@ -43,7 +43,6 @@ interface PlatformAccounts {
   
   discord: SocialAccount[];
   tumblr: SocialAccount[];
-  snapchat: SocialAccount[];
   google_business: SocialAccount[];
 }
 
@@ -53,7 +52,7 @@ export default function SocialAccounts() {
   const [accounts, setAccounts] = useState<PlatformAccounts>({
     x: [], facebook: [], instagram: [], tiktok: [], youtube: [], linkedin: [],
     threads: [], telegram: [], bluesky: [], mastodon: [],
-    pinterest: [], discord: [], tumblr: [], snapchat: [], google_business: [],
+    pinterest: [], discord: [], tumblr: [], google_business: [],
   });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; platform: string; accountId: string; accountName: string }>({
     open: false,
@@ -116,7 +115,7 @@ export default function SocialAccounts() {
     if (!session) return;
 
     // Load all accounts for each platform
-    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, threadsResult, telegramResult, blueskyResult, mastodonResult, pinterestResult, discordResult, tumblrResult, snapchatResult, googleBizResult] = await Promise.all([
+    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, threadsResult, telegramResult, blueskyResult, mastodonResult, pinterestResult, discordResult, tumblrResult, googleBizResult] = await Promise.all([
       supabase.from('twitter_oauth1_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('facebook_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('instagram_oauth_tokens').select('*').eq('user_id', session.user.id),
@@ -130,7 +129,6 @@ export default function SocialAccounts() {
       (supabase as any).from('pinterest_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('discord_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('tumblr_oauth_tokens').select('*').eq('user_id', session.user.id),
-      (supabase as any).from('snapchat_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('google_business_tokens').select('*').eq('user_id', session.user.id),
     ]);
 
@@ -197,10 +195,6 @@ export default function SocialAccounts() {
       tumblr: (tumblrResult.data || []).map((a: any) => ({
         id: a.id, account_name: a.account_name,
         display_name: a.blog_name || a.username || 'Blog Tumblr',
-      })),
-      snapchat: (snapchatResult.data || []).map((a: any) => ({
-        id: a.id, account_name: a.account_name,
-        display_name: a.display_name || 'Konto Snapchat',
       })),
       google_business: (googleBizResult.data || []).map((a: any) => ({
         id: a.id, account_name: a.account_name,
@@ -488,25 +482,6 @@ export default function SocialAccounts() {
     } finally { setLoading('tumblr', false); }
   };
 
-  const connectSnapchat = async () => {
-    setLoading('snapchat', true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { toast.error('Musisz być zalogowany'); return; }
-      const { data, error } = await supabase.functions.invoke('snapchat-oauth-start', {
-        body: { userId: session.user.id },
-      });
-      if (error) throw error;
-      if (data?.url) {
-        if (data.state) sessionStorage.setItem('snapchat_oauth_state', data.state);
-        sessionStorage.setItem('snapchat_user_id', session.user.id);
-        window.location.href = data.url;
-      }
-    } catch (error: any) {
-      toast.error('Nie udało się połączyć ze Snapchat', { description: error.message });
-    } finally { setLoading('snapchat', false); }
-  };
-
   const connectGoogleBusiness = async () => {
     setLoading('google_business', true);
     try {
@@ -540,7 +515,7 @@ export default function SocialAccounts() {
         bluesky: 'bluesky_tokens', mastodon: 'mastodon_tokens',
         pinterest: 'pinterest_oauth_tokens',
         discord: 'discord_tokens',
-        tumblr: 'tumblr_oauth_tokens', snapchat: 'snapchat_oauth_tokens',
+        tumblr: 'tumblr_oauth_tokens',
         google_business: 'google_business_tokens',
       };
 
@@ -581,7 +556,6 @@ export default function SocialAccounts() {
     
     { id: 'discord', name: 'Discord', icon: MessageCircle, color: 'text-indigo-500', bgColor: 'bg-indigo-500/10', connect: connectDiscord, formType: 'discord' as const },
     { id: 'tumblr', name: 'Tumblr', icon: Globe, color: 'text-blue-900', bgColor: 'bg-blue-900/10', connect: connectTumblr },
-    { id: 'snapchat', name: 'Snapchat', icon: Camera, color: 'text-yellow-500', bgColor: 'bg-yellow-500/10', connect: connectSnapchat },
     { id: 'google_business', name: 'Google Business', icon: Map, color: 'text-blue-500', bgColor: 'bg-blue-500/10', connect: connectGoogleBusiness },
   ];
 
@@ -592,7 +566,7 @@ export default function SocialAccounts() {
           <Button 
             variant="ghost" 
             onClick={() => {
-              if (sourcePlatform && ['x','facebook','instagram','tiktok','youtube','linkedin','threads','telegram','bluesky','mastodon','pinterest','discord','tumblr','snapchat','google_business'].includes(sourcePlatform)) {
+              if (sourcePlatform && ['x','facebook','instagram','tiktok','youtube','linkedin','threads','telegram','bluesky','mastodon','pinterest','discord','tumblr','google_business'].includes(sourcePlatform)) {
                 navigate(`/platforms/${sourcePlatform}`);
               } else {
                 navigate('/platforms');

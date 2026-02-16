@@ -98,7 +98,7 @@ function getTokenTableName(platform: string): string {
     
     case 'discord': return 'discord_tokens';
     case 'tumblr': return 'tumblr_oauth_tokens';
-    case 'snapchat': return 'snapchat_oauth_tokens';
+    case 'google_business': return 'google_business_tokens';
     case 'google_business': return 'google_business_tokens';
     default: return '';
   }
@@ -122,7 +122,7 @@ function getPlatformNamePL(platform: string): string {
     
     case 'discord': return 'Discord';
     case 'tumblr': return 'Tumblr';
-    case 'snapchat': return 'Snapchat';
+    case 'google_business': return 'Google Business';
     case 'google_business': return 'Google Business';
     default: return platform;
   }
@@ -249,9 +249,6 @@ Deno.serve(async (req) => {
             break;
           case 'tumblr':
             publishFunctionName = 'publish-to-tumblr';
-            break;
-          case 'snapchat':
-            publishFunctionName = 'publish-to-snapchat';
             break;
           case 'google_business':
             publishFunctionName = 'publish-to-google-business';
@@ -434,9 +431,6 @@ Deno.serve(async (req) => {
               break;
             case 'tumblr':
               publishFunctionName = 'publish-to-tumblr';
-              break;
-            case 'snapchat':
-              publishFunctionName = 'publish-to-snapchat';
               break;
             case 'google_business':
               publishFunctionName = 'publish-to-google-business';
