@@ -177,7 +177,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     path: '/platforms/bluesky',
     status: 'active',
     priority: 7,
-    mediaType: 'both',
+    mediaType: 'image-only',
   },
   mastodon: {
     id: 'mastodon',
