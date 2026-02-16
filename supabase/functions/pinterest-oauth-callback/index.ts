@@ -59,31 +59,57 @@ Deno.serve(async (req) => {
 
     const expiresAt = new Date(Date.now() + (expires_in || 3600) * 1000).toISOString();
 
-    // Save token
+    // Save token - check if existing token has sandbox mode enabled
     const supabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-    const { error: upsertError } = await supabase
+    // Check existing token to preserve sandbox settings
+    const { data: existingTokens } = await supabase
       .from('pinterest_oauth_tokens')
-      .upsert({
-        user_id: userId,
-        access_token,
-        refresh_token: refresh_token || null,
-        expires_at: expiresAt,
-        scope: scope || null,
-        username: username || null,
-        account_name: username || null,
-      }, { onConflict: 'user_id' });
+      .select('id, is_sandbox, access_token')
+      .eq('user_id', userId);
 
-    if (upsertError) {
-      await supabase.from('pinterest_oauth_tokens').insert({
-        user_id: userId,
-        access_token,
-        refresh_token: refresh_token || null,
-        expires_at: expiresAt,
-        scope: scope || null,
-        username: username || null,
-        account_name: username || null,
-      });
+    const existingToken = existingTokens?.[0];
+
+    if (existingToken?.is_sandbox) {
+      // User has sandbox mode - DON'T overwrite their sandbox token
+      // Only update metadata (username, expiry, scope) but keep sandbox access_token
+      console.log('Preserving sandbox token, only updating metadata');
+      await supabase
+        .from('pinterest_oauth_tokens')
+        .update({
+          refresh_token: refresh_token || null,
+          expires_at: expiresAt,
+          scope: scope || null,
+          username: username || existingToken.access_token ? undefined : (username || null),
+          account_name: username || null,
+        })
+        .eq('id', existingToken.id);
+    } else {
+      // No sandbox mode - normal upsert with production token
+      const { error: upsertError } = await supabase
+        .from('pinterest_oauth_tokens')
+        .upsert({
+          user_id: userId,
+          access_token,
+          refresh_token: refresh_token || null,
+          expires_at: expiresAt,
+          scope: scope || null,
+          username: username || null,
+          account_name: username || null,
+          is_sandbox: false,
+        }, { onConflict: 'user_id' });
+
+      if (upsertError) {
+        await supabase.from('pinterest_oauth_tokens').insert({
+          user_id: userId,
+          access_token,
+          refresh_token: refresh_token || null,
+          expires_at: expiresAt,
+          scope: scope || null,
+          username: username || null,
+          account_name: username || null,
+        });
+      }
     }
 
     return Response.redirect(`${siteUrl}/platforms/pinterest?connected=true&platform=pinterest`, 302);
