@@ -1,62 +1,65 @@
 
+# Naprawa: Instagram publikuje 3 razy (race condition w auto-publish)
 
-## Naprawa publikacji video na Tumblr
+## Znaleziony problem
 
-### Problem
+Cron job `auto-publish-books` uruchamia sie co minute. Kiedy publikacja na Instagram trwa dluzej (do 2 minut -- czekanie na przetworzenie obrazu/wideo przez serwery Instagrama), kolejne uruchomienia crona "widza" ten sam post ze statusem `scheduled` i publikuja go ponownie. Stad 3x publikacja (3 uruchomienia crona = 3 publikacje tego samego posta).
 
-Tumblr zwraca blad 8005 ("media format not supported") przy uploadzievideo. Analiza wskazuje na 3 przyczyny:
+## Rozwiazanie
 
-1. Blob z video nie ma ustawionego typu `video/mp4`, a filename to `'0'` bez rozszerzenia -- Tumblr nie rozpoznaje formatu
-2. Wymiary 1920x1080 sa hardcoded i nie odpowiadaja rzeczywistym wymiarom pliku
-3. Pliki video moga miec nieobslugiwany kodek (Tumblr wymaga H.264 + AAC)
+Natychmiast po pobraniu postow do publikacji, zaktualizowac ich status na `publishing` ZANIM rozpocznie sie faktyczna praca. Dzieki temu kolejne uruchomienia crona nie beda ich ponownie przetwarzac.
 
-### Plan zmian
+## Szczegoly techniczne
 
-#### Zmiana 1: Poprawne FormData (plik `supabase/functions/publish-to-tumblr/index.ts`)
+### Plik: `supabase/functions/auto-publish-books/index.ts`
 
-Linia 133 -- zmiana z:
-```text
-formData.append(videoIdentifier, new Blob([videoArrayBuffer]), '0');
-```
-na:
-```text
-formData.append(videoIdentifier, new Blob([videoArrayBuffer], { type: 'video/mp4' }), 'video.mp4');
-```
-
-To zapewni:
-- Poprawny `Content-Type: video/mp4` w czesci multipart
-- Poprawny `filename="video.mp4"` w Content-Disposition
-
-#### Zmiana 2: Usuniecie hardcoded wymiarow
-
-Linie 117-120 -- zamiast stalych 1920x1080, nie podawac wymiarow w ogole (sa opcjonalne wg NPF spec) lub ustawic bardziej typowe wartosci. Bezpieczniej jest je pominac:
+**Zmiana 1**: Po pobraniu `campaignPostsToPublish` (okolo linii 177), natychmiast zaktualizowac status wszystkich pobranych postow na `publishing`:
 
 ```text
-media: {
-  type: 'video/mp4',
-  identifier: videoIdentifier,
-},
+// Po: const { data: campaignPostsToPublish, ... }
+
+// RACE CONDITION FIX: Natychmiast oznacz posty jako "publishing"
+if (campaignPostsToPublish && campaignPostsToPublish.length > 0) {
+  const postIds = campaignPostsToPublish.map(p => p.id);
+  await supabase
+    .from('campaign_posts')
+    .update({ status: 'publishing' })
+    .in('id', postIds);
+}
 ```
 
-Tumblr sam odczyta wymiary z pliku po przetworzeniu.
-
-#### Zmiana 3: Logowanie Content-Type z odpowiedzi video
-
-Dodac log sprawdzajacy Content-Type pobranego pliku, zeby zdiagnozowac czy plik jest rzeczywiscie MP4:
+**Zmiana 2**: To samo dla `contentToPublish` (book_platform_content) -- ustawic `published: true` natychmiast po pobraniu, zanim zaczniemy publikowac:
 
 ```text
-const contentType = videoResponse.headers.get('content-type');
-console.log(`Video content-type from source: ${contentType}`);
+if (contentToPublish && contentToPublish.length > 0) {
+  const contentIds = contentToPublish.map(c => c.id);
+  await supabase
+    .from('book_platform_content')
+    .update({ auto_publish_enabled: false })
+    .in('id', contentIds);
+}
 ```
 
-Jesli okaze sie ze pliki nie sa H.264/AAC, to bedzie trzeba je transkodowac przed uploadem (ale to osobny krok).
+**Zmiana 3**: Zaktualizowac zapytanie pobierajace campaign_posts (linia 176), aby wykluczac status `publishing`:
 
-### Podsumowanie
+```text
+.or(`status.eq.scheduled,and(status.eq.rate_limited,next_retry_at.lte.${now})`)
+```
+To juz jest poprawne -- `publishing` nie jest w warunku, wiec posty ze statusem `publishing` nie beda pobierane ponownie.
 
-Zmiana dotyczy jednego pliku: `supabase/functions/publish-to-tumblr/index.ts`. Trzy poprawki:
-1. Explicit `video/mp4` type na Blobie + filename `video.mp4`
-2. Usuniecie hardcoded width/height z NPF payload
-3. Dodatkowe logowanie content-type zrodlowego pliku
+**Zmiana 4**: W przypadku bledu publikacji, przywrocic status z `publishing` na `failed` (to juz jest obslugiwane w istniejacym kodzie na liniach 649+, ale trzeba upewnic sie ze sciezka bledu tez dziala).
 
-Po wdrozeniu -- test publikacji video. Jesli nadal blad 8005, problem lezy w kodeku samych plikow video.
+### Dodatkowe zabezpieczenie
 
+Dodac `status != 'publishing'` jako dodatkowy warunek w zapytaniu, zeby miec pewnosc:
+
+```text
+.not('status', 'eq', 'publishing')
+```
+
+## Wplyw
+
+- Zero zmian w UI
+- Zero zmian w bazie danych (status `publishing` to po prostu nowa wartosc tekstowa w istniejacym polu)
+- Naprawa dotyczy WSZYSTKICH platform, nie tylko Instagrama
+- Posty kampanii nie beda juz publikowane wielokrotnie
