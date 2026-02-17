@@ -112,7 +112,33 @@ serve(async (req) => {
   }
 
   try {
+    // JWT Authentication - verify caller identity
+    const authHeader = req.headers.get('Authorization');
+    let authenticatedUserId: string | null = null;
+    
+    if (authHeader?.startsWith('Bearer ')) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+      const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } }
+      });
+      const token = authHeader.replace('Bearer ', '');
+      const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+      if (!claimsError && claimsData?.claims?.sub) {
+        authenticatedUserId = claimsData.claims.sub as string;
+      }
+    }
+
+    if (!authenticatedUserId) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Wymagane uwierzytelnienie." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const body = await req.json();
+    // Override userId with authenticated user to prevent impersonation
+    body.userId = authenticatedUserId;
     const { action } = body;
 
     const GROK_API_KEY = Deno.env.get("GROK_API_KEY");
