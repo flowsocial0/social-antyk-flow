@@ -9,7 +9,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 // ... keep existing code (all other imports)
 import Login from "./pages/Login";
-import LandingPage from "./pages/LandingPage";
+
 import Schedule from "./pages/Schedule";
 import Campaigns from "./pages/Campaigns";
 import CampaignsNew from "./pages/CampaignsNew";
@@ -110,7 +110,7 @@ const App = () => (
         <FeatureRequestButton />
         <Routes>
           {/* Public routes */}
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={<Login />} />
           <Route path="/login" element={<Login />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
