@@ -130,7 +130,34 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { type, reportId, newStatus, commentId } = await req.json();
+    const body = await req.json();
+    const { type, reportId, newStatus, commentId } = body;
+
+    // Input validation
+    const validTypes = ["new_report", "status_change", "new_comment"];
+    if (!type || !validTypes.includes(type)) {
+      return new Response(JSON.stringify({ error: "Invalid type" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!reportId || typeof reportId !== "string") {
+      return new Response(JSON.stringify({ error: "Invalid reportId" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (type === "status_change") {
+      const validStatuses = ["nowy", "w_trakcie", "potrzebne_informacje", "rozwiazany", "anulowane"];
+      if (!newStatus || !validStatuses.includes(newStatus)) {
+        return new Response(JSON.stringify({ error: "Invalid status" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     const { data: report, error: reportErr } = await supabase
       .from("bug_reports")
@@ -333,8 +360,8 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    console.error("Error in send-bug-report-email:", err);
-    return new Response(JSON.stringify({ success: false, error: err.message }), {
+    console.error("Error in send-bug-report-email:", err instanceof Error ? err.message : String(err));
+    return new Response(JSON.stringify({ success: false, error: "Wystąpił błąd podczas wysyłania powiadomienia." }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

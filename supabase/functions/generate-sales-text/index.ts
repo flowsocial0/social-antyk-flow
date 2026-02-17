@@ -240,11 +240,11 @@ Wygeneruj TYLKO tekst posta, bez żadnych dodatkowych komentarzy ani linków.`;
     );
 
   } catch (error) {
-    console.error('Error in generate-sales-text function:', error);
+    console.error('Error in generate-sales-text function:', error instanceof Error ? error.message : String(error));
     return new Response(
       JSON.stringify({ 
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+        error: 'Wystąpił błąd podczas generowania tekstu. Spróbuj ponownie.' 
       }),
       {
         status: 200,
