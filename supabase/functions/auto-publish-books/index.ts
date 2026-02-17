@@ -160,6 +160,16 @@ Deno.serve(async (req) => {
 
     console.log(`Found ${contentToPublish?.length || 0} book contents ready to publish`);
 
+    // RACE CONDITION FIX: Immediately disable auto_publish to prevent duplicate processing
+    if (contentToPublish && contentToPublish.length > 0) {
+      const contentIds = contentToPublish.map(c => c.id);
+      console.log(`Locking ${contentIds.length} book contents (setting auto_publish_enabled=false)`);
+      await supabase
+        .from('book_platform_content')
+        .update({ auto_publish_enabled: false })
+        .in('id', contentIds);
+    }
+
     // Get campaign posts that are ready to be published (scheduled OR rate_limited with retry time passed)
     // Exclude posts from paused campaigns
     // IMPORTANT: Include campaign.user_id to know who owns the campaign!
@@ -174,6 +184,7 @@ Deno.serve(async (req) => {
       .lte('scheduled_at', now)
       .neq('campaign.status', 'paused')
       .or(`status.eq.scheduled,and(status.eq.rate_limited,next_retry_at.lte.${now})`)
+      .not('status', 'eq', 'publishing')
       .order('scheduled_at', { ascending: true });
 
     if (campaignFetchError) {
@@ -182,6 +193,16 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Found ${campaignPostsToPublish?.length || 0} campaign posts ready to publish`);
+
+    // RACE CONDITION FIX: Immediately mark campaign posts as "publishing" to prevent duplicate processing
+    if (campaignPostsToPublish && campaignPostsToPublish.length > 0) {
+      const postIds = campaignPostsToPublish.map(p => p.id);
+      console.log(`Locking ${postIds.length} campaign posts (setting status=publishing)`);
+      await supabase
+        .from('campaign_posts')
+        .update({ status: 'publishing' })
+        .in('id', postIds);
+    }
 
     if ((!contentToPublish || contentToPublish.length === 0) && 
         (!campaignPostsToPublish || campaignPostsToPublish.length === 0)) {
