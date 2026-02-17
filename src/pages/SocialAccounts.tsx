@@ -380,32 +380,7 @@ export default function SocialAccounts() {
     }
   };
 
-  const connectThreads = async () => {
-    setLoading('threads', true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('Musisz być zalogowany');
-        return;
-      }
 
-      const { data, error } = await supabase.functions.invoke('threads-oauth-start', {
-        body: { userId: session.user.id }
-      });
-      
-      if (error) throw error;
-      
-      if (data?.authUrl) {
-        if (data.state) sessionStorage.setItem('threads_oauth_state', data.state);
-        sessionStorage.setItem('threads_user_id', session.user.id);
-        window.location.href = data.authUrl;
-      }
-    } catch (error: any) {
-      toast.error('Nie udało się połączyć z Threads', { description: error.message });
-    } finally {
-      setLoading('threads', false);
-    }
-  };
 
   const connectTelegram = async () => {
     setTelegramDialogOpen(true);

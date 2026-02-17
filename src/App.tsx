@@ -41,19 +41,13 @@ import PlatformTikTok from "./pages/platforms/PlatformTikTok";
 import PlatformPinterest from "./pages/platforms/PlatformPinterest";
 
 import PlatformTelegram from "./pages/platforms/PlatformTelegram";
-import PlatformBeReal from "./pages/platforms/PlatformBeReal";
-import PlatformMeWe from "./pages/platforms/PlatformMeWe";
 import PlatformBluesky from "./pages/platforms/PlatformBluesky";
 import PlatformMastodon from "./pages/platforms/PlatformMastodon";
-import PlatformRumble from "./pages/platforms/PlatformRumble";
-import PlatformOnlyFans from "./pages/platforms/PlatformOnlyFans";
-import PlatformLocals from "./pages/platforms/PlatformLocals";
 
 import PlatformDiscord from "./pages/platforms/PlatformDiscord";
 import PlatformTumblr from "./pages/platforms/PlatformTumblr";
 
 import PlatformGoogleBusiness from "./pages/platforms/PlatformGoogleBusiness";
-import PlatformParler from "./pages/platforms/PlatformParler";
 import ScheduleOverview from "./pages/ScheduleOverview";
 import Platforms from "./pages/Platforms";
 import ExpressCampaignLaunch from "./pages/ExpressCampaignLaunch";
@@ -161,19 +155,13 @@ const App = () => (
           <Route path="/platforms/pinterest" element={<ProtectedRoute><PlatformPinterest /></ProtectedRoute>} />
           
           <Route path="/platforms/telegram" element={<ProtectedRoute><PlatformTelegram /></ProtectedRoute>} />
-          <Route path="/platforms/bereal" element={<ProtectedRoute><PlatformBeReal /></ProtectedRoute>} />
-          <Route path="/platforms/mewe" element={<ProtectedRoute><PlatformMeWe /></ProtectedRoute>} />
           <Route path="/platforms/bluesky" element={<ProtectedRoute><PlatformBluesky /></ProtectedRoute>} />
           <Route path="/platforms/mastodon" element={<ProtectedRoute><PlatformMastodon /></ProtectedRoute>} />
-          <Route path="/platforms/rumble" element={<ProtectedRoute><PlatformRumble /></ProtectedRoute>} />
-          <Route path="/platforms/onlyfans" element={<ProtectedRoute><PlatformOnlyFans /></ProtectedRoute>} />
-          <Route path="/platforms/locals" element={<ProtectedRoute><PlatformLocals /></ProtectedRoute>} />
           
           <Route path="/platforms/discord" element={<ProtectedRoute><PlatformDiscord /></ProtectedRoute>} />
           <Route path="/platforms/tumblr" element={<ProtectedRoute><PlatformTumblr /></ProtectedRoute>} />
           
           <Route path="/platforms/google-business" element={<ProtectedRoute><PlatformGoogleBusiness /></ProtectedRoute>} />
-          <Route path="/platforms/parler" element={<ProtectedRoute><PlatformParler /></ProtectedRoute>} />
           <Route path="/schedule-overview" element={<ProtectedRoute><ScheduleOverview /></ProtectedRoute>} />
 
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
