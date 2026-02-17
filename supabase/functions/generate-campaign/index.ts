@@ -136,15 +136,12 @@ serve(async (req) => {
       return await generateSimpleCampaign(body, GROK_API_KEY);
     }
   } catch (error) {
-    console.error("Error in generate-campaign function:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    const errorDetails = error instanceof Error ? error.toString() : String(error);
+    console.error("Error in generate-campaign function:", error instanceof Error ? error.message : String(error), error instanceof Error ? error.stack : '');
 
     return new Response(
       JSON.stringify({
         success: false,
-        error: errorMessage,
-        details: errorDetails,
+        error: "Wystąpił błąd podczas generowania kampanii. Spróbuj ponownie.",
       }),
       {
         status: 200,
