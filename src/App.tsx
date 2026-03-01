@@ -106,65 +106,9 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <BugReportButton />
-        <FeatureRequestButton />
+        {/* <BugReportButton /> */}
+        {/* <FeatureRequestButton /> */}
         <Routes>
-          {/* Public routes */}
-          <Route path="/" element={<Login />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-          <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="/terms" element={<TermsOfService />} />
-          <Route path="/terms-of-service" element={<TermsOfService />} />
-          <Route path="/data-deletion" element={<DataDeletion />} />
-
-          {/* OAuth callbacks (need to work during auth flow) */}
-          <Route path="/twitter-callback" element={<TwitterCallback />} />
-          <Route path="/oauth/facebook/callback" element={<FacebookCallback />} />
-          <Route path="/oauth/tiktok/callback" element={<TikTokCallback />} />
-          <Route path="/oauth/youtube/callback" element={<YouTubeCallback />} />
-          <Route path="/oauth/linkedin/callback" element={<LinkedInCallback />} />
-          <Route path="/oauth/mastodon/callback" element={<MastodonCallback />} />
-          
-          <Route path="/oauth/pinterest/callback" element={<PinterestCallback />} />
-          
-          <Route path="/oauth/tumblr/callback" element={<TumblrCallback />} />
-          
-          <Route path="/oauth/google-business/callback" element={<GoogleBusinessCallback />} />
-
-          {/* Protected routes */}
-          <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-          <Route path="/schedule" element={<ProtectedRoute><Schedule /></ProtectedRoute>} />
-          <Route path="/campaigns" element={<ProtectedRoute><Campaigns /></ProtectedRoute>} />
-          <Route path="/campaigns/new" element={<ProtectedRoute><CampaignsNew /></ProtectedRoute>} />
-          <Route path="/express-campaign-launch" element={<ProtectedRoute><ExpressCampaignLaunch /></ProtectedRoute>} />
-          <Route path="/campaigns/:id" element={<ProtectedRoute><CampaignDetails /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
-          <Route path="/settings/social-accounts" element={<ProtectedRoute><SocialAccounts /></ProtectedRoute>} />
-          <Route path="/book/:id" element={<ProtectedRoute><BookPreview /></ProtectedRoute>} />
-          <Route path="/book/:id/redirect" element={<ProtectedRoute><BookRedirect /></ProtectedRoute>} />
-          <Route path="/platforms" element={<ProtectedRoute><Platforms /></ProtectedRoute>} />
-          <Route path="/platforms/x" element={<ProtectedRoute><PlatformX /></ProtectedRoute>} />
-          <Route path="/platforms/facebook" element={<ProtectedRoute><PlatformFacebook /></ProtectedRoute>} />
-          <Route path="/platforms/facebook/select-page/*" element={<ProtectedRoute><FacebookSelectPage /></ProtectedRoute>} />
-          <Route path="/platforms/instagram" element={<ProtectedRoute><PlatformInstagram /></ProtectedRoute>} />
-          <Route path="/platforms/youtube" element={<ProtectedRoute><PlatformYouTube /></ProtectedRoute>} />
-          <Route path="/platforms/linkedin" element={<ProtectedRoute><PlatformLinkedIn /></ProtectedRoute>} />
-          <Route path="/platforms/tiktok" element={<ProtectedRoute><PlatformTikTok /></ProtectedRoute>} />
-          <Route path="/platforms/pinterest" element={<ProtectedRoute><PlatformPinterest /></ProtectedRoute>} />
-          
-          <Route path="/platforms/telegram" element={<ProtectedRoute><PlatformTelegram /></ProtectedRoute>} />
-          <Route path="/platforms/bluesky" element={<ProtectedRoute><PlatformBluesky /></ProtectedRoute>} />
-          <Route path="/platforms/mastodon" element={<ProtectedRoute><PlatformMastodon /></ProtectedRoute>} />
-          
-          <Route path="/platforms/discord" element={<ProtectedRoute><PlatformDiscord /></ProtectedRoute>} />
-          <Route path="/platforms/tumblr" element={<ProtectedRoute><PlatformTumblr /></ProtectedRoute>} />
-          
-          <Route path="/platforms/google-business" element={<ProtectedRoute><PlatformGoogleBusiness /></ProtectedRoute>} />
-          <Route path="/schedule-overview" element={<ProtectedRoute><ScheduleOverview /></ProtectedRoute>} />
-
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
