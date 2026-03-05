@@ -64,6 +64,36 @@ Deno.serve(async (req) => {
     console.log('Files to delete:', filesToDelete);
     console.log('Files to keep:', filesKept);
 
+    // Also clean up temp-videos older than 2 hours
+    let tempDeletedCount = 0;
+    try {
+      const { data: tempFiles } = await supabase.storage
+        .from('ObrazkiKsiazek')
+        .list('temp-videos', { limit: 1000 });
+
+      if (tempFiles && tempFiles.length > 0) {
+        const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
+        const tempToDelete: string[] = [];
+        for (const file of tempFiles) {
+          const match = file.name.match(/-(\d{13})\./);
+          if (match) {
+            if (parseInt(match[1], 10) < twoHoursAgo) {
+              tempToDelete.push(`temp-videos/${file.name}`);
+            }
+          } else {
+            tempToDelete.push(`temp-videos/${file.name}`);
+          }
+        }
+        if (tempToDelete.length > 0) {
+          const { error } = await supabase.storage.from('ObrazkiKsiazek').remove(tempToDelete);
+          if (!error) tempDeletedCount = tempToDelete.length;
+          console.log(`Temp-videos cleanup: deleted ${tempDeletedCount} files`);
+        }
+      }
+    } catch (e) {
+      console.warn('Temp-videos cleanup failed:', e);
+    }
+
     let deletedCount = 0;
     const deleteErrors: string[] = [];
 
@@ -84,11 +114,12 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Usunięto ${deletedCount} nieużywanych obrazków. Zachowano ${filesKept.length} używanych.`,
+        message: `Usunięto ${deletedCount} nieużywanych obrazków i ${tempDeletedCount} tymczasowych wideo. Zachowano ${filesKept.length} używanych.`,
         stats: {
           totalInStorage: storageFiles?.length || 0,
           deleted: deletedCount,
           kept: filesKept.length,
+          tempVideosDeleted: tempDeletedCount,
           deletedFiles: filesToDelete,
           keptFiles: filesKept,
           errors: deleteErrors,

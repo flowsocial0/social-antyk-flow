@@ -166,3 +166,6 @@ verify_jwt = false
 
 [functions.send-bug-report-email]
 verify_jwt = false
+
+[functions.cleanup-temp-videos]
+verify_jwt = false
