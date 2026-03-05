@@ -11,115 +11,110 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('Starting cleanup of unused images from storage...');
+    console.log('Starting full cleanup of unused files from storage...');
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get all storage_paths that are actually used by books
-    const { data: usedPaths, error: fetchError } = await supabase
+    // Get ALL referenced storage paths from books
+    const { data: books, error: fetchError } = await supabase
       .from('books')
-      .select('storage_path')
-      .not('storage_path', 'is', null)
-      .neq('storage_path', '');
+      .select('storage_path, video_storage_path')
+      .limit(2000);
 
     if (fetchError) {
-      console.error('Error fetching used paths:', fetchError);
+      console.error('Error fetching book paths:', fetchError);
       throw fetchError;
     }
 
-    const usedStoragePaths = new Set(
-      (usedPaths || [])
-        .map((b: { storage_path: string }) => b.storage_path)
-        .filter(Boolean)
-    );
-
-    console.log('Used storage paths:', Array.from(usedStoragePaths));
-
-    // List all files in the ObrazkiKsiazek bucket under books/ folder
-    const { data: storageFiles, error: listError } = await supabase.storage
-      .from('ObrazkiKsiazek')
-      .list('books', { limit: 1000 });
-
-    if (listError) {
-      console.error('Error listing storage files:', listError);
-      throw listError;
+    const usedPaths = new Set<string>();
+    for (const b of books || []) {
+      if (b.storage_path) usedPaths.add(b.storage_path);
+      if (b.video_storage_path) usedPaths.add(b.video_storage_path);
     }
 
-    console.log(`Found ${storageFiles?.length || 0} files in storage`);
+    console.log(`Found ${usedPaths.size} referenced storage paths`);
+
+    // List ALL top-level folders in the bucket
+    const { data: topLevel, error: topError } = await supabase.storage
+      .from('ObrazkiKsiazek')
+      .list('', { limit: 1000 });
+
+    if (topError) {
+      console.error('Error listing top-level:', topError);
+      throw topError;
+    }
 
     const filesToDelete: string[] = [];
     const filesKept: string[] = [];
+    let totalScanned = 0;
 
-    for (const file of storageFiles || []) {
-      const fullPath = `books/${file.name}`;
-      if (!usedStoragePaths.has(fullPath)) {
-        filesToDelete.push(fullPath);
-      } else {
-        filesKept.push(fullPath);
-      }
-    }
+    // Scan each folder (skip temp-videos, handled by dedicated cron)
+    for (const item of topLevel || []) {
+      // Skip non-folder items at root level
+      if (!item.id && item.name) {
+        // It's a folder - list its contents
+        const folderName = item.name;
+        
+        // Skip temp-videos (handled by cleanup-temp-videos)
+        if (folderName === 'temp-videos' || folderName === '.emptyFolderPlaceholder') continue;
 
-    console.log('Files to delete:', filesToDelete);
-    console.log('Files to keep:', filesKept);
+        const { data: files, error: listError } = await supabase.storage
+          .from('ObrazkiKsiazek')
+          .list(folderName, { limit: 1000 });
 
-    // Also clean up temp-videos older than 2 hours
-    let tempDeletedCount = 0;
-    try {
-      const { data: tempFiles } = await supabase.storage
-        .from('ObrazkiKsiazek')
-        .list('temp-videos', { limit: 1000 });
+        if (listError) {
+          console.warn(`Error listing ${folderName}:`, listError);
+          continue;
+        }
 
-      if (tempFiles && tempFiles.length > 0) {
-        const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
-        const tempToDelete: string[] = [];
-        for (const file of tempFiles) {
-          const match = file.name.match(/-(\d{13})\./);
-          if (match) {
-            if (parseInt(match[1], 10) < twoHoursAgo) {
-              tempToDelete.push(`temp-videos/${file.name}`);
-            }
+        for (const file of files || []) {
+          if (file.name === '.emptyFolderPlaceholder') continue;
+          const fullPath = `${folderName}/${file.name}`;
+          totalScanned++;
+          if (!usedPaths.has(fullPath)) {
+            filesToDelete.push(fullPath);
           } else {
-            tempToDelete.push(`temp-videos/${file.name}`);
+            filesKept.push(fullPath);
           }
         }
-        if (tempToDelete.length > 0) {
-          const { error } = await supabase.storage.from('ObrazkiKsiazek').remove(tempToDelete);
-          if (!error) tempDeletedCount = tempToDelete.length;
-          console.log(`Temp-videos cleanup: deleted ${tempDeletedCount} files`);
-        }
       }
-    } catch (e) {
-      console.warn('Temp-videos cleanup failed:', e);
     }
+
+    console.log(`Scanned ${totalScanned} files across all folders`);
+    console.log(`Files to delete: ${filesToDelete.length}`);
+    console.log(`Files to keep: ${filesKept.length}`);
 
     let deletedCount = 0;
     const deleteErrors: string[] = [];
 
-    if (filesToDelete.length > 0) {
+    // Delete in batches of 100
+    for (let i = 0; i < filesToDelete.length; i += 100) {
+      const batch = filesToDelete.slice(i, i + 100);
       const { error: deleteError } = await supabase.storage
         .from('ObrazkiKsiazek')
-        .remove(filesToDelete);
+        .remove(batch);
 
       if (deleteError) {
-        console.error('Error deleting files:', deleteError);
+        console.error(`Error deleting batch ${i}:`, deleteError);
         deleteErrors.push(deleteError.message);
       } else {
-        deletedCount = filesToDelete.length;
-        console.log(`Successfully deleted ${deletedCount} files`);
+        deletedCount += batch.length;
+        console.log(`Deleted batch: ${batch.length} files`);
       }
     }
+
+    console.log(`Cleanup complete: deleted ${deletedCount} files, kept ${filesKept.length}`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Usunięto ${deletedCount} nieużywanych obrazków i ${tempDeletedCount} tymczasowych wideo. Zachowano ${filesKept.length} używanych.`,
+        message: `Usunięto ${deletedCount} nieużywanych plików. Zachowano ${filesKept.length} używanych.`,
         stats: {
-          totalInStorage: storageFiles?.length || 0,
+          totalScanned,
           deleted: deletedCount,
           kept: filesKept.length,
-          tempVideosDeleted: tempDeletedCount,
           deletedFiles: filesToDelete,
           keptFiles: filesKept,
           errors: deleteErrors,
