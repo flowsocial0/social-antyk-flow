@@ -1,64 +1,74 @@
 
 
-## Analiza zużycia zasobów Supabase
+## Problem: VACUUM FULL nie działa w SQL Editorze + projekt nadal zablokowany
 
-### Obecny stan
+### Dlaczego błąd?
+
+SQL Editor Supabase domyślnie opakowuje zapytania w transakcję, a `VACUUM FULL` nie może działać w transakcji. To ograniczenie PostgreSQL.
+
+### Aktualny stan (zweryfikowany)
 
 ```text
-STORAGE (bucket ObrazkiKsiazek): 419 MB
-├── videos/           168 MB  (23 pliki, 14 z Mega duplikatem = 121 MB do usunięcia)
-├── 644dcc40.../      121 MB  (54 pliki, 0 referencji = całość do usunięcia)
-├── ac74eee0.../       41 MB  (44 pliki, 0 referencji = całość do usunięcia)
-├── books/             69 MB  (637 plików, używane)
-├── temp-videos/       14 MB  (cleanup działa)
-└── inne                6 MB
+BAZA DANYCH: 347 MB
+├── net._http_response    194 MB  (366 wierszy - same błędy 402!)
+├── cron.job_run_details  114 MB  (10,674 wierszy - 7 dni logów)
+└── dane aplikacji         39 MB
 
-BAZA DANYCH: 334 MB
-├── net._http_response   181 MB  (logi pg_net, ~361 wierszy ale duże)
-├── cron.job_run_details 114 MB  (169K wierszy od 5 miesięcy!)
-└── dane aplikacji        39 MB
+STORAGE: 291 MB (pliki)
+├── 644dcc40.../          118 MB  (osierocone - 0 referencji)
+├── books/                 61 MB  (używane)
+├── videos/                39 MB
+├── ac74eee0.../           35 MB  (osierocone - 0 referencji)
+├── temp-videos/           31 MB  (4 pliki do usunięcia)
+└── inne                    7 MB
 
-RAZEM: ~753 MB (Supabase liczy z WAL/indeksami, stąd 1.7 GB)
+PRZEKROCZONE LIMITY:
+├── Cached Egress: 6,076 / 5 GB (122%) ← GŁÓWNY PROBLEM
+├── Database Size: 379 / 500 MB (76%)
+└── Storage Size: 751 / 1000 MB (75%)
 ```
 
-Supabase odświeża metryki co ~24h dla billingu, ale dashboard pokazuje dane z opóźnieniem kilku godzin. Po cleanup efekt będzie widoczny następnego dnia.
+Cached Egress jest przekroczony (122%) -- to dlatego projekt jest zablokowany. Auto-publish cron co minutę generuje zapytania HTTP, które zwracają 402 i liczą się jako egress. Zmiana na co 2 minuty zmniejszy egress o ~50%.
 
-### Źródła problemu
+### Plan naprawy (4 kroki)
 
-1. **cron.job_run_details** -- 114 MB, 169K wierszy. Auto-publish cron co minutę od 5 miesięcy, nigdy nieczyszczone.
-2. **Osierocone pliki w folderach user-id** -- 162 MB plików wideo, które nie są referencjonowane przez żadną książkę.
-3. **Duplikaty wideo z Mega** -- 121 MB plików w `videos/`, które mają backup na Mega.nz. Można usunąć kopie ze storage i zostawić Mega URL.
+**1. TRUNCATE zamiast VACUUM FULL (odzyskanie ~308 MB z DB)**
 
-### Plan optymalizacji
+`TRUNCATE` działa w transakcji i natychmiast zwalnia miejsce. Użyjemy go na obu tabelach, bo:
+- `net._http_response` -- 366 wierszy, same błędy 402, bezwartościowe
+- `cron.job_run_details` -- logi cron, niepotrzebne historycznie
 
-**1. Czyszczenie cron.job_run_details (oszczędność ~114 MB)**
-- Migracja SQL: usunięcie wpisów starszych niż 7 dni
-- Dodanie crona, który co dzień czyści stare wpisy (zachowuje ostatnie 7 dni)
+Musisz uruchomić w SQL Editorze Supabase:
+```sql
+TRUNCATE cron.job_run_details;
+TRUNCATE net._http_response;
+```
 
-**2. Usunięcie osieroconych plików storage (oszczędność ~162 MB)**
-- Rozszerzenie Edge Function `cleanup-unused-images` o skanowanie WSZYSTKICH folderów w buckecie (nie tylko `books/` i `temp-videos/`)
-- Jednorazowe wywołanie usunie 98 osieroconych plików z folderów user-id
+**2. Zmiana auto-publish cron z 1 min na 2 min (redukcja egress ~50%)**
 
-**3. Deduplikacja wideo z Mega (oszczędność ~121 MB)**
-- Dla 14 książek, które mają `video_storage_path` wskazujący na `videos/` ORAZ `video_url` z Mega.nz -- wyczyścić `video_storage_path` i usunąć plik ze storage
-- System i tak pobiera wideo z Mega podczas publikacji
+Migracja SQL: `cron.unschedule` starego joba i `cron.schedule` nowego z `*/2 * * * *`.
 
-**4. Czyszczenie net._http_response (oszczędność ~181 MB)**
-- Migracja SQL: dodanie crona czyszczącego odpowiedzi HTTP starsze niż 24h
+**3. Skrócenie retencji logów do 24h**
+
+Aktualizacja istniejących cronów czyszczących:
+- `cron.job_run_details`: z 7 dni na 24h
+- `net._http_response`: już 24h (OK)
+
+**4. Usunięcie osieroconych plików storage (~184 MB)**
+
+Po odblokowaniu projektu -- wywołanie `cleanup-unused-images` i `cleanup-temp-videos` Edge Functions, które usuną 81 osieroconych plików + 4 temp pliki.
 
 ### Oczekiwany efekt
 
 ```text
-Przed:  ~1.7 GB (raport Supabase)
-Po:     ~400-500 MB
-Oszczędność: ~578 MB jednorazowo + zapobieganie przyszłemu wzrostowi
+Database: 347 MB → ~39 MB
+Storage: 291 MB → ~107 MB
+Egress: spadnie o ~50% dzięki rzadszemu cronowi
 ```
 
-### Szczegóły techniczne
+### Kolejność działań
 
-- Migracja SQL z `DELETE FROM cron.job_run_details WHERE start_time < NOW() - INTERVAL '7 days'`
-- Migracja SQL z `DELETE FROM net._http_response WHERE created < NOW() - INTERVAL '1 day'`
-- Cron jobs dla obu tabel (raz dziennie)
-- Aktualizacja `cleanup-unused-images` -- pełne skanowanie bucketu vs referencje w `books.storage_path` i `books.video_storage_path`
-- UPDATE na 14 książkach: `SET video_storage_path = NULL WHERE video_url LIKE 'https://mega.nz/%'`
+1. **Ty** -- uruchom TRUNCATE w SQL Editorze (krok 1)
+2. **Ja** -- stworzę migrację zmieniającą cron na co 2 minuty i retencję na 24h (kroki 2-3)
+3. **Ja** -- po odblokowaniu wywołam cleanup Edge Functions (krok 4)
 
