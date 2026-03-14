@@ -1,74 +1,51 @@
 
 
-## Problem: VACUUM FULL nie działa w SQL Editorze + projekt nadal zablokowany
+## Problem: Projekt nadal zablokowany (402) mimo TRUNCATE
 
-### Dlaczego błąd?
-
-SQL Editor Supabase domyślnie opakowuje zapytania w transakcję, a `VACUUM FULL` nie może działać w transakcji. To ograniczenie PostgreSQL.
-
-### Aktualny stan (zweryfikowany)
+### Stan po TRUNCATE
 
 ```text
-BAZA DANYCH: 347 MB
-├── net._http_response    194 MB  (366 wierszy - same błędy 402!)
-├── cron.job_run_details  114 MB  (10,674 wierszy - 7 dni logów)
-└── dane aplikacji         39 MB
-
-STORAGE: 291 MB (pliki)
-├── 644dcc40.../          118 MB  (osierocone - 0 referencji)
-├── books/                 61 MB  (używane)
-├── videos/                39 MB
-├── ac74eee0.../           35 MB  (osierocone - 0 referencji)
-├── temp-videos/           31 MB  (4 pliki do usunięcia)
-└── inne                    7 MB
-
-PRZEKROCZONE LIMITY:
-├── Cached Egress: 6,076 / 5 GB (122%) ← GŁÓWNY PROBLEM
-├── Database Size: 379 / 500 MB (76%)
-└── Storage Size: 751 / 1000 MB (75%)
+DATABASE: 40 MB ✅ (było 347 MB - TRUNCATE zadziałał!)
+STORAGE:  291 MB (pliki nadal na dysku)
+├── 644dcc40.../   118 MB  (42 osierocone pliki)
+├── books/          61 MB  (używane)
+├── videos/         39 MB
+├── ac74eee0.../    35 MB  (35 osieroconych plików)
+├── temp-videos/    31 MB  (4 pliki)
+└── inne             7 MB
 ```
 
-Cached Egress jest przekroczony (122%) -- to dlatego projekt jest zablokowany. Auto-publish cron co minutę generuje zapytania HTTP, które zwracają 402 i liczą się jako egress. Zmiana na co 2 minuty zmniejszy egress o ~50%.
+Supabase nadal blokuje projekt (`exceed_storage_size_quota`). Crony `auto-publish-every-2-minutes` i `cleanup-temp-videos-hourly` wywołują edge functions co 2 min / co godzinę, każde wywołanie zwraca 402 i generuje dodatkowy egress. To pogarsza sytuację.
 
-### Plan naprawy (4 kroki)
+### Plan naprawy (2 kroki)
 
-**1. TRUNCATE zamiast VACUUM FULL (odzyskanie ~308 MB z DB)**
+**Krok 1: Wstrzymanie wszystkich HTTP cronów (migracja SQL)**
 
-`TRUNCATE` działa w transakcji i natychmiast zwalnia miejsce. Użyjemy go na obu tabelach, bo:
-- `net._http_response` -- 366 wierszy, same błędy 402, bezwartościowe
-- `cron.job_run_details` -- logi cron, niepotrzebne historycznie
+Wyłączę (unschedule) dwa crony wywołujące Edge Functions:
+- `auto-publish-every-2-minutes` (jobid 7)
+- `cleanup-temp-videos-hourly` (jobid 4)
 
-Musisz uruchomić w SQL Editorze Supabase:
-```sql
-TRUNCATE cron.job_run_details;
-TRUNCATE net._http_response;
-```
+Zostawiam crony czyszczące SQL (nie wywołują HTTP):
+- `cleanup-cron-job-details-daily` (jobid 8) 
+- `cleanup-http-response-daily` (jobid 6)
 
-**2. Zmiana auto-publish cron z 1 min na 2 min (redukcja egress ~50%)**
+**Krok 2: Ręczne usunięcie osieroconych plików (~184 MB)**
 
-Migracja SQL: `cron.unschedule` starego joba i `cron.schedule` nowego z `*/2 * * * *`.
+Edge Functions są zablokowane (402), więc nie mogę usunąć plików programowo. Musisz to zrobić ręcznie w Supabase Dashboard → Storage → ObrazkiKsiazek:
 
-**3. Skrócenie retencji logów do 24h**
+1. Usuń **cały folder** `644dcc40-a8ec-4125-b340-0b3a6e068683` (118 MB, 42 pliki)
+2. Usuń **cały folder** `ac74eee0-0b37-49cb-8c66-3185c92384ea` (35 MB, 35 plików)
+3. Usuń **cały folder** `temp-videos` (31 MB, 4 pliki)
 
-Aktualizacja istniejących cronów czyszczących:
-- `cron.job_run_details`: z 7 dni na 24h
-- `net._http_response`: już 24h (OK)
+To zwolni ~184 MB. Po tym Supabase powinien zdjąć blokadę (metryki odświeżają się co kilka godzin do 24h).
 
-**4. Usunięcie osieroconych plików storage (~184 MB)**
-
-Po odblokowaniu projektu -- wywołanie `cleanup-unused-images` i `cleanup-temp-videos` Edge Functions, które usuną 81 osieroconych plików + 4 temp pliki.
+**Po odblokowaniu** -- stworzę nową migrację przywracającą crony auto-publish (co 2 min) i cleanup-temp-videos (co godzinę).
 
 ### Oczekiwany efekt
 
 ```text
-Database: 347 MB → ~39 MB
+Database:  40 MB (już OK)
 Storage: 291 MB → ~107 MB
-Egress: spadnie o ~50% dzięki rzadszemu cronowi
+Łącznie: ~147 MB (bezpiecznie w limicie)
 ```
-
-### Kolejność działań
-
-1. **Ty** -- uruchom TRUNCATE w SQL Editorze (krok 1)
-2. **Ja** -- stworzę migrację zmieniającą cron na co 2 minuty i retencję na 24h (kroki 2-3)
-3. **Ja** -- po odblokowaniu wywołam cleanup Edge Functions (krok 4)
 
