@@ -346,6 +346,9 @@ const Admin = () => {
               </Card>
             </div>
 
+            {/* Resource Monitor */}
+            <ResourceMonitor />
+
             {/* Bug Reports */}
             <AdminBugReports />
 
