@@ -12,6 +12,7 @@ import { PlatformLimitsAdmin } from "@/components/admin/PlatformLimitsAdmin";
 import { AdminIdeas } from "@/components/admin/AdminIdeas";
 import { AdminDefaultSettings } from "@/components/admin/AdminDefaultSettings";
 import { AdminBugReports } from "@/components/admin/AdminBugReports";
+import { ResourceMonitor } from "@/components/admin/ResourceMonitor";
 import type { User } from "@supabase/supabase-js";
 
 interface AdminStats {
