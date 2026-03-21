@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('Starting full cleanup of unused files from storage...');
+    console.log('Starting full recursive cleanup of unused files from storage...');
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -36,7 +36,35 @@ Deno.serve(async (req) => {
 
     console.log(`Found ${usedPaths.size} referenced storage paths`);
 
-    // List ALL top-level folders in the bucket
+    // Recursive function to list all files in a folder
+    async function listAllFiles(folder: string): Promise<string[]> {
+      const paths: string[] = [];
+      const { data: items, error } = await supabase.storage
+        .from('ObrazkiKsiazek')
+        .list(folder, { limit: 1000 });
+
+      if (error) {
+        console.warn(`Error listing ${folder}:`, error);
+        return paths;
+      }
+
+      for (const item of items || []) {
+        if (item.name === '.emptyFolderPlaceholder') continue;
+        const fullPath = folder ? `${folder}/${item.name}` : item.name;
+        
+        // If item has no id, it's a folder — recurse
+        if (!item.id) {
+          const subFiles = await listAllFiles(fullPath);
+          paths.push(...subFiles);
+        } else {
+          paths.push(fullPath);
+        }
+      }
+
+      return paths;
+    }
+
+    // List ALL top-level items in the bucket
     const { data: topLevel, error: topError } = await supabase.storage
       .from('ObrazkiKsiazek')
       .list('', { limit: 1000 });
@@ -48,41 +76,33 @@ Deno.serve(async (req) => {
 
     const filesToDelete: string[] = [];
     const filesKept: string[] = [];
-    let totalScanned = 0;
 
-    // Scan each folder (skip temp-videos, handled by dedicated cron)
     for (const item of topLevel || []) {
-      // Skip non-folder items at root level
-      if (!item.id && item.name) {
-        // It's a folder - list its contents
-        const folderName = item.name;
-        
-        // Skip temp-videos (handled by cleanup-temp-videos)
-        if (folderName === 'temp-videos' || folderName === '.emptyFolderPlaceholder') continue;
+      if (item.name === '.emptyFolderPlaceholder') continue;
+      
+      // Skip temp-videos (handled by dedicated cleanup)
+      if (item.name === 'temp-videos') continue;
 
-        const { data: files, error: listError } = await supabase.storage
-          .from('ObrazkiKsiazek')
-          .list(folderName, { limit: 1000 });
-
-        if (listError) {
-          console.warn(`Error listing ${folderName}:`, listError);
-          continue;
-        }
-
-        for (const file of files || []) {
-          if (file.name === '.emptyFolderPlaceholder') continue;
-          const fullPath = `${folderName}/${file.name}`;
-          totalScanned++;
-          if (!usedPaths.has(fullPath)) {
-            filesToDelete.push(fullPath);
+      if (!item.id) {
+        // It's a folder — recursively list all files
+        const allFiles = await listAllFiles(item.name);
+        for (const filePath of allFiles) {
+          if (!usedPaths.has(filePath)) {
+            filesToDelete.push(filePath);
           } else {
-            filesKept.push(fullPath);
+            filesKept.push(filePath);
           }
+        }
+      } else {
+        // Root-level file
+        if (!usedPaths.has(item.name)) {
+          filesToDelete.push(item.name);
+        } else {
+          filesKept.push(item.name);
         }
       }
     }
 
-    console.log(`Scanned ${totalScanned} files across all folders`);
     console.log(`Files to delete: ${filesToDelete.length}`);
     console.log(`Files to keep: ${filesKept.length}`);
 
@@ -112,7 +132,7 @@ Deno.serve(async (req) => {
         success: true,
         message: `Usunięto ${deletedCount} nieużywanych plików. Zachowano ${filesKept.length} używanych.`,
         stats: {
-          totalScanned,
+          totalScanned: filesToDelete.length + filesKept.length,
           deleted: deletedCount,
           kept: filesKept.length,
           deletedFiles: filesToDelete,
