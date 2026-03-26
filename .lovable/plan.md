@@ -1,100 +1,67 @@
 
 
-## Aktualny stan po TRUNCATE
+## Analiza zgłoszenia: "179 błędów w kampanii"
+
+### Przyczyna błędów
+
+Kampania o ID `5517d097` nie istnieje już w bazie (prawdopodobnie została usunięta i odtworzona jako "kontynuacja"). Jednak wzorzec błędów jest jasny -- przeanalizowałem wszystkie kampanie użytkownika `antyk@ksiegarnia.pl`:
 
 ```text
-DATABASE: 39 MB (OK - TRUNCATE zadziałał)
-├── cron.job_run_details: 104 KB (4 wiersze)
-├── net._http_response: 56 KB (0 wierszy)
-└── dane aplikacji: ~39 MB
-
-STORAGE: 291 MB
-├── 644dcc40.../   118 MB (42 pliki, 0 referencji - OSIEROCONE)
-├── books/          61 MB (598 plików - UŻYWANE)
-├── videos/         39 MB (6 plików - WSZYSTKIE używane przez books)
-├── ac74eee0.../    35 MB (35 plików, 0 referencji - OSIEROCONE)
-├── temp-videos/    31 MB (4 pliki - DO USUNIĘCIA)
-├── 662824bf.../     7 MB (3 pliki - prawdopodobnie osierocone)
-├── 23012587_1.jpg   0 MB (1 plik - OSIEROCONY)
-└── RAZEM:         291 MB
-
-CRONY AKTYWNE:
-├── cleanup-http-response-daily (24h retencja) ✅
-├── cleanup-cron-job-details-daily (24h retencja) ✅
-├── auto-publish - WYŁĄCZONY ❌
-└── cleanup-temp-videos - WYŁĄCZONY ❌
-
-LIMITY FREE PLAN:
-├── Database: 500 MB (39 MB = 8%) ✅
-├── Storage: 1 GB (291 MB = 29%) ✅
-├── Cached Egress: 5 GB/mies ← był przekroczony (122%)
-├── Edge Function Invocations: 500K/mies
-└── Edge Function Runtime: brak limitu na free
+ROZKŁAD BŁĘDÓW WG PRZYCZYNY:
+├── Instagram "too many actions"          193 błędów (34%)
+├── X (Twitter) limit 15 tweetów/dzień    231 błędów (41%)
+├── Facebook antyspam                      62 błędów (11%)
+├── LinkedIn throttle dziennego limitu     42 błędów (7%)
+├── Mega.nz download failure               ~40 błędów (7%)
+└── RAZEM                                ~568 failed postów
 ```
 
-## Kluczowe ustalenia
+**Główna przyczyna**: Platformy blokują publikacje, gdy jest ich za dużo w krótkim czasie. System publikuje posty z wielu kampanii jednocześnie, co powoduje przekroczenie limitów platform.
 
-1. **Folder `videos/`** -- 6 plików, 39 MB -- WSZYSTKIE referencjonowane w `books`. Nie usuwać.
-2. **Osierocone foldery** -- 644dcc40 (118 MB), ac74eee0 (35 MB), 662824bf (7 MB) -- razem 160 MB do usunięcia.
-3. **temp-videos/** -- 31 MB, 4 pliki do usunięcia.
-4. **Crony auto-publish i cleanup-temp-videos** -- wyłączone, trzeba przywrócić.
-5. **Egress** -- główna przyczyna blokady. Resetuje się co miesiąc. Cron co 2 min zamiast 1 min = ~21,600 wywołań/mies zamiast 43,200.
+**Dlaczego nie zrobił zrzutu ekranu**: `html2canvas` może cicho zawieść na stronach z dużą ilością elementów DOM (tabela z 179+ wierszami) lub przy cross-origin zasobach. Formularz otwiera się mimo to, ale bez screenshota.
 
-## Plan implementacji
+### Plan naprawy
 
-### 1. Wywołanie cleanup Edge Functions (usunięcie ~191 MB)
+#### 1. Inteligentne limitowanie w `auto-publish-books`
 
-Wywołam `cleanup-unused-images` i `cleanup-temp-videos` przez API -- usuną osierocone pliki z folderów 644dcc40, ac74eee0, 662824bf, temp-videos i plik 23012587_1.jpg.
+Obecnie system publikuje wszystkie gotowe posty naraz. Trzeba dodać **limity per platforma per konto per interwał**:
 
-Oczekiwany storage po cleanup: ~100 MB (books 61 + videos 39).
+- X/Twitter: max 1 tweet / 30 min per konto (max 15/dzień na free)
+- Instagram: max 1 post / 30 min per konto
+- Facebook: max 2 posty / godzinę per stronę
+- LinkedIn: max 1 post / godzinę per konto
 
-### 2. Przywrócenie cronów (INSERT via SQL)
+Posty, które nie zmieszczą się w limicie, dostaną status `rate_limited` z `next_retry_at` ustawionym na następny dostępny slot -- zamiast `failed`.
 
-Dwa nowe cron joby (nie migracja -- zawierają URL i klucz):
-- `auto-publish-every-2-minutes`: `*/2 * * * *` -- wywołanie `auto-publish-books`
-- `cleanup-temp-videos-hourly`: `0 * * * *` -- wywołanie `cleanup-temp-videos`
+Zmiany w `auto-publish-books/index.ts`:
+- Przed publikacją sprawdź ile postów opublikowano z danego konta w ostatnich N minutach
+- Jeśli limit przekroczony → ustaw `rate_limited` + `next_retry_at` zamiast próbować i dostać `failed`
+- Posty `rate_limited` są już obsługiwane w query (linia 186)
 
-### 3. Nowa Edge Function `admin-resource-monitor`
+#### 2. Retry dla postów `failed` z błędami rate-limit
 
-Zwraca aktualny stan zasobów:
-- Rozmiar bazy danych (`pg_database_size`)
-- Rozmiar storage (z `storage.objects` -- sum metadata->size per folder)
-- Rozmiar tabel logów (cron.job_run_details, net._http_response)
-- Liczba aktywnych cron jobów
-- Liczba osieroconych plików (pliki bez referencji w books)
+Nowa logika: posty z `error_code = 'PUBLISH_FAILED'` i komunikatem zawierającym "too many actions", "throttle", "ograniczamy liczbę" powinny automatycznie przejść na `rate_limited` zamiast `failed`, z retry za 2 godziny.
 
-### 4. Komponent `ResourceMonitor` w panelu admin
+#### 3. Poprawka screenshota w `BugReportButton`
 
-Nowy komponent `src/components/admin/ResourceMonitor.tsx` dodany do `Admin.tsx`:
+Dodanie `try-catch` z fallbackiem + timeout 10s dla `html2canvas`. Jeśli screenshot się nie uda, formularz otworzy się bez niego ale z informacją "Nie udało się wykonać zrzutu ekranu".
 
-- **Karty z postępem** dla każdego limitu:
-  - Database: X / 500 MB (progress bar, kolor zielony/żółty/czerwony)
-  - Storage: X / 1000 MB
-  - Osierocone pliki: liczba + rozmiar
-  - Logi cron: rozmiar + wiersze
-  - Logi HTTP: rozmiar + wiersze
+#### 4. Panel kampanii -- widoczność błędów
 
-- **Przyciski akcji**:
-  - "Wyczyść osierocone pliki" -- wywołuje `cleanup-unused-images`
-  - "Wyczyść temp-videos" -- wywołuje `cleanup-temp-videos`
-  - "Odśwież dane" -- ponowne pobranie statystyk
-
-- **Status cronów**: lista aktywnych cron jobów z ich harmonogramem
+W widoku szczegółów kampanii (`CampaignDetails`) dodać podsumowanie błędów z kategoryzacją (rate limit vs real error) i przycisk "Ponów publikację nieudanych postów" który zmienia status `failed` → `scheduled`.
 
 ### Szczegóły techniczne
 
-**Edge Function `admin-resource-monitor`:**
-- Wymaga autoryzacji (sprawdzenie `has_role` przez service_role client)
-- Zapytania SQL: `pg_database_size`, `pg_total_relation_size`, agregacja `storage.objects`
-- Porównanie plików storage vs referencje w `books` (dry-run cleanup)
+**Plik: `supabase/functions/auto-publish-books/index.ts`**
+- Dodanie funkcji `checkAccountRateLimit(supabase, accountId, platform)` -- query do `campaign_posts` sprawdzającej ile postów opublikowano w ostatnich 30/60 min
+- Modyfikacja pętli publikacji: skip kont ponad limitem, ustaw `rate_limited`
+- W catch-u: rozpoznanie błędów rate-limit i zmiana statusu na `rate_limited` zamiast `failed`
 
-**Komponent `ResourceMonitor`:**
-- Wywołuje `supabase.functions.invoke('admin-resource-monitor')`
-- Progress bary z kolorami: zielony <60%, żółty 60-80%, czerwony >80%
-- Przyciski cleanup z potwierdzeniem i loadingiem
+**Plik: `src/components/bugs/BugReportButton.tsx`**
+- Timeout 10s na `html2canvas`
+- Graceful fallback bez screenshota
 
-**Limity free planu (hardcoded w komponencie):**
-- Database: 500 MB
-- Storage: 1000 MB (1 GB)
-- Egress: 5 GB (nie da się zmierzyć z poziomu SQL -- informacja tekstowa)
+**Plik: `src/components/campaigns/CampaignPostCard.tsx` lub `CampaignDetails.tsx`**
+- Podsumowanie błędów z kategoryzacją
+- Przycisk "Ponów nieudane posty"
 
