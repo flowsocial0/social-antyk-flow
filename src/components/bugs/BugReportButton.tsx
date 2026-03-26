@@ -31,42 +31,49 @@ export const BugReportButton = () => {
       const bugButton = document.querySelector('[data-bug-report-button]') as HTMLElement;
       if (bugButton) bugButton.style.visibility = 'hidden';
 
-      // Capture full page first, then crop to visible viewport
-      const fullCanvas = await html2canvas(document.body, {
+      // Race html2canvas against a 10s timeout
+      const capturePromise = html2canvas(document.body, {
         logging: false,
         useCORS: true,
         allowTaint: true,
       });
-
-      // Crop to current viewport
-      const cropCanvas = document.createElement('canvas');
-      const dpr = fullCanvas.width / document.body.scrollWidth;
-      cropCanvas.width = window.innerWidth * dpr;
-      cropCanvas.height = window.innerHeight * dpr;
-      const ctx = cropCanvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(
-          fullCanvas,
-          window.scrollX * dpr,
-          window.scrollY * dpr,
-          cropCanvas.width,
-          cropCanvas.height,
-          0,
-          0,
-          cropCanvas.width,
-          cropCanvas.height
-        );
-      }
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 10000));
+      
+      const fullCanvas = await Promise.race([capturePromise, timeoutPromise]);
 
       if (bugButton) bugButton.style.visibility = 'visible';
-      
-      const blob = await new Promise<Blob | null>((resolve) => {
-        cropCanvas.toBlob(resolve, "image/png");
-      });
 
-      if (blob) {
-        setScreenshot(blob);
-        setScreenshotUrl(URL.createObjectURL(blob));
+      if (fullCanvas) {
+        // Crop to current viewport
+        const cropCanvas = document.createElement('canvas');
+        const dpr = fullCanvas.width / document.body.scrollWidth;
+        cropCanvas.width = window.innerWidth * dpr;
+        cropCanvas.height = window.innerHeight * dpr;
+        const ctx = cropCanvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(
+            fullCanvas,
+            window.scrollX * dpr,
+            window.scrollY * dpr,
+            cropCanvas.width,
+            cropCanvas.height,
+            0,
+            0,
+            cropCanvas.width,
+            cropCanvas.height
+          );
+        }
+
+        const blob = await new Promise<Blob | null>((resolve) => {
+          cropCanvas.toBlob(resolve, "image/png");
+        });
+
+        if (blob) {
+          setScreenshot(blob);
+          setScreenshotUrl(URL.createObjectURL(blob));
+        }
+      } else {
+        console.warn("Screenshot timed out after 10s — opening form without screenshot");
       }
     } catch (err) {
       console.error("Screenshot failed:", err);
