@@ -583,6 +583,38 @@ const CampaignDetails = () => {
     },
   });
 
+  const retryAllFailedMutation = useMutation({
+    mutationFn: async () => {
+      const failedPosts = posts?.filter((p: any) => p.status === 'failed') || [];
+      if (failedPosts.length === 0) return;
+
+      const scheduledAt = new Date();
+      scheduledAt.setMinutes(scheduledAt.getMinutes() + 2);
+
+      const { error } = await (supabase as any)
+        .from("campaign_posts")
+        .update({
+          status: "scheduled",
+          scheduled_at: scheduledAt.toISOString(),
+          published_at: null,
+          next_retry_at: null,
+          error_message: null,
+          error_code: null,
+        } as any)
+        .eq("campaign_id", id)
+        .eq("status", "failed");
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaign-posts", id] });
+      toast.success("Wszystkie nieudane posty zostaną ponowione za 2 minuty");
+    },
+    onError: () => {
+      toast.error("Błąd podczas ponownej próby");
+    },
+  });
+
   const pauseCampaignMutation = useMutation({
     mutationFn: async () => {
       // Update campaign status to paused
@@ -632,6 +664,7 @@ const CampaignDetails = () => {
   const scheduledCount = posts.filter((p) => p.status === "scheduled").length;
   const failedCount = posts.filter((p) => p.status === "failed").length;
   const pausedCount = posts.filter((p) => p.status === "paused").length;
+  const rateLimitedCount = posts.filter((p: any) => p.status === "rate_limited").length;
   const progress = posts.length > 0 ? (publishedCount / posts.length) * 100 : 0;
 
   // Group posts by day
