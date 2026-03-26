@@ -852,6 +852,12 @@ const CampaignDetails = () => {
                   <span>{failedCount} błędów</span>
                 </div>
               )}
+              {rateLimitedCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-amber-600" />
+                  <span>{rateLimitedCount} oczekuje (limit)</span>
+                </div>
+              )}
               {pausedCount > 0 && (
                 <div className="flex items-center gap-2">
                   <Pause className="h-4 w-4 text-yellow-600" />
@@ -860,6 +866,52 @@ const CampaignDetails = () => {
               )}
             </div>
           </div>
+
+          {/* Error Summary & Retry All */}
+          {failedCount > 0 && (
+            <div className="mt-4 p-4 rounded-lg border border-destructive/30 bg-destructive/5">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-semibold text-destructive flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Podsumowanie błędów ({failedCount})
+                </h4>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => retryAllFailedMutation.mutate()}
+                  disabled={retryAllFailedMutation.isPending}
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${retryAllFailedMutation.isPending ? 'animate-spin' : ''}`} />
+                  {retryAllFailedMutation.isPending ? 'Ponawiam...' : 'Ponów wszystkie'}
+                </Button>
+              </div>
+              <div className="space-y-1 text-sm text-muted-foreground max-h-32 overflow-y-auto">
+                {(() => {
+                  const failedPosts = posts.filter((p: any) => p.status === 'failed');
+                  const errorGroups: Record<string, number> = {};
+                  failedPosts.forEach((p: any) => {
+                    const msg = p.error_message || 'Nieznany błąd';
+                    // Categorize errors
+                    const key = msg.includes('rate limit') || msg.includes('too many') || msg.includes('429') || msg.includes('throttle')
+                      ? '⏱ Limit platformy (rate limit)'
+                      : msg.includes('Mega') || msg.includes('mega')
+                      ? '📥 Błąd pobierania wideo (Mega.nz)'
+                      : msg.includes('token') || msg.includes('unauthorized') || msg.includes('401')
+                      ? '🔑 Błąd autoryzacji'
+                      : `❌ ${msg.substring(0, 80)}`;
+                    errorGroups[key] = (errorGroups[key] || 0) + 1;
+                  });
+                  return Object.entries(errorGroups).map(([msg, count]) => (
+                    <div key={msg} className="flex justify-between">
+                      <span>{msg}</span>
+                      <Badge variant="secondary" className="text-xs">{count}x</Badge>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          )}
 
           {/* Selected Accounts Section */}
           <div className="mt-6 pt-6 border-t border-border">

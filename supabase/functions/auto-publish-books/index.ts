@@ -126,6 +126,51 @@ function getPlatformNamePL(platform: string): string {
   }
 }
 
+// Platform rate limits: max posts per account per time window
+const PLATFORM_RATE_LIMITS: Record<string, { maxPosts: number; windowMinutes: number }> = {
+  x: { maxPosts: 1, windowMinutes: 30 },        // max 15/day on free tier
+  instagram: { maxPosts: 1, windowMinutes: 30 }, // IG throttles aggressively
+  facebook: { maxPosts: 2, windowMinutes: 60 },  // FB anti-spam
+  linkedin: { maxPosts: 1, windowMinutes: 60 },  // LinkedIn daily limit
+  tiktok: { maxPosts: 1, windowMinutes: 60 },
+  youtube: { maxPosts: 1, windowMinutes: 120 },
+  pinterest: { maxPosts: 2, windowMinutes: 60 },
+  // No limits for self-hosted: telegram, discord, bluesky, mastodon, gab, tumblr, google_business
+};
+
+const RATE_LIMIT_ERROR_PATTERNS = [
+  'too many actions', 'throttle', 'ograniczamy liczbę', 'rate limit',
+  '429', 'Too Many Requests', 'spam', 'try again later',
+  'limit exceeded', 'Please wait', 'slow down',
+];
+
+function isRateLimitErrorMessage(msg: string): boolean {
+  const lower = msg.toLowerCase();
+  return RATE_LIMIT_ERROR_PATTERNS.some(p => lower.includes(p.toLowerCase()));
+}
+
+// Check how many posts were published for a given account+platform in the last N minutes
+async function checkAccountRateLimit(
+  supabase: any,
+  accountId: string,
+  platform: string,
+  windowMinutes: number
+): Promise<number> {
+  const since = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString();
+  const { count, error } = await supabase
+    .from('platform_publications')
+    .select('*', { count: 'exact', head: true })
+    .eq('account_id', accountId)
+    .eq('platform', platform)
+    .gte('published_at', since);
+  
+  if (error) {
+    console.warn(`Error checking rate limit for ${platform}/${accountId}:`, error.message);
+    return 0;
+  }
+  return count || 0;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -498,6 +543,30 @@ Deno.serve(async (req) => {
           for (const accountId of accountsForPlatform) {
             console.log(`Publishing to account ${accountId} on ${platform}`);
             
+            // PRE-PUBLISH RATE LIMIT CHECK
+            const rateLimit = PLATFORM_RATE_LIMITS[platform];
+            if (rateLimit) {
+              const recentCount = await checkAccountRateLimit(supabase, accountId, platform, rateLimit.windowMinutes);
+              if (recentCount >= rateLimit.maxPosts) {
+                console.log(`Rate limit reached for ${platform} account ${accountId}: ${recentCount}/${rateLimit.maxPosts} in ${rateLimit.windowMinutes}min`);
+                // Don't fail the post - just skip this account, will retry next cycle
+                const retryAt = new Date(Date.now() + rateLimit.windowMinutes * 60 * 1000).toISOString();
+                await supabase
+                  .from('campaign_posts')
+                  .update({
+                    status: 'rate_limited',
+                    next_retry_at: retryAt,
+                    error_message: `Limit platformy ${getPlatformNamePL(platform)}: ${recentCount}/${rateLimit.maxPosts} postów w ${rateLimit.windowMinutes} min. Automatyczna ponowna próba.`,
+                    error_code: 'RATE_LIMITED'
+                  })
+                  .eq('id', post.id);
+                // Skip to next platform entirely since this post is now rate_limited
+                platformErrors.push(`${getPlatformNamePL(platform)}: osiągnięto limit, ponowna próba za ${rateLimit.windowMinutes} min`);
+                platformFailCount++;
+                continue;
+              }
+            }
+            
             // Get the owner of THIS specific account (should be campaignOwnerId, but verify)
             const tableName = getTokenTableName(platform);
             const { data: accountData } = await supabase
@@ -667,12 +736,18 @@ Deno.serve(async (req) => {
             ? platformErrors.join(' | ')
             : `Nie udało się opublikować na ${platformFailCount} z ${platforms.length} platform.`;
           
+          // Check if the error is rate-limit related → use rate_limited instead of failed
+          const isRateError = isRateLimitErrorMessage(errorMessage);
+          const newStatus = isRateError ? 'rate_limited' : 'failed';
+          const retryAt = isRateError ? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() : null;
+          
           const { error: updateError } = await supabase
             .from('campaign_posts')
             .update({
-              status: 'failed',
+              status: newStatus,
               error_message: errorMessage,
-              error_code: 'PUBLISH_FAILED'
+              error_code: isRateError ? 'RATE_LIMITED' : 'PUBLISH_FAILED',
+              next_retry_at: retryAt
             })
             .eq('id', post.id);
 
