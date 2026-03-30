@@ -1,67 +1,52 @@
 
 
-## Analiza zgłoszenia: "179 błędów w kampanii"
+## Problem: Odmowa TikTok Review
 
-### Przyczyna błędów
+TikTok wymaga:
+1. **Website URL nie może być stroną logowania** -- obecnie `socialautoflow.pl` (route `/`) to strona Login
+2. **Nazwa aplikacji musi pasować do TOS, Privacy Policy i Website** -- muszą być spójne ("Social Auto Flow")
+3. **Wyjaśnienie jak każdy scope/produkt jest używany** -- to opis w panelu TikTok (nie kod)
+4. **Strona musi być "fully developed website"** -- potrzebna publiczna strona główna, nie login
 
-Kampania o ID `5517d097` nie istnieje już w bazie (prawdopodobnie została usunięta i odtworzona jako "kontynuacja"). Jednak wzorzec błędów jest jasny -- przeanalizowałem wszystkie kampanie użytkownika `antyk@ksiegarnia.pl`:
+### Rozwiązanie: Publiczna strona główna (Landing Page)
 
-```text
-ROZKŁAD BŁĘDÓW WG PRZYCZYNY:
-├── Instagram "too many actions"          193 błędów (34%)
-├── X (Twitter) limit 15 tweetów/dzień    231 błędów (41%)
-├── Facebook antyspam                      62 błędów (11%)
-├── LinkedIn throttle dziennego limitu     42 błędów (7%)
-├── Mega.nz download failure               ~40 błędów (7%)
-└── RAZEM                                ~568 failed postów
-```
+Stworzymy prostą, publiczną stronę informacyjną na route `/` i przeniesiemy login na `/login`.
 
-**Główna przyczyna**: Platformy blokują publikacje, gdy jest ich za dużo w krótkim czasie. System publikuje posty z wielu kampanii jednocześnie, co powoduje przekroczenie limitów platform.
+#### 1. Nowa strona główna (`src/pages/HomePage.tsx`)
 
-**Dlaczego nie zrobił zrzutu ekranu**: `html2canvas` może cicho zawieść na stronach z dużą ilością elementów DOM (tabela z 179+ wierszami) lub przy cross-origin zasobach. Formularz otwiera się mimo to, ale bez screenshota.
+Publiczna strona z:
+- Nagłówek "Social Auto Flow" z logo/ikoną
+- Krótki opis: "Automatyzacja publikacji w mediach społecznościowych dla księgarni"
+- Sekcja "Jak to działa" -- 3-4 kroki z ikonami
+- Sekcja "Obsługiwane platformy" -- ikony platform (X, Facebook, Instagram, TikTok, YouTube, LinkedIn, etc.)
+- Przycisk "Zaloguj się" → `/login`
+- Linki w stopce: Polityka Prywatności, Regulamin, Kontakt
 
-### Plan naprawy
+#### 2. Zmiana routingu (`src/App.tsx`)
 
-#### 1. Inteligentne limitowanie w `auto-publish-books`
+- Route `/` → `HomePage` (publiczny)
+- Route `/login` → `Login` (bez zmian)
+- Linki "Powrót" w Privacy Policy i Terms → `/`
 
-Obecnie system publikuje wszystkie gotowe posty naraz. Trzeba dodać **limity per platforma per konto per interwał**:
+#### 3. Spójność nazewnictwa
 
-- X/Twitter: max 1 tweet / 30 min per konto (max 15/dzień na free)
-- Instagram: max 1 post / 30 min per konto
-- Facebook: max 2 posty / godzinę per stronę
-- LinkedIn: max 1 post / godzinę per konto
+Sprawdzę i upewnię się, że wszędzie jest "Social Auto Flow":
+- `index.html` title/meta
+- Privacy Policy title
+- Terms of Service title
+- Login page header
 
-Posty, które nie zmieszczą się w limicie, dostaną status `rate_limited` z `next_retry_at` ustawionym na następny dostępny slot -- zamiast `failed`.
+#### 4. Co trzeba zmienić w panelu TikTok Developer (ręcznie)
 
-Zmiany w `auto-publish-books/index.ts`:
-- Przed publikacją sprawdź ile postów opublikowano z danego konta w ostatnich N minutach
-- Jeśli limit przekroczony → ustaw `rate_limited` + `next_retry_at` zamiast próbować i dostać `failed`
-- Posty `rate_limited` są już obsługiwane w query (linia 186)
-
-#### 2. Retry dla postów `failed` z błędami rate-limit
-
-Nowa logika: posty z `error_code = 'PUBLISH_FAILED'` i komunikatem zawierającym "too many actions", "throttle", "ograniczamy liczbę" powinny automatycznie przejść na `rate_limited` zamiast `failed`, z retry za 2 godziny.
-
-#### 3. Poprawka screenshota w `BugReportButton`
-
-Dodanie `try-catch` z fallbackiem + timeout 10s dla `html2canvas`. Jeśli screenshot się nie uda, formularz otworzy się bez niego ale z informacją "Nie udało się wykonać zrzutu ekranu".
-
-#### 4. Panel kampanii -- widoczność błędów
-
-W widoku szczegółów kampanii (`CampaignDetails`) dodać podsumowanie błędów z kategoryzacją (rate limit vs real error) i przycisk "Ponów publikację nieudanych postów" który zmienia status `failed` → `scheduled`.
+- **Website URL**: `https://socialautoflow.pl` (teraz pokaże landing page, nie login)
+- **App name**: Upewnić się, że brzmi "Social Auto Flow"
+- **Opis scope'ów**: Dodać wyjaśnienie np. "Share Kit is used to publish book promotions to TikTok on behalf of the user"
 
 ### Szczegóły techniczne
 
-**Plik: `supabase/functions/auto-publish-books/index.ts`**
-- Dodanie funkcji `checkAccountRateLimit(supabase, accountId, platform)` -- query do `campaign_posts` sprawdzającej ile postów opublikowano w ostatnich 30/60 min
-- Modyfikacja pętli publikacji: skip kont ponad limitem, ustaw `rate_limited`
-- W catch-u: rozpoznanie błędów rate-limit i zmiana statusu na `rate_limited` zamiast `failed`
+**HomePage** -- prosty komponent z Tailwind, bez logiki backendowej. Responsywny, z sekcjami hero + features + platforms + footer. Bez animacji/efektów -- czysta informacyjna strona.
 
-**Plik: `src/components/bugs/BugReportButton.tsx`**
-- Timeout 10s na `html2canvas`
-- Graceful fallback bez screenshota
+**Routing** -- jedyna zmiana w `App.tsx`: linia 113 zmieni się z `<Login />` na `<HomePage />`.
 
-**Plik: `src/components/campaigns/CampaignPostCard.tsx` lub `CampaignDetails.tsx`**
-- Podsumowanie błędów z kategoryzacją
-- Przycisk "Ponów nieudane posty"
+**Privacy/Terms** -- link "Powrót do strony głównej" już prowadzi do `/`, więc będzie działać.
 
