@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 // ... keep existing code (all other imports)
 import Login from "./pages/Login";
+import HomePage from "./pages/HomePage";
 
 import Schedule from "./pages/Schedule";
 import Campaigns from "./pages/Campaigns";
@@ -110,7 +111,7 @@ const App = () => (
         <FeatureRequestButton />
         <Routes>
           {/* Public routes */}
-          <Route path="/" element={<Login />} />
+          <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
