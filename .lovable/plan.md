@@ -1,52 +1,52 @@
 
 
-## Problem: Odmowa TikTok Review
+## Diagnoza: Dlaczego rate limiting NIE DZIAŁA
 
-TikTok wymaga:
-1. **Website URL nie może być stroną logowania** -- obecnie `socialautoflow.pl` (route `/`) to strona Login
-2. **Nazwa aplikacji musi pasować do TOS, Privacy Policy i Website** -- muszą być spójne ("Social Auto Flow")
-3. **Wyjaśnienie jak każdy scope/produkt jest używany** -- to opis w panelu TikTok (nie kod)
-4. **Strona musi być "fully developed website"** -- potrzebna publiczna strona główna, nie login
+Znalazłem **dwa krytyczne bugi** w `auto-publish-books`:
 
-### Rozwiązanie: Publiczna strona główna (Landing Page)
+### Bug 1: Rate limit check odpytuje pustą tabelę
 
-Stworzymy prostą, publiczną stronę informacyjną na route `/` i przeniesiemy login na `/login`.
+Funkcja `checkAccountRateLimit` sprawdza tabelę `platform_publications`, ale **X, Facebook, Instagram, LinkedIn, TikTok, Bluesky, Mastodon, Telegram, Gab** -- ŻADNA z tych platform NIE zapisuje danych do `platform_publications` po publikacji. Tylko Pinterest, Discord, Tumblr i Google Business to robią.
 
-#### 1. Nowa strona główna (`src/pages/HomePage.tsx`)
+Wynik: `checkAccountRateLimit()` zawsze zwraca 0, throttling nigdy się nie uruchamia, wszystkie posty lecą naraz.
 
-Publiczna strona z:
-- Nagłówek "Social Auto Flow" z logo/ikoną
-- Krótki opis: "Automatyzacja publikacji w mediach społecznościowych dla księgarni"
-- Sekcja "Jak to działa" -- 3-4 kroki z ikonami
-- Sekcja "Obsługiwane platformy" -- ikony platform (X, Facebook, Instagram, TikTok, YouTube, LinkedIn, etc.)
-- Przycisk "Zaloguj się" → `/login`
-- Linki w stopce: Polityka Prywatności, Regulamin, Kontakt
+### Bug 2: Zmiana statusu na `rate_limited` wewnątrz pętli kont
 
-#### 2. Zmiana routingu (`src/App.tsx`)
+Na liniach 554-563, gdy rate limit się (teoretycznie) uruchomi, kod ustawia status posta na `rate_limited` w wewnętrznej pętli kont, ale potem `continue` do następnego konta. Dla postów multi-platformowych to powoduje chaos -- status posta jest nadpisywany wielokrotnie.
 
-- Route `/` → `HomePage` (publiczny)
-- Route `/login` → `Login` (bez zmian)
-- Linki "Powrót" w Privacy Policy i Terms → `/`
+## Plan naprawy
 
-#### 3. Spójność nazewnictwa
+### 1. Zmiana strategii rate limitingu (auto-publish-books)
 
-Sprawdzę i upewnię się, że wszędzie jest "Social Auto Flow":
-- `index.html` title/meta
-- Privacy Policy title
-- Terms of Service title
-- Login page header
+Zamiast polegać na `platform_publications` (która nie jest wypełniana), sprawdzam `campaign_posts` -- tabelę, która **zawsze** ma dane. Nowa logika:
 
-#### 4. Co trzeba zmienić w panelu TikTok Developer (ręcznie)
+- Przed publikacją posta na daną platformę, policz ile postów z danego **usera** na tej **platformie** zostało opublikowanych w ostatnich N minutach (query `campaign_posts` WHERE `status = 'published'` AND `published_at > since` AND user matches via campaign join)
+- Usunięcie zależności od `platform_publications` i `accountId`
 
-- **Website URL**: `https://socialautoflow.pl` (teraz pokaże landing page, nie login)
-- **App name**: Upewnić się, że brzmi "Social Auto Flow"
-- **Opis scope'ów**: Dodać wyjaśnienie np. "Share Kit is used to publish book promotions to TikTok on behalf of the user"
+### 2. Przeniesienie rate limit check PRZED pętlę kont
+
+Aktualnie rate check jest wewnątrz pętli kont i zmienia status posta -- to błąd. Przeniosę go przed pętlę platform: jeśli dana platforma jest over-limit, cały post zostaje w kolejce na `rate_limited` bez próby publikacji.
+
+### 3. Dodanie `platform_publications` INSERT do brakujących platform
+
+Dodanie zapisu do `platform_publications` po udanej publikacji w `auto-publish-books` (centralne miejsce) zamiast w każdej indywidualnej funkcji. To rozwiąże problem na przyszłość i da dokładniejsze dane.
+
+### 4. Staggering postów w `retryAllFailed`
+
+Zmiana w `CampaignDetails.tsx`: zamiast ustawiać wszystkie failed posty na tę samą datę (za 2 min), rozłożyć je w czasie -- każdy post +30min od poprzedniego. To zapobiegnie powtórzeniu problemu 179 błędów.
 
 ### Szczegóły techniczne
 
-**HomePage** -- prosty komponent z Tailwind, bez logiki backendowej. Responsywny, z sekcjami hero + features + platforms + footer. Bez animacji/efektów -- czysta informacyjna strona.
+**auto-publish-books/index.ts:**
+- Nowa `checkUserPlatformRateLimit(supabase, userId, platform, windowMinutes)` -- query `campaign_posts` JOIN `campaigns` po `user_id`, filtr `published_at` + `status = 'published'` + `platforms` contains platform
+- Rate limit check przeniesiony na poziom platform loop (przed account loop)
+- Po udanej publikacji: INSERT do `platform_publications` z `auto-publish-books`
+- Dodanie globalnego limitu per cykl: max 3 posty per platforma per user per wywołanie cron (2 min)
 
-**Routing** -- jedyna zmiana w `App.tsx`: linia 113 zmieni się z `<Login />` na `<HomePage />`.
+**CampaignDetails.tsx:**
+- `retryAllFailedMutation`: staggering -- post N planowany na `now + 2min + (N * 30min)`
+- Komunikat informujący o rozłożeniu w czasie
 
-**Privacy/Terms** -- link "Powrót do strony głównej" już prowadzi do `/`, więc będzie działać.
+**Publish functions (X, Facebook, Instagram, LinkedIn, TikTok, Bluesky, Mastodon, Telegram, Gab):**
+- Nie zmieniamy -- zapis do `platform_publications` będzie centralnie w auto-publish-books
 
