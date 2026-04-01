@@ -588,27 +588,36 @@ const CampaignDetails = () => {
       const failedPosts = posts?.filter((p: any) => p.status === 'failed') || [];
       if (failedPosts.length === 0) return;
 
-      const scheduledAt = new Date();
-      scheduledAt.setMinutes(scheduledAt.getMinutes() + 2);
+      // Stagger posts: each post gets scheduled 30 minutes after the previous one
+      // First post starts in 2 minutes
+      const promises = failedPosts.map((post: any, index: number) => {
+        const scheduledAt = new Date();
+        scheduledAt.setMinutes(scheduledAt.getMinutes() + 2 + (index * 30));
 
-      const { error } = await (supabase as any)
-        .from("campaign_posts")
-        .update({
-          status: "scheduled",
-          scheduled_at: scheduledAt.toISOString(),
-          published_at: null,
-          next_retry_at: null,
-          error_message: null,
-          error_code: null,
-        } as any)
-        .eq("campaign_id", id)
-        .eq("status", "failed");
+        return (supabase as any)
+          .from("campaign_posts")
+          .update({
+            status: "scheduled",
+            scheduled_at: scheduledAt.toISOString(),
+            published_at: null,
+            next_retry_at: null,
+            error_message: null,
+            error_code: null,
+          } as any)
+          .eq("id", post.id);
+      });
 
-      if (error) throw error;
+      const results = await Promise.all(promises);
+      const errors = results.filter((r: any) => r.error);
+      if (errors.length > 0) throw errors[0].error;
     },
     onSuccess: () => {
+      const failedCount = posts?.filter((p: any) => p.status === 'failed').length || 0;
+      const totalMinutes = 2 + ((failedCount - 1) * 30);
+      const hours = Math.floor(totalMinutes / 60);
+      const mins = totalMinutes % 60;
       queryClient.invalidateQueries({ queryKey: ["campaign-posts", id] });
-      toast.success("Wszystkie nieudane posty zostaną ponowione za 2 minuty");
+      toast.success(`${failedCount} postów rozłożonych w czasie: od 2 min do ~${hours > 0 ? `${hours}h ${mins}min` : `${mins} min`}`);
     },
     onError: () => {
       toast.error("Błąd podczas ponownej próby");

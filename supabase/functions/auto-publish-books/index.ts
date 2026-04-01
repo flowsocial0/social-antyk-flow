@@ -149,10 +149,11 @@ function isRateLimitErrorMessage(msg: string): boolean {
   return RATE_LIMIT_ERROR_PATTERNS.some(p => lower.includes(p.toLowerCase()));
 }
 
-// Check how many posts were published for a given account+platform in the last N minutes
-async function checkAccountRateLimit(
+// Check how many posts were published for a given user+platform in the last N minutes
+// Uses platform_publications which is NOW populated centrally after each successful publish
+async function checkUserPlatformRateLimit(
   supabase: any,
-  accountId: string,
+  userId: string,
   platform: string,
   windowMinutes: number
 ): Promise<number> {
@@ -160,15 +161,34 @@ async function checkAccountRateLimit(
   const { count, error } = await supabase
     .from('platform_publications')
     .select('*', { count: 'exact', head: true })
-    .eq('account_id', accountId)
+    .eq('user_id', userId)
     .eq('platform', platform)
     .gte('published_at', since);
   
   if (error) {
-    console.warn(`Error checking rate limit for ${platform}/${accountId}:`, error.message);
+    console.warn(`Error checking rate limit for ${platform}/user ${userId}:`, error.message);
     return 0;
   }
+  console.log(`Rate limit check: ${platform} user ${userId.substring(0,8)} = ${count || 0} posts in last ${windowMinutes}min`);
   return count || 0;
+}
+
+// Global per-cycle counters to enforce max posts per platform per user per cron run
+const cyclePublishCounts: Record<string, number> = {};
+const MAX_PER_CYCLE = 3; // max 3 posts per platform per user per 2-min cron cycle
+
+function getCycleKey(userId: string, platform: string): string {
+  return `${userId}:${platform}`;
+}
+
+function canPublishInCycle(userId: string, platform: string): boolean {
+  const key = getCycleKey(userId, platform);
+  return (cyclePublishCounts[key] || 0) < MAX_PER_CYCLE;
+}
+
+function recordCyclePublish(userId: string, platform: string): void {
+  const key = getCycleKey(userId, platform);
+  cyclePublishCounts[key] = (cyclePublishCounts[key] || 0) + 1;
 }
 
 Deno.serve(async (req) => {
@@ -451,6 +471,46 @@ Deno.serve(async (req) => {
         }
         
         for (const platform of platforms) {
+          // ====== PRE-PLATFORM RATE LIMIT CHECK (before account loop) ======
+          const rateLimit = PLATFORM_RATE_LIMITS[platform];
+          if (rateLimit) {
+            const recentCount = await checkUserPlatformRateLimit(supabase, campaignOwnerId, platform, rateLimit.windowMinutes);
+            if (recentCount >= rateLimit.maxPosts) {
+              console.log(`⛔ Rate limit reached for ${platform} user ${campaignOwnerId.substring(0,8)}: ${recentCount}/${rateLimit.maxPosts} in ${rateLimit.windowMinutes}min — skipping entire post`);
+              const retryAt = new Date(Date.now() + rateLimit.windowMinutes * 60 * 1000).toISOString();
+              await supabase
+                .from('campaign_posts')
+                .update({
+                  status: 'rate_limited',
+                  next_retry_at: retryAt,
+                  error_message: `Limit platformy ${getPlatformNamePL(platform)}: ${recentCount}/${rateLimit.maxPosts} postów w ${rateLimit.windowMinutes} min. Automatyczna ponowna próba o ${new Date(retryAt).toLocaleTimeString('pl-PL')}.`,
+                  error_code: 'RATE_LIMITED'
+                })
+                .eq('id', post.id);
+              platformErrors.push(`${getPlatformNamePL(platform)}: limit, retry za ${rateLimit.windowMinutes} min`);
+              platformFailCount++;
+              continue; // skip to next platform
+            }
+          }
+          
+          // ====== PER-CYCLE LIMIT CHECK ======
+          if (!canPublishInCycle(campaignOwnerId, platform)) {
+            console.log(`⛔ Cycle limit reached for ${platform} user ${campaignOwnerId.substring(0,8)} (max ${MAX_PER_CYCLE} per cron run)`);
+            const retryAt = new Date(Date.now() + 3 * 60 * 1000).toISOString(); // retry in 3 min (next cron)
+            await supabase
+              .from('campaign_posts')
+              .update({
+                status: 'rate_limited',
+                next_retry_at: retryAt,
+                error_message: `Limit cyklu: max ${MAX_PER_CYCLE} posty/${platform} na cykl. Automatycznie za 3 min.`,
+                error_code: 'CYCLE_LIMITED'
+              })
+              .eq('id', post.id);
+            platformErrors.push(`${getPlatformNamePL(platform)}: limit cyklu`);
+            platformFailCount++;
+            continue;
+          }
+
           let publishFunctionName = '';
           
           switch (platform) {
@@ -543,30 +603,6 @@ Deno.serve(async (req) => {
           for (const accountId of accountsForPlatform) {
             console.log(`Publishing to account ${accountId} on ${platform}`);
             
-            // PRE-PUBLISH RATE LIMIT CHECK
-            const rateLimit = PLATFORM_RATE_LIMITS[platform];
-            if (rateLimit) {
-              const recentCount = await checkAccountRateLimit(supabase, accountId, platform, rateLimit.windowMinutes);
-              if (recentCount >= rateLimit.maxPosts) {
-                console.log(`Rate limit reached for ${platform} account ${accountId}: ${recentCount}/${rateLimit.maxPosts} in ${rateLimit.windowMinutes}min`);
-                // Don't fail the post - just skip this account, will retry next cycle
-                const retryAt = new Date(Date.now() + rateLimit.windowMinutes * 60 * 1000).toISOString();
-                await supabase
-                  .from('campaign_posts')
-                  .update({
-                    status: 'rate_limited',
-                    next_retry_at: retryAt,
-                    error_message: `Limit platformy ${getPlatformNamePL(platform)}: ${recentCount}/${rateLimit.maxPosts} postów w ${rateLimit.windowMinutes} min. Automatyczna ponowna próba.`,
-                    error_code: 'RATE_LIMITED'
-                  })
-                  .eq('id', post.id);
-                // Skip to next platform entirely since this post is now rate_limited
-                platformErrors.push(`${getPlatformNamePL(platform)}: osiągnięto limit, ponowna próba za ${rateLimit.windowMinutes} min`);
-                platformFailCount++;
-                continue;
-              }
-            }
-            
             // Get the owner of THIS specific account (should be campaignOwnerId, but verify)
             const tableName = getTokenTableName(platform);
             const { data: accountData } = await supabase
@@ -627,8 +663,30 @@ Deno.serve(async (req) => {
               }
               // Continue to next account even if this one failed
             } else {
-              console.log(`Successfully published campaign post ${post.id} to ${platform} account ${accountId}`);
+              console.log(`✅ Successfully published campaign post ${post.id} to ${platform} account ${accountId}`);
               accountSuccessCount++;
+              
+              // Record in platform_publications for accurate rate limiting
+              const { error: pubInsertError } = await supabase
+                .from('platform_publications')
+                .insert({
+                  user_id: campaignOwnerId,
+                  account_id: accountId,
+                  platform: platform,
+                  campaign_post_id: post.id,
+                  book_id: post.book_id || null,
+                  post_id: data?.postId || null,
+                  published_at: new Date().toISOString(),
+                  source: 'campaign',
+                  quota_cost: 1
+                });
+              
+              if (pubInsertError) {
+                console.warn(`Failed to record publication for rate limiting:`, pubInsertError.message);
+              }
+              
+              // Record in cycle counter
+              recordCyclePublish(campaignOwnerId, platform);
             }
           }
           
