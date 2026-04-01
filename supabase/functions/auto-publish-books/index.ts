@@ -149,10 +149,11 @@ function isRateLimitErrorMessage(msg: string): boolean {
   return RATE_LIMIT_ERROR_PATTERNS.some(p => lower.includes(p.toLowerCase()));
 }
 
-// Check how many posts were published for a given account+platform in the last N minutes
-async function checkAccountRateLimit(
+// Check how many posts were published for a given user+platform in the last N minutes
+// Uses platform_publications which is NOW populated centrally after each successful publish
+async function checkUserPlatformRateLimit(
   supabase: any,
-  accountId: string,
+  userId: string,
   platform: string,
   windowMinutes: number
 ): Promise<number> {
@@ -160,15 +161,34 @@ async function checkAccountRateLimit(
   const { count, error } = await supabase
     .from('platform_publications')
     .select('*', { count: 'exact', head: true })
-    .eq('account_id', accountId)
+    .eq('user_id', userId)
     .eq('platform', platform)
     .gte('published_at', since);
   
   if (error) {
-    console.warn(`Error checking rate limit for ${platform}/${accountId}:`, error.message);
+    console.warn(`Error checking rate limit for ${platform}/user ${userId}:`, error.message);
     return 0;
   }
+  console.log(`Rate limit check: ${platform} user ${userId.substring(0,8)} = ${count || 0} posts in last ${windowMinutes}min`);
   return count || 0;
+}
+
+// Global per-cycle counters to enforce max posts per platform per user per cron run
+const cyclePublishCounts: Record<string, number> = {};
+const MAX_PER_CYCLE = 3; // max 3 posts per platform per user per 2-min cron cycle
+
+function getCycleKey(userId: string, platform: string): string {
+  return `${userId}:${platform}`;
+}
+
+function canPublishInCycle(userId: string, platform: string): boolean {
+  const key = getCycleKey(userId, platform);
+  return (cyclePublishCounts[key] || 0) < MAX_PER_CYCLE;
+}
+
+function recordCyclePublish(userId: string, platform: string): void {
+  const key = getCycleKey(userId, platform);
+  cyclePublishCounts[key] = (cyclePublishCounts[key] || 0) + 1;
 }
 
 Deno.serve(async (req) => {
