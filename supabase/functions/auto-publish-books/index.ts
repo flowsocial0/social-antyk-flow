@@ -663,8 +663,30 @@ Deno.serve(async (req) => {
               }
               // Continue to next account even if this one failed
             } else {
-              console.log(`Successfully published campaign post ${post.id} to ${platform} account ${accountId}`);
+              console.log(`✅ Successfully published campaign post ${post.id} to ${platform} account ${accountId}`);
               accountSuccessCount++;
+              
+              // Record in platform_publications for accurate rate limiting
+              const { error: pubInsertError } = await supabase
+                .from('platform_publications')
+                .insert({
+                  user_id: campaignOwnerId,
+                  account_id: accountId,
+                  platform: platform,
+                  campaign_post_id: post.id,
+                  book_id: post.book_id || null,
+                  post_id: data?.postId || null,
+                  published_at: new Date().toISOString(),
+                  source: 'campaign',
+                  quota_cost: 1
+                });
+              
+              if (pubInsertError) {
+                console.warn(`Failed to record publication for rate limiting:`, pubInsertError.message);
+              }
+              
+              // Record in cycle counter
+              recordCyclePublish(campaignOwnerId, platform);
             }
           }
           
