@@ -648,6 +648,14 @@ Deno.serve(async (req) => {
           for (const accountId of accountsForPlatform) {
             console.log(`Publishing to account ${accountId} on ${platform}`);
             
+            // ====== PRE-PUBLISH TOKEN VALIDATION ======
+            const tokenValidation = await validateAccountToken(supabase, platform, accountId);
+            if (!tokenValidation.valid) {
+              console.error(`⛔ Account ${accountId} invalid: ${tokenValidation.reason}`);
+              accountErrors.push(`Konto ${accountId.substring(0, 8)}: ${tokenValidation.reason}`);
+              continue; // skip to next account
+            }
+            
             // Get the owner of THIS specific account (should be campaignOwnerId, but verify)
             const tableName = getTokenTableName(platform);
             const { data: accountData } = await supabase
@@ -696,14 +704,18 @@ Deno.serve(async (req) => {
               const errorMsg = data?.message || data?.error || publishError?.message || 'Nieznany błąd';
               console.error(`Failed to publish campaign post ${post.id} to ${platform} account ${accountId}:`, errorMsg);
               
-              // Check if it's a rate limit error
-              const isRateLimitError = errorMsg?.includes('429') || 
-                errorMsg?.includes('Too Many Requests') ||
-                errorMsg?.includes('rate limit') ||
+              // Check if it's a rate limit error (expanded patterns)
+              const isRateLimitError = isRateLimitErrorMessage(errorMsg) ||
                 data?.error === 'rate_limit' ||
-                data?.errorCode === 'RATE_LIMITED';
+                data?.errorCode === 'RATE_LIMITED' ||
+                data?.errorCode === 'DAILY_LIMIT' ||
+                data?.errorCode === 'X_API_DAILY_LIMIT' ||
+                data?.errorCode === 'CREDITS_DEPLETED';
               
-              if (!isRateLimitError) {
+              if (isRateLimitError) {
+                // Don't add to accountErrors - this will be handled at post level
+                console.log(`Rate limit detected for ${platform} account ${accountId}, will set rate_limited`);
+              } else {
                 accountErrors.push(`Konto ${accountId.substring(0, 8)}: ${errorMsg}`);
               }
               // Continue to next account even if this one failed
