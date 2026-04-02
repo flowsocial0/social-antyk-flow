@@ -883,21 +883,40 @@ Deno.serve(async (req) => {
       } catch (error: any) {
         console.error(`Error publishing campaign post ${post.id}:`, error);
         
-        // Check if it's a rate limit error - if so, don't override status (publish function already handled it)
-        const isRateLimitError = error.message?.includes('429') || 
-          error.message?.includes('Too Many Requests') ||
-          error.message?.includes('rate limit');
+        // Check if it's a rate limit error using expanded patterns
+        const isRateLimitError = isRateLimitErrorMessage(error.message || '');
         
-        if (!isRateLimitError) {
-          // Mark post as failed only for non-rate-limit errors
+        if (isRateLimitError) {
+          // Set rate_limited with retry instead of failed
+          const retryAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
           await supabase
             .from('campaign_posts')
             .update({
-              status: 'failed',
-              error_message: error.message || 'Wystąpił nieoczekiwany błąd podczas publikacji.',
-              error_code: 'UNEXPECTED_ERROR'
+              status: 'rate_limited',
+              error_message: error.message || 'Limit platformy - automatyczna ponowna próba.',
+              error_code: 'RATE_LIMITED',
+              next_retry_at: retryAt
             })
             .eq('id', post.id);
+        } else {
+          // Mark post as failed only for non-rate-limit errors
+          // But first check if post is already rate_limited (don't overwrite!)
+          const { data: currentPost } = await supabase
+            .from('campaign_posts')
+            .select('status')
+            .eq('id', post.id)
+            .single();
+          
+          if (currentPost?.status !== 'rate_limited') {
+            await supabase
+              .from('campaign_posts')
+              .update({
+                status: 'failed',
+                error_message: error.message || 'Wystąpił nieoczekiwany błąd podczas publikacji.',
+                error_code: 'UNEXPECTED_ERROR'
+              })
+              .eq('id', post.id);
+          }
           
           failCount++;
         }
