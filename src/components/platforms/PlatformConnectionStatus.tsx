@@ -90,10 +90,17 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
         else if (platform === "mastodon") name = token.username ? `@${token.username}@${(token.server_url || '').replace('https://', '')}` : "Konto Mastodon";
 
 
+        const expiresAt = token.expires_at ? new Date(token.expires_at) : null;
+        const now = new Date();
+        const isExpired = expiresAt ? expiresAt < now : false;
+        const expiresInDays = expiresAt ? Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : undefined;
+
         return {
           id: token.id,
           name,
           expires_at: token.expires_at,
+          isExpired,
+          expiresInDays,
         };
       });
     },
