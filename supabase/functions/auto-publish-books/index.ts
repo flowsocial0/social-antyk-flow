@@ -142,11 +142,56 @@ const RATE_LIMIT_ERROR_PATTERNS = [
   'too many actions', 'throttle', 'ograniczamy liczbę', 'rate limit',
   '429', 'Too Many Requests', 'spam', 'try again later',
   'limit exceeded', 'Please wait', 'slow down',
+  'DAILY_LIMIT', 'X_API_DAILY_LIMIT', 'CreditsDepleted', 'credits depleted',
+  'APPLICATION_AND_MEMBER DAY', 'member day', 'application day',
+  'zbyt wiele', 'za dużo', 'poczekaj', 'spróbuj później',
+  'too many requests', 'too_many_requests', 'temporarily blocked',
+  'User request limit reached', 'quota', 'exceeded the rate limit',
+  '15/15 dzienny limit', 'dzienny limit',
 ];
 
 function isRateLimitErrorMessage(msg: string): boolean {
   const lower = msg.toLowerCase();
   return RATE_LIMIT_ERROR_PATTERNS.some(p => lower.includes(p.toLowerCase()));
+}
+
+// Token tables that have expires_at column
+const TABLES_WITH_EXPIRY = ['facebook_oauth_tokens', 'instagram_oauth_tokens', 'linkedin_oauth_tokens', 
+  'tiktok_oauth_tokens', 'youtube_oauth_tokens', 'pinterest_oauth_tokens', 'google_business_tokens', 'tumblr_oauth_tokens'];
+
+// Pre-publish validation: check if a specific account token is still valid
+async function validateAccountToken(
+  supabase: any, 
+  platform: string, 
+  accountId: string
+): Promise<{ valid: boolean; reason?: string }> {
+  const tableName = getTokenTableName(platform);
+  if (!tableName) return { valid: false, reason: 'Nieznana platforma' };
+  
+  const { data: account, error } = await supabase
+    .from(tableName)
+    .select('*')
+    .eq('id', accountId)
+    .maybeSingle();
+  
+  if (error || !account) {
+    return { valid: false, reason: `Konto nie istnieje. Połącz ponownie w ustawieniach.` };
+  }
+  
+  // Check token expiry for platforms that have it
+  if (TABLES_WITH_EXPIRY.includes(tableName) && account.expires_at) {
+    const expiresAt = new Date(account.expires_at);
+    if (expiresAt < new Date()) {
+      return { valid: false, reason: `Token ${getPlatformNamePL(platform)} wygasł. Połącz konto ponownie.` };
+    }
+  }
+  
+  // Check if access_token exists
+  if (!account.access_token && !account.oauth_token && !account.bot_token && !account.app_password && !account.webhook_url) {
+    return { valid: false, reason: `Brak tokenu autoryzacji. Połącz konto ponownie.` };
+  }
+  
+  return { valid: true };
 }
 
 // Check how many posts were published for a given user+platform in the last N minutes
