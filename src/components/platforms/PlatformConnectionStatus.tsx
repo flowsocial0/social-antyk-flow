@@ -285,8 +285,18 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
                 onClick={handleConnect}
               >
                 <LinkIcon className="h-4 w-4 mr-2" />
-                Zarządzaj
+                {accounts?.some(a => a.isExpired) ? 'Połącz ponownie' : 'Zarządzaj'}
               </Button>
+              {accounts?.some(a => a.isExpired) && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleConnect}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Odśwież uprawnienia
+                </Button>
+              )}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
