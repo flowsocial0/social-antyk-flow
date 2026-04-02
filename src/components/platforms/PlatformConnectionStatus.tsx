@@ -26,6 +26,8 @@ interface AccountInfo {
   id: string;
   name: string;
   expires_at?: string;
+  isExpired?: boolean;
+  expiresInDays?: number;
 }
 
 export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnectionStatusProps) => {
