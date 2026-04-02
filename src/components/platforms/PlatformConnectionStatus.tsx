@@ -26,6 +26,8 @@ interface AccountInfo {
   id: string;
   name: string;
   expires_at?: string;
+  isExpired?: boolean;
+  expiresInDays?: number;
 }
 
 export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnectionStatusProps) => {
@@ -88,10 +90,17 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
         else if (platform === "mastodon") name = token.username ? `@${token.username}@${(token.server_url || '').replace('https://', '')}` : "Konto Mastodon";
 
 
+        const expiresAt = token.expires_at ? new Date(token.expires_at) : null;
+        const now = new Date();
+        const isExpired = expiresAt ? expiresAt < now : false;
+        const expiresInDays = expiresAt ? Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : undefined;
+
         return {
           id: token.id,
           name,
           expires_at: token.expires_at,
+          isExpired,
+          expiresInDays,
         };
       });
     },
@@ -219,20 +228,36 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
         {isConnected ? (
           <>
             <div className="space-y-2">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-2">
                 {accounts?.map((account) => (
-                  <Badge key={account.id} variant="secondary" className="text-xs">
-                    {account.name}
-                  </Badge>
+                  <div key={account.id} className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Badge variant={account.isExpired ? "destructive" : "secondary"} className="text-xs shrink-0">
+                        {account.isExpired ? "⚠️ Wygasł" : "✅"}
+                      </Badge>
+                      <span className="text-sm truncate">{account.name}</span>
+                    </div>
+                    {account.expires_at && (
+                      <span className={`text-xs shrink-0 ${account.isExpired ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                        {account.isExpired 
+                          ? `Wygasł ${new Date(account.expires_at).toLocaleDateString('pl-PL')}` 
+                          : account.expiresInDays !== undefined && account.expiresInDays <= 7 
+                            ? `Wygasa za ${account.expiresInDays} dni` 
+                            : ''}
+                      </span>
+                    )}
+                  </div>
                 ))}
               </div>
               <p className="text-sm text-muted-foreground">
                 Publikacja trafi na wszystkie połączone konta
               </p>
-              {accounts?.some(a => a.expires_at && new Date(a.expires_at) < new Date()) && (
-                <p className="text-xs text-destructive">
-                  ⚠️ Niektóre tokeny wygasły - odśwież połączenie
-                </p>
+              {accounts?.some(a => a.isExpired) && (
+                <div className="p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                  <p className="text-xs text-destructive font-medium">
+                    ⚠️ Niektóre tokeny wygasły — kliknij „Połącz ponownie" aby odświeżyć uprawnienia. Posty na wygasłe konta nie będą publikowane.
+                  </p>
+                </div>
               )}
             </div>
             <div className="flex flex-wrap gap-2">
@@ -260,8 +285,18 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
                 onClick={handleConnect}
               >
                 <LinkIcon className="h-4 w-4 mr-2" />
-                Zarządzaj
+                {accounts?.some(a => a.isExpired) ? 'Połącz ponownie' : 'Zarządzaj'}
               </Button>
+              {accounts?.some(a => a.isExpired) && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleConnect}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Odśwież uprawnienia
+                </Button>
+              )}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button

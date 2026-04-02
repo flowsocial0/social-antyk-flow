@@ -142,11 +142,56 @@ const RATE_LIMIT_ERROR_PATTERNS = [
   'too many actions', 'throttle', 'ograniczamy liczbę', 'rate limit',
   '429', 'Too Many Requests', 'spam', 'try again later',
   'limit exceeded', 'Please wait', 'slow down',
+  'DAILY_LIMIT', 'X_API_DAILY_LIMIT', 'CreditsDepleted', 'credits depleted',
+  'APPLICATION_AND_MEMBER DAY', 'member day', 'application day',
+  'zbyt wiele', 'za dużo', 'poczekaj', 'spróbuj później',
+  'too many requests', 'too_many_requests', 'temporarily blocked',
+  'User request limit reached', 'quota', 'exceeded the rate limit',
+  '15/15 dzienny limit', 'dzienny limit',
 ];
 
 function isRateLimitErrorMessage(msg: string): boolean {
   const lower = msg.toLowerCase();
   return RATE_LIMIT_ERROR_PATTERNS.some(p => lower.includes(p.toLowerCase()));
+}
+
+// Token tables that have expires_at column
+const TABLES_WITH_EXPIRY = ['facebook_oauth_tokens', 'instagram_oauth_tokens', 'linkedin_oauth_tokens', 
+  'tiktok_oauth_tokens', 'youtube_oauth_tokens', 'pinterest_oauth_tokens', 'google_business_tokens', 'tumblr_oauth_tokens'];
+
+// Pre-publish validation: check if a specific account token is still valid
+async function validateAccountToken(
+  supabase: any, 
+  platform: string, 
+  accountId: string
+): Promise<{ valid: boolean; reason?: string }> {
+  const tableName = getTokenTableName(platform);
+  if (!tableName) return { valid: false, reason: 'Nieznana platforma' };
+  
+  const { data: account, error } = await supabase
+    .from(tableName)
+    .select('*')
+    .eq('id', accountId)
+    .maybeSingle();
+  
+  if (error || !account) {
+    return { valid: false, reason: `Konto nie istnieje. Połącz ponownie w ustawieniach.` };
+  }
+  
+  // Check token expiry for platforms that have it
+  if (TABLES_WITH_EXPIRY.includes(tableName) && account.expires_at) {
+    const expiresAt = new Date(account.expires_at);
+    if (expiresAt < new Date()) {
+      return { valid: false, reason: `Token ${getPlatformNamePL(platform)} wygasł. Połącz konto ponownie.` };
+    }
+  }
+  
+  // Check if access_token exists
+  if (!account.access_token && !account.oauth_token && !account.bot_token && !account.app_password && !account.webhook_url) {
+    return { valid: false, reason: `Brak tokenu autoryzacji. Połącz konto ponownie.` };
+  }
+  
+  return { valid: true };
 }
 
 // Check how many posts were published for a given user+platform in the last N minutes
@@ -603,6 +648,14 @@ Deno.serve(async (req) => {
           for (const accountId of accountsForPlatform) {
             console.log(`Publishing to account ${accountId} on ${platform}`);
             
+            // ====== PRE-PUBLISH TOKEN VALIDATION ======
+            const tokenValidation = await validateAccountToken(supabase, platform, accountId);
+            if (!tokenValidation.valid) {
+              console.error(`⛔ Account ${accountId} invalid: ${tokenValidation.reason}`);
+              accountErrors.push(`Konto ${accountId.substring(0, 8)}: ${tokenValidation.reason}`);
+              continue; // skip to next account
+            }
+            
             // Get the owner of THIS specific account (should be campaignOwnerId, but verify)
             const tableName = getTokenTableName(platform);
             const { data: accountData } = await supabase
@@ -651,14 +704,18 @@ Deno.serve(async (req) => {
               const errorMsg = data?.message || data?.error || publishError?.message || 'Nieznany błąd';
               console.error(`Failed to publish campaign post ${post.id} to ${platform} account ${accountId}:`, errorMsg);
               
-              // Check if it's a rate limit error
-              const isRateLimitError = errorMsg?.includes('429') || 
-                errorMsg?.includes('Too Many Requests') ||
-                errorMsg?.includes('rate limit') ||
+              // Check if it's a rate limit error (expanded patterns)
+              const isRateLimitError = isRateLimitErrorMessage(errorMsg) ||
                 data?.error === 'rate_limit' ||
-                data?.errorCode === 'RATE_LIMITED';
+                data?.errorCode === 'RATE_LIMITED' ||
+                data?.errorCode === 'DAILY_LIMIT' ||
+                data?.errorCode === 'X_API_DAILY_LIMIT' ||
+                data?.errorCode === 'CREDITS_DEPLETED';
               
-              if (!isRateLimitError) {
+              if (isRateLimitError) {
+                // Don't add to accountErrors - this will be handled at post level
+                console.log(`Rate limit detected for ${platform} account ${accountId}, will set rate_limited`);
+              } else {
                 accountErrors.push(`Konto ${accountId.substring(0, 8)}: ${errorMsg}`);
               }
               // Continue to next account even if this one failed
@@ -826,21 +883,40 @@ Deno.serve(async (req) => {
       } catch (error: any) {
         console.error(`Error publishing campaign post ${post.id}:`, error);
         
-        // Check if it's a rate limit error - if so, don't override status (publish function already handled it)
-        const isRateLimitError = error.message?.includes('429') || 
-          error.message?.includes('Too Many Requests') ||
-          error.message?.includes('rate limit');
+        // Check if it's a rate limit error using expanded patterns
+        const isRateLimitError = isRateLimitErrorMessage(error.message || '');
         
-        if (!isRateLimitError) {
-          // Mark post as failed only for non-rate-limit errors
+        if (isRateLimitError) {
+          // Set rate_limited with retry instead of failed
+          const retryAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
           await supabase
             .from('campaign_posts')
             .update({
-              status: 'failed',
-              error_message: error.message || 'Wystąpił nieoczekiwany błąd podczas publikacji.',
-              error_code: 'UNEXPECTED_ERROR'
+              status: 'rate_limited',
+              error_message: error.message || 'Limit platformy - automatyczna ponowna próba.',
+              error_code: 'RATE_LIMITED',
+              next_retry_at: retryAt
             })
             .eq('id', post.id);
+        } else {
+          // Mark post as failed only for non-rate-limit errors
+          // But first check if post is already rate_limited (don't overwrite!)
+          const { data: currentPost } = await supabase
+            .from('campaign_posts')
+            .select('status')
+            .eq('id', post.id)
+            .single();
+          
+          if (currentPost?.status !== 'rate_limited') {
+            await supabase
+              .from('campaign_posts')
+              .update({
+                status: 'failed',
+                error_message: error.message || 'Wystąpił nieoczekiwany błąd podczas publikacji.',
+                error_code: 'UNEXPECTED_ERROR'
+              })
+              .eq('id', post.id);
+          }
           
           failCount++;
         }
