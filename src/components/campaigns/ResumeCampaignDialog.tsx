@@ -142,8 +142,8 @@ export const ResumeCampaignDialog = ({
           const [hours, minutes] = originalPost.time.split(':').map(Number);
           scheduledDate.setHours(hours, minutes, 0, 0);
           
-          // Include target_accounts from original post, or fall back to campaign's selected_accounts
-          const postTargetAccounts = originalPost.target_accounts || campaign.selected_accounts || {};
+          // Use fresh accounts instead of potentially stale original post accounts
+          const postTargetAccounts = freshSelectedAccounts;
           
           const { error: postError } = await (supabase as any)
             .from('campaign_posts')
