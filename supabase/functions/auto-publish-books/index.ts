@@ -128,13 +128,13 @@ function getPlatformNamePL(platform: string): string {
 
 // Platform rate limits: max posts per account per time window
 const PLATFORM_RATE_LIMITS: Record<string, { maxPosts: number; windowMinutes: number }> = {
-  x: { maxPosts: 1, windowMinutes: 30 },        // max 15/day on free tier
-  instagram: { maxPosts: 1, windowMinutes: 30 }, // IG throttles aggressively
-  facebook: { maxPosts: 2, windowMinutes: 60 },  // FB anti-spam
-  linkedin: { maxPosts: 1, windowMinutes: 60 },  // LinkedIn daily limit
-  tiktok: { maxPosts: 1, windowMinutes: 60 },
-  youtube: { maxPosts: 1, windowMinutes: 120 },
-  pinterest: { maxPosts: 2, windowMinutes: 60 },
+  x: { maxPosts: 100, windowMinutes: 1 },        // max 15/day on free tier
+  instagram: { maxPosts: 100, windowMinutes: 1 }, // IG throttles aggressively
+  facebook: { maxPosts: 100, windowMinutes: 1 },  // FB anti-spam
+  linkedin: { maxPosts: 100, windowMinutes: 1 },  // LinkedIn daily limit
+  tiktok: { maxPosts: 100, windowMinutes: 1 }, 
+  youtube: { maxPosts: 100, windowMinutes: 1 }, 
+  pinterest: { maxPosts: 100, windowMinutes: 1 }, 
   // No limits for self-hosted: telegram, discord, bluesky, mastodon, gab, tumblr, google_business
 };
 
