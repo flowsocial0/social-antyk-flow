@@ -84,7 +84,30 @@ export const ResumeCampaignDialog = ({
         return;
       }
 
-      // Create new campaign - include selected_accounts from original campaign
+      // Build fresh selected_accounts from user's CURRENT tokens instead of copying stale IDs
+      const originalPlatforms = campaign.target_platforms || [];
+      const freshSelectedAccounts: Record<string, string[]> = {};
+      
+      for (const platform of originalPlatforms) {
+        const tableName = platform === 'x' ? 'twitter_oauth1_tokens' :
+          platform === 'bluesky' ? 'bluesky_tokens' :
+          platform === 'telegram' ? 'telegram_tokens' :
+          platform === 'discord' ? 'discord_tokens' :
+          platform === 'mastodon' ? 'mastodon_tokens' :
+          platform === 'google_business' ? 'google_business_tokens' :
+          `${platform}_oauth_tokens`;
+        
+        const { data: currentAccounts } = await (supabase as any)
+          .from(tableName)
+          .select('id')
+          .eq('user_id', user.id);
+        
+        if (currentAccounts && currentAccounts.length > 0) {
+          freshSelectedAccounts[platform] = currentAccounts.map((a: any) => a.id);
+        }
+      }
+
+      // Create new campaign with fresh account IDs
       const { data: newCampaign, error: campaignError } = await (supabase as any)
         .from('campaigns')
         .insert({
@@ -98,7 +121,7 @@ export const ResumeCampaignDialog = ({
           start_date: startDate,
           posting_times: campaign.posting_times,
           target_platforms: campaign.target_platforms,
-          selected_accounts: campaign.selected_accounts || {},
+          selected_accounts: freshSelectedAccounts,
           user_id: user.id,
         })
         .select()
@@ -119,8 +142,8 @@ export const ResumeCampaignDialog = ({
           const [hours, minutes] = originalPost.time.split(':').map(Number);
           scheduledDate.setHours(hours, minutes, 0, 0);
           
-          // Include target_accounts from original post, or fall back to campaign's selected_accounts
-          const postTargetAccounts = originalPost.target_accounts || campaign.selected_accounts || {};
+          // Use fresh accounts instead of potentially stale original post accounts
+          const postTargetAccounts = freshSelectedAccounts;
           
           const { error: postError } = await (supabase as any)
             .from('campaign_posts')

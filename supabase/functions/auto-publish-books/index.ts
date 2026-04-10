@@ -159,6 +159,101 @@ function isRateLimitErrorMessage(msg: string): boolean {
 const TABLES_WITH_EXPIRY = ['facebook_oauth_tokens', 'instagram_oauth_tokens', 'linkedin_oauth_tokens', 
   'tiktok_oauth_tokens', 'youtube_oauth_tokens', 'pinterest_oauth_tokens', 'google_business_tokens', 'tumblr_oauth_tokens'];
 
+// Try to find a replacement account when the original account ID no longer exists
+// This happens when a user reconnects their social account (new token row with new UUID)
+async function tryRemapOrphanedAccount(
+  supabase: any,
+  platform: string,
+  oldAccountId: string,
+  userId: string
+): Promise<{ newAccountId: string | null; remapped: boolean }> {
+  const tableName = getTokenTableName(platform);
+  if (!tableName) return { newAccountId: null, remapped: false };
+
+  // Check if old account exists
+  const { data: oldAccount } = await supabase
+    .from(tableName)
+    .select('*')
+    .eq('id', oldAccountId)
+    .maybeSingle();
+
+  if (oldAccount) {
+    // Account still exists, no remap needed
+    return { newAccountId: oldAccountId, remapped: false };
+  }
+
+  // Account doesn't exist - try to find a replacement for the same user
+  console.log(`🔄 Account ${oldAccountId.substring(0,8)} not found for ${platform}, attempting auto-remap for user ${userId.substring(0,8)}`);
+  
+  const { data: userAccounts, error } = await supabase
+    .from(tableName)
+    .select('id')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (error || !userAccounts || userAccounts.length === 0) {
+    console.log(`❌ No replacement ${platform} account found for user ${userId.substring(0,8)}`);
+    return { newAccountId: null, remapped: false };
+  }
+
+  const newId = userAccounts[0].id;
+  console.log(`✅ Auto-remapped ${platform}: ${oldAccountId.substring(0,8)} → ${newId.substring(0,8)}`);
+  return { newAccountId: newId, remapped: true };
+}
+
+// Update campaign and post references after successful remap
+async function persistAccountRemap(
+  supabase: any,
+  postId: string,
+  campaignId: string,
+  platform: string,
+  oldAccountId: string,
+  newAccountId: string
+): Promise<void> {
+  try {
+    // Update target_accounts in the campaign_post
+    const { data: post } = await supabase
+      .from('campaign_posts')
+      .select('target_accounts')
+      .eq('id', postId)
+      .single();
+
+    if (post?.target_accounts) {
+      const ta = post.target_accounts as Record<string, string[]>;
+      if (ta[platform]) {
+        ta[platform] = ta[platform].map((id: string) => id === oldAccountId ? newAccountId : id);
+        await supabase
+          .from('campaign_posts')
+          .update({ target_accounts: ta })
+          .eq('id', postId);
+      }
+    }
+
+    // Also update campaigns.selected_accounts
+    const { data: campaign } = await supabase
+      .from('campaigns')
+      .select('selected_accounts')
+      .eq('id', campaignId)
+      .single();
+
+    if (campaign?.selected_accounts) {
+      const sa = campaign.selected_accounts as Record<string, string[]>;
+      if (sa[platform]) {
+        sa[platform] = sa[platform].map((id: string) => id === oldAccountId ? newAccountId : id);
+        await supabase
+          .from('campaigns')
+          .update({ selected_accounts: sa })
+          .eq('id', campaignId);
+      }
+    }
+
+    console.log(`💾 Persisted remap for ${platform}: ${oldAccountId.substring(0,8)} → ${newAccountId.substring(0,8)} in post ${postId.substring(0,8)} and campaign ${campaignId.substring(0,8)}`);
+  } catch (err: any) {
+    console.warn(`Warning: failed to persist remap: ${err.message}`);
+  }
+}
+
 // Pre-publish validation: check if a specific account token is still valid
 async function validateAccountToken(
   supabase: any, 
@@ -645,8 +740,24 @@ Deno.serve(async (req) => {
           let accountSuccessCount = 0;
           const accountErrors: string[] = [];
           
-          for (const accountId of accountsForPlatform) {
+          for (let accountId of accountsForPlatform) {
             console.log(`Publishing to account ${accountId} on ${platform}`);
+            
+            // ====== AUTO-REMAP ORPHANED ACCOUNTS ======
+            const remap = await tryRemapOrphanedAccount(supabase, platform, accountId, campaignOwnerId);
+            if (remap.remapped && remap.newAccountId) {
+              // Successfully remapped to a new account
+              await persistAccountRemap(supabase, post.id, post.campaign?.id || '', platform, accountId, remap.newAccountId);
+              accountId = remap.newAccountId;
+            } else if (!remap.newAccountId && !remap.remapped) {
+              // Old account gone, no replacement found — check if it truly doesn't exist
+              const tokenValidation = await validateAccountToken(supabase, platform, accountId);
+              if (!tokenValidation.valid) {
+                console.error(`⛔ Account ${accountId} invalid and no replacement: ${tokenValidation.reason}`);
+                accountErrors.push(`Konto ${accountId.substring(0, 8)}: ${tokenValidation.reason}`);
+                continue;
+              }
+            }
             
             // ====== PRE-PUBLISH TOKEN VALIDATION ======
             const tokenValidation = await validateAccountToken(supabase, platform, accountId);
