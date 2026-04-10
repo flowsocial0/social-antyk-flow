@@ -961,34 +961,118 @@ const CampaignDetails = () => {
               <Users className="h-5 w-5 text-primary" />
               <h3 className="font-semibold">Konta do publikacji</h3>
             </div>
+
+            {/* Stale accounts warning */}
+            {(() => {
+              if (!campaign.selected_accounts || Object.keys(campaign.selected_accounts).length === 0) return null;
+              const allSelectedIds = Object.values(campaign.selected_accounts as Record<string, string[]>).flat();
+              const staleIds = allSelectedIds.filter((id: string) => !accountsMap[id]);
+              // Only show warning after accountsMap has been loaded (at least partially)
+              if (staleIds.length === 0 || Object.keys(accountsMap).length === 0) return null;
+              return (
+                <div className="mb-4 p-4 rounded-lg border border-amber-500/30 bg-amber-500/5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-amber-600" />
+                      <span className="text-sm font-medium text-amber-700">
+                        {staleIds.length} kont nie istnieje — prawdopodobnie zostały ponownie podłączone z nowymi identyfikatorami.
+                        Publikacja na te konta będzie nieudana.
+                      </span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2 border-amber-500/30 text-amber-700 hover:bg-amber-500/10"
+                      onClick={async () => {
+                        if (!user) return;
+                        try {
+                          // Build new selected_accounts from current user tokens
+                          const selectedAccounts = campaign.selected_accounts as Record<string, string[]>;
+                          const newSelectedAccounts: Record<string, string[]> = {};
+                          
+                          for (const platform of Object.keys(selectedAccounts)) {
+                            const tableName = platform === 'x' ? 'twitter_oauth1_tokens' :
+                              platform === 'bluesky' ? 'bluesky_tokens' :
+                              platform === 'telegram' ? 'telegram_tokens' :
+                              platform === 'discord' ? 'discord_tokens' :
+                              platform === 'mastodon' ? 'mastodon_tokens' :
+                              platform === 'google_business' ? 'google_business_tokens' :
+                              `${platform}_oauth_tokens`;
+                            
+                            const { data: currentAccounts } = await (supabase as any)
+                              .from(tableName)
+                              .select('id')
+                              .eq('user_id', user.id);
+                            
+                            if (currentAccounts && currentAccounts.length > 0) {
+                              newSelectedAccounts[platform] = currentAccounts.map((a: any) => a.id);
+                            }
+                          }
+
+                          // Update campaign
+                          await (supabase as any)
+                            .from('campaigns')
+                            .update({ selected_accounts: newSelectedAccounts })
+                            .eq('id', id);
+
+                          // Update all scheduled/rate_limited/failed posts in this campaign
+                          const { data: postsToFix } = await (supabase as any)
+                            .from('campaign_posts')
+                            .select('id')
+                            .eq('campaign_id', id)
+                            .in('status', ['scheduled', 'rate_limited', 'failed']);
+
+                          if (postsToFix && postsToFix.length > 0) {
+                            await (supabase as any)
+                              .from('campaign_posts')
+                              .update({ target_accounts: newSelectedAccounts })
+                              .eq('campaign_id', id)
+                              .in('status', ['scheduled', 'rate_limited', 'failed']);
+                          }
+
+                          queryClient.invalidateQueries({ queryKey: ["campaign", id] });
+                          queryClient.invalidateQueries({ queryKey: ["campaign-posts", id] });
+                          toast.success(`Odświeżono konta w kampanii! Zaktualizowano ${postsToFix?.length || 0} postów.`);
+                        } catch (error: any) {
+                          console.error('Error refreshing accounts:', error);
+                          toast.error('Błąd podczas odświeżania kont');
+                        }
+                      }}
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Odśwież konta
+                    </Button>
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="flex flex-wrap gap-2">
               {campaign.selected_accounts && Object.keys(campaign.selected_accounts).length > 0 ? (
-                // Show only accounts that:
-                // 1. Exist in accountsMap (verified to exist in DB)
-                // 2. Their platform is in target_platforms (if target_platforms exists)
                 Object.entries(campaign.selected_accounts as Record<string, string[]>)
                   .filter(([platform]) => {
-                    // Only show platforms that are actually selected for this campaign
                     const targetPlatforms = campaign.target_platforms as string[] | null;
                     return !targetPlatforms || targetPlatforms.length === 0 || targetPlatforms.includes(platform);
                   })
                   .flatMap(([platform, accountIds]) => {
                     const platformConfig = getPlatformConfig(platform as PlatformId);
                     const Icon = platformConfig?.icon;
-                    return (accountIds as string[])
-                      .filter((accountId) => accountsMap[accountId]) // Only show accounts that exist
-                      .map((accountId) => {
-                        const accountInfo = accountsMap[accountId];
-                        return (
-                          <Badge key={accountId} variant="secondary" className="gap-2 py-1.5 px-3">
-                            {Icon && <Icon className="h-3.5 w-3.5" />}
-                            <span>{accountInfo.display_name}</span>
-                          </Badge>
-                        );
-                      });
+                    return (accountIds as string[]).map((accountId) => {
+                      const accountInfo = accountsMap[accountId];
+                      const isStale = !accountInfo && Object.keys(accountsMap).length > 0;
+                      return (
+                        <Badge 
+                          key={accountId} 
+                          variant="secondary" 
+                          className={`gap-2 py-1.5 px-3 ${isStale ? 'border-amber-500/50 bg-amber-500/10 text-amber-700' : ''}`}
+                        >
+                          {Icon && <Icon className="h-3.5 w-3.5" />}
+                          <span>{accountInfo ? accountInfo.display_name : `⚠ ${accountId.substring(0, 8)}… (nieaktualne)`}</span>
+                        </Badge>
+                      );
+                    });
                   })
               ) : (
-                // Fallback for older campaigns - show target platforms only if they exist
                 (campaign.target_platforms as string[] || []).length > 0 ? (
                   (campaign.target_platforms as string[]).map((platform: string) => {
                     const platformConfig = getPlatformConfig(platform as PlatformId);
@@ -1004,7 +1088,6 @@ const CampaignDetails = () => {
                   <span className="text-sm text-muted-foreground">Brak wybranych platform</span>
                 )
               )}
-              {/* Show message if no accounts found */}
               {campaign.selected_accounts && 
                 Object.keys(campaign.selected_accounts).length > 0 && 
                 Object.keys(accountsMap).length === 0 && (
