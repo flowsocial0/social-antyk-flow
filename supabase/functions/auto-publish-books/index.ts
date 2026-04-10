@@ -740,8 +740,24 @@ Deno.serve(async (req) => {
           let accountSuccessCount = 0;
           const accountErrors: string[] = [];
           
-          for (const accountId of accountsForPlatform) {
+          for (let accountId of accountsForPlatform) {
             console.log(`Publishing to account ${accountId} on ${platform}`);
+            
+            // ====== AUTO-REMAP ORPHANED ACCOUNTS ======
+            const remap = await tryRemapOrphanedAccount(supabase, platform, accountId, campaignOwnerId);
+            if (remap.remapped && remap.newAccountId) {
+              // Successfully remapped to a new account
+              await persistAccountRemap(supabase, post.id, post.campaign?.id || '', platform, accountId, remap.newAccountId);
+              accountId = remap.newAccountId;
+            } else if (!remap.newAccountId && !remap.remapped) {
+              // Old account gone, no replacement found — check if it truly doesn't exist
+              const tokenValidation = await validateAccountToken(supabase, platform, accountId);
+              if (!tokenValidation.valid) {
+                console.error(`⛔ Account ${accountId} invalid and no replacement: ${tokenValidation.reason}`);
+                accountErrors.push(`Konto ${accountId.substring(0, 8)}: ${tokenValidation.reason}`);
+                continue;
+              }
+            }
             
             // ====== PRE-PUBLISH TOKEN VALIDATION ======
             const tokenValidation = await validateAccountToken(supabase, platform, accountId);
