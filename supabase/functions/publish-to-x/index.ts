@@ -4,8 +4,9 @@ import { createHmac } from "node:crypto";
 const API_KEY = Deno.env.get("TWITTER_CONSUMER_KEY")?.trim();
 const API_SECRET = Deno.env.get("TWITTER_CONSUMER_SECRET")?.trim();
 
-// Daily limit for X Free tier (15 tweets per 24 hours shared across app)
-const X_FREE_TIER_DAILY_LIMIT = 15;
+// Daily limit for X Free tier — raised to 50 to avoid false positives
+// The real X API will return 429 if we exceed the actual limit
+const X_FREE_TIER_DAILY_LIMIT = 50;
 // Monthly limit for X Free tier (estimated ~500/month)
 const X_FREE_TIER_MONTHLY_LIMIT = 500;
 

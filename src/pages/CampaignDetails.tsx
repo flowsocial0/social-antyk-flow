@@ -585,14 +585,14 @@ const CampaignDetails = () => {
 
   const retryAllFailedMutation = useMutation({
     mutationFn: async () => {
-      const failedPosts = posts?.filter((p: any) => p.status === 'failed') || [];
-      if (failedPosts.length === 0) return;
+      const retryablePosts = posts?.filter((p: any) => p.status === 'failed' || p.status === 'rate_limited') || [];
+      if (retryablePosts.length === 0) return;
 
-      // Stagger posts: each post gets scheduled 30 minutes after the previous one
+      // Stagger posts: each post gets scheduled 5 minutes after the previous one
       // First post starts in 2 minutes
-      const promises = failedPosts.map((post: any, index: number) => {
+      const promises = retryablePosts.map((post: any, index: number) => {
         const scheduledAt = new Date();
-        scheduledAt.setMinutes(scheduledAt.getMinutes() + 2 + (index * 30));
+        scheduledAt.setMinutes(scheduledAt.getMinutes() + 2 + (index * 5));
 
         return (supabase as any)
           .from("campaign_posts")
@@ -612,12 +612,12 @@ const CampaignDetails = () => {
       if (errors.length > 0) throw errors[0].error;
     },
     onSuccess: () => {
-      const failedCount = posts?.filter((p: any) => p.status === 'failed').length || 0;
-      const totalMinutes = 2 + ((failedCount - 1) * 30);
+      const retryableCount = posts?.filter((p: any) => p.status === 'failed' || p.status === 'rate_limited').length || 0;
+      const totalMinutes = 2 + ((retryableCount - 1) * 5);
       const hours = Math.floor(totalMinutes / 60);
       const mins = totalMinutes % 60;
       queryClient.invalidateQueries({ queryKey: ["campaign-posts", id] });
-      toast.success(`${failedCount} postów rozłożonych w czasie: od 2 min do ~${hours > 0 ? `${hours}h ${mins}min` : `${mins} min`}`);
+      toast.success(`${retryableCount} postów rozłożonych w czasie: od 2 min do ~${hours > 0 ? `${hours}h ${mins}min` : `${mins} min`}`);
     },
     onError: () => {
       toast.error("Błąd podczas ponownej próby");
@@ -909,13 +909,43 @@ const CampaignDetails = () => {
             </div>
           </div>
 
+          {/* Rate Limited Info */}
+          {rateLimitedCount > 0 && (
+            <div className="mt-4 p-4 rounded-lg border border-amber-500/30 bg-amber-500/5">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-amber-700 flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Oczekujące na limit ({rateLimitedCount})
+                </h4>
+                <span className="text-xs text-muted-foreground">System wznowi automatycznie</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Te posty czekają na zwolnienie limitu platformy i zostaną opublikowane automatycznie — nie musisz nic klikać.
+              </p>
+              {(() => {
+                const rateLimitedPosts = posts.filter((p: any) => p.status === 'rate_limited' && p.next_retry_at);
+                const soonest = rateLimitedPosts.length > 0
+                  ? rateLimitedPosts.reduce((min: any, p: any) => !min || new Date(p.next_retry_at) < new Date(min.next_retry_at) ? p : min, null)
+                  : null;
+                if (soonest) {
+                  return (
+                    <p className="text-sm text-amber-700 mt-1 font-medium">
+                      Najbliższa próba: {format(new Date(soonest.next_retry_at), "HH:mm", { locale: pl })}
+                    </p>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+          )}
+
           {/* Error Summary & Retry All */}
-          {failedCount > 0 && (
+          {(failedCount > 0 || rateLimitedCount > 0) && (
             <div className="mt-4 p-4 rounded-lg border border-destructive/30 bg-destructive/5">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-semibold text-destructive flex items-center gap-2">
                   <AlertCircle className="h-4 w-4" />
-                  Podsumowanie błędów ({failedCount})
+                  {failedCount > 0 ? `Błędy (${failedCount})` : ''}{failedCount > 0 && rateLimitedCount > 0 ? ' + ' : ''}{rateLimitedCount > 0 ? `Limity (${rateLimitedCount})` : ''}
                 </h4>
                 <Button
                   size="sm"
@@ -930,12 +960,13 @@ const CampaignDetails = () => {
               </div>
               <div className="space-y-1 text-sm text-muted-foreground max-h-32 overflow-y-auto">
                 {(() => {
-                  const failedPosts = posts.filter((p: any) => p.status === 'failed');
+                  const problemPosts = posts.filter((p: any) => p.status === 'failed' || p.status === 'rate_limited');
                   const errorGroups: Record<string, number> = {};
-                  failedPosts.forEach((p: any) => {
+                  problemPosts.forEach((p: any) => {
                     const msg = p.error_message || 'Nieznany błąd';
-                    // Categorize errors
-                    const key = msg.includes('rate limit') || msg.includes('too many') || msg.includes('429') || msg.includes('throttle')
+                    const key = p.status === 'rate_limited'
+                      ? '⏱ Limit platformy (auto-retry)'
+                      : msg.includes('rate limit') || msg.includes('too many') || msg.includes('429') || msg.includes('throttle')
                       ? '⏱ Limit platformy (rate limit)'
                       : msg.includes('Mega') || msg.includes('mega')
                       ? '📥 Błąd pobierania wideo (Mega.nz)'

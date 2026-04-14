@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 // App-level daily limit for X Free tier (shared across all users)
-const X_APP_DAILY_LIMIT = 15;
+const X_APP_DAILY_LIMIT = 50;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
