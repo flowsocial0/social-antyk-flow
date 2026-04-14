@@ -873,6 +873,12 @@ Deno.serve(async (req) => {
           // Consider platform successful if at least one account succeeded
           if (accountSuccessCount > 0) {
             platformSuccessCount++;
+          } else if (accountRateLimitedCount > 0 && accountErrors.length === 0) {
+            // ALL failures were rate-limits — don't count as hard failure
+            // The post status was already set to rate_limited by publish-to-x
+            // We must NOT overwrite it later with "failed"
+            console.log(`⏳ Platform ${platform}: all ${accountRateLimitedCount} accounts rate-limited, preserving rate_limited status`);
+            // Don't increment platformFailCount — skip to preserve rate_limited
           } else {
             platformFailCount++;
             const platformName = getPlatformNamePL(platform);
