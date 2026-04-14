@@ -909,13 +909,43 @@ const CampaignDetails = () => {
             </div>
           </div>
 
+          {/* Rate Limited Info */}
+          {rateLimitedCount > 0 && (
+            <div className="mt-4 p-4 rounded-lg border border-amber-500/30 bg-amber-500/5">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-amber-700 flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Oczekujące na limit ({rateLimitedCount})
+                </h4>
+                <span className="text-xs text-muted-foreground">System wznowi automatycznie</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Te posty czekają na zwolnienie limitu platformy i zostaną opublikowane automatycznie — nie musisz nic klikać.
+              </p>
+              {(() => {
+                const rateLimitedPosts = posts.filter((p: any) => p.status === 'rate_limited' && p.next_retry_at);
+                const soonest = rateLimitedPosts.length > 0
+                  ? rateLimitedPosts.reduce((min: any, p: any) => !min || new Date(p.next_retry_at) < new Date(min.next_retry_at) ? p : min, null)
+                  : null;
+                if (soonest) {
+                  return (
+                    <p className="text-sm text-amber-700 mt-1 font-medium">
+                      Najbliższa próba: {format(new Date(soonest.next_retry_at), "HH:mm", { locale: pl })}
+                    </p>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+          )}
+
           {/* Error Summary & Retry All */}
-          {failedCount > 0 && (
+          {(failedCount > 0 || rateLimitedCount > 0) && (
             <div className="mt-4 p-4 rounded-lg border border-destructive/30 bg-destructive/5">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-semibold text-destructive flex items-center gap-2">
                   <AlertCircle className="h-4 w-4" />
-                  Podsumowanie błędów ({failedCount})
+                  {failedCount > 0 ? `Błędy (${failedCount})` : ''}{failedCount > 0 && rateLimitedCount > 0 ? ' + ' : ''}{rateLimitedCount > 0 ? `Limity (${rateLimitedCount})` : ''}
                 </h4>
                 <Button
                   size="sm"
@@ -930,12 +960,13 @@ const CampaignDetails = () => {
               </div>
               <div className="space-y-1 text-sm text-muted-foreground max-h-32 overflow-y-auto">
                 {(() => {
-                  const failedPosts = posts.filter((p: any) => p.status === 'failed');
+                  const problemPosts = posts.filter((p: any) => p.status === 'failed' || p.status === 'rate_limited');
                   const errorGroups: Record<string, number> = {};
-                  failedPosts.forEach((p: any) => {
+                  problemPosts.forEach((p: any) => {
                     const msg = p.error_message || 'Nieznany błąd';
-                    // Categorize errors
-                    const key = msg.includes('rate limit') || msg.includes('too many') || msg.includes('429') || msg.includes('throttle')
+                    const key = p.status === 'rate_limited'
+                      ? '⏱ Limit platformy (auto-retry)'
+                      : msg.includes('rate limit') || msg.includes('too many') || msg.includes('429') || msg.includes('throttle')
                       ? '⏱ Limit platformy (rate limit)'
                       : msg.includes('Mega') || msg.includes('mega')
                       ? '📥 Błąd pobierania wideo (Mega.nz)'
