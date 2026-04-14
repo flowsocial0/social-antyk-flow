@@ -585,14 +585,14 @@ const CampaignDetails = () => {
 
   const retryAllFailedMutation = useMutation({
     mutationFn: async () => {
-      const failedPosts = posts?.filter((p: any) => p.status === 'failed') || [];
-      if (failedPosts.length === 0) return;
+      const retryablePosts = posts?.filter((p: any) => p.status === 'failed' || p.status === 'rate_limited') || [];
+      if (retryablePosts.length === 0) return;
 
-      // Stagger posts: each post gets scheduled 30 minutes after the previous one
+      // Stagger posts: each post gets scheduled 5 minutes after the previous one
       // First post starts in 2 minutes
-      const promises = failedPosts.map((post: any, index: number) => {
+      const promises = retryablePosts.map((post: any, index: number) => {
         const scheduledAt = new Date();
-        scheduledAt.setMinutes(scheduledAt.getMinutes() + 2 + (index * 30));
+        scheduledAt.setMinutes(scheduledAt.getMinutes() + 2 + (index * 5));
 
         return (supabase as any)
           .from("campaign_posts")
@@ -612,12 +612,12 @@ const CampaignDetails = () => {
       if (errors.length > 0) throw errors[0].error;
     },
     onSuccess: () => {
-      const failedCount = posts?.filter((p: any) => p.status === 'failed').length || 0;
-      const totalMinutes = 2 + ((failedCount - 1) * 30);
+      const retryableCount = posts?.filter((p: any) => p.status === 'failed' || p.status === 'rate_limited').length || 0;
+      const totalMinutes = 2 + ((retryableCount - 1) * 5);
       const hours = Math.floor(totalMinutes / 60);
       const mins = totalMinutes % 60;
       queryClient.invalidateQueries({ queryKey: ["campaign-posts", id] });
-      toast.success(`${failedCount} postów rozłożonych w czasie: od 2 min do ~${hours > 0 ? `${hours}h ${mins}min` : `${mins} min`}`);
+      toast.success(`${retryableCount} postów rozłożonych w czasie: od 2 min do ~${hours > 0 ? `${hours}h ${mins}min` : `${mins} min`}`);
     },
     onError: () => {
       toast.error("Błąd podczas ponownej próby");
