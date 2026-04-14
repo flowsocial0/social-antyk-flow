@@ -4,11 +4,7 @@ import { createHmac } from "node:crypto";
 const API_KEY = Deno.env.get("TWITTER_CONSUMER_KEY")?.trim();
 const API_SECRET = Deno.env.get("TWITTER_CONSUMER_SECRET")?.trim();
 
-// Daily limit for X Free tier — raised to 50 to avoid false positives
-// The real X API will return 429 if we exceed the actual limit
-const X_FREE_TIER_DAILY_LIMIT = 50;
-// Monthly limit for X Free tier (estimated ~500/month)
-const X_FREE_TIER_MONTHLY_LIMIT = 500;
+// X is now pay-per-post — no artificial limits. Only real API 429s are respected.
 
 function validateEnvironmentVariables() {
   if (!API_KEY) throw new Error("Missing TWITTER_CONSUMER_KEY environment variable");
@@ -228,104 +224,7 @@ async function preCheckXApiLimits(
   }
 }
 
-// Check daily publication limit (our own tracking, not API headers)
-// GLOBAL limit - counts ALL publications across ALL users/accounts
-async function checkDailyPublicationLimit(
-  supabaseClient: any
-): Promise<{ canPublish: boolean; publishedToday: number; resetAt: Date }> {
-  try {
-    const now = new Date();
-    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    
-    // Count ALL X publications across ALL users in last 24 hours
-    const { count, error } = await supabaseClient
-      .from('x_daily_publications')
-      .select('*', { count: 'exact', head: true })
-      .gte('published_at', twentyFourHoursAgo.toISOString());
-
-    if (error) {
-      console.error('Error checking daily publication limit:', error);
-      return { canPublish: true, publishedToday: 0, resetAt: now };
-    }
-
-    const publishedToday = count || 0;
-    const canPublish = publishedToday < X_FREE_TIER_DAILY_LIMIT;
-    
-    let resetAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    
-    if (!canPublish) {
-      const { data: oldestPublication } = await supabaseClient
-        .from('x_daily_publications')
-        .select('published_at')
-        .gte('published_at', twentyFourHoursAgo.toISOString())
-        .order('published_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      
-      if (oldestPublication?.published_at) {
-        resetAt = new Date(new Date(oldestPublication.published_at).getTime() + 24 * 60 * 60 * 1000);
-      }
-    }
-
-    console.log(`📊 Global daily publication check: ${publishedToday}/${X_FREE_TIER_DAILY_LIMIT} tweets in last 24h (all users). Can publish: ${canPublish}`);
-    
-    return { canPublish, publishedToday, resetAt };
-  } catch (err) {
-    console.error('Error in checkDailyPublicationLimit:', err);
-    return { canPublish: true, publishedToday: 0, resetAt: new Date() };
-  }
-}
-
-// Check monthly publication limit
-async function checkMonthlyPublicationLimit(
-  supabaseClient: any,
-  accountId: string
-): Promise<{ canPublish: boolean; publishedThisMonth: number; resetAt: Date }> {
-  try {
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    
-    // Count publications in last 30 days for this account
-    const { count, error } = await supabaseClient
-      .from('x_daily_publications')
-      .select('*', { count: 'exact', head: true })
-      .eq('account_id', accountId)
-      .gte('published_at', thirtyDaysAgo.toISOString());
-
-    if (error) {
-      console.error('Error checking monthly publication limit:', error);
-      return { canPublish: true, publishedThisMonth: 0, resetAt: now };
-    }
-
-    const publishedThisMonth = count || 0;
-    const canPublish = publishedThisMonth < X_FREE_TIER_MONTHLY_LIMIT;
-    
-    // Calculate approximate reset (oldest tweet in 30d window)
-    let resetAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    
-    if (!canPublish) {
-      const { data: oldestPublication } = await supabaseClient
-        .from('x_daily_publications')
-        .select('published_at')
-        .eq('account_id', accountId)
-        .gte('published_at', thirtyDaysAgo.toISOString())
-        .order('published_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      
-      if (oldestPublication?.published_at) {
-        resetAt = new Date(new Date(oldestPublication.published_at).getTime() + 30 * 24 * 60 * 60 * 1000);
-      }
-    }
-
-    console.log(`📊 Monthly publication check: ${publishedThisMonth}/${X_FREE_TIER_MONTHLY_LIMIT} tweets in last 30 days. Can publish: ${canPublish}`);
-    
-    return { canPublish, publishedThisMonth, resetAt };
-  } catch (err) {
-    console.error('Error in checkMonthlyPublicationLimit:', err);
-    return { canPublish: true, publishedThisMonth: 0, resetAt: new Date() };
-  }
-}
+// Daily/monthly limit functions removed — X is now pay-per-post, no artificial limits.
 
 // Save successful publication to our tracking table
 async function savePublication(
@@ -702,19 +601,14 @@ async function sendTweet(
       throw error;
     }
 
-    // Check for 429 and provide better error message
+    // Handle 429 rate limit from X API
     if (response.status === 429) {
-      const remaining = response.headers.get('x-rate-limit-remaining');
-      const remainingNum = remaining ? parseInt(remaining) : 0;
-      
-      // If remaining is high but we got 429, it's the daily publication limit
-      if (remainingNum > 100) {
-        const error = new Error(`Osiągnięto dzienny limit publikacji X (${X_FREE_TIER_DAILY_LIMIT} tweetów/24h dla Free tier). API rate limit OK (${remaining} pozostało), ale dzienny limit wyczerpany. Spróbuj ponownie za kilka godzin lub rozważ upgrade do Basic tier (100 tweetów/dzień).`);
-        (error as any).statusCode = 429;
-        (error as any).isDailyLimit = true;
-        (error as any).response = response;
-        throw error;
-      }
+      const resetHeader = response.headers.get('x-rate-limit-reset');
+      const resetInfo = resetHeader ? ` Reset: ${new Date(parseInt(resetHeader) * 1000).toISOString()}` : '';
+      const error = new Error(`X API rate limit (429).${resetInfo} Spróbuj ponownie za chwilę.`);
+      (error as any).statusCode = 429;
+      (error as any).response = response;
+      throw error;
     }
     
     const error = new Error(`Failed to send tweet: ${response.status}, body: ${responseText}`);
@@ -1008,39 +902,7 @@ Deno.serve(async (req) => {
     // Handle campaign post
     if (campaignPostId) {
       try {
-        // Check daily publication limit FIRST (our own tracking)
-        if (true) {
-          const dailyLimitCheck = await checkDailyPublicationLimit(supabaseClient);
-          if (!dailyLimitCheck.canPublish) {
-            console.log(`⚠️ Daily publication limit reached (${dailyLimitCheck.publishedToday}/${X_FREE_TIER_DAILY_LIMIT}). Reset at: ${dailyLimitCheck.resetAt.toISOString()}`);
-            
-            // Update campaign post with daily limit info
-            await supabaseClient
-              .from('campaign_posts')
-              .update({ 
-                status: 'rate_limited',
-                error_code: 'DAILY_LIMIT',
-                error_message: `Dzienny limit publikacji X wyczerpany (${dailyLimitCheck.publishedToday}/${X_FREE_TIER_DAILY_LIMIT} tweetów). Automatyczne ponowienie po resecie.`,
-                next_retry_at: dailyLimitCheck.resetAt.toISOString()
-              })
-              .eq('id', campaignPostId);
-            
-            return new Response(
-              JSON.stringify({ 
-                success: false, 
-                error: 'daily_limit',
-                published_today: dailyLimitCheck.publishedToday,
-                daily_limit: X_FREE_TIER_DAILY_LIMIT,
-                reset_at: dailyLimitCheck.resetAt.toISOString(),
-                message: `Dzienny limit publikacji X wyczerpany (${dailyLimitCheck.publishedToday}/${X_FREE_TIER_DAILY_LIMIT}). Free tier pozwala na ${X_FREE_TIER_DAILY_LIMIT} tweetów/24h. Publikacja zostanie wznowiona automatycznie.`
-              }),
-              { 
-                status: 200,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-              }
-            );
-          }
-        }
+        // No artificial daily limit check — X is pay-per-post now
 
         // Also check API rate limits (existing check)
         if (xAccountId) {
@@ -1243,8 +1105,7 @@ Deno.serve(async (req) => {
         const isRateLimitError = error.statusCode === 429 || 
           error.message?.includes('429') || 
           error.message?.includes('Too Many Requests') ||
-          error.message?.includes('rate limit') ||
-          error.isDailyLimit;
+          error.message?.includes('rate limit');
         
         if (isRateLimitError) {
           const { data: currentPost } = await supabaseClient
@@ -1254,39 +1115,30 @@ Deno.serve(async (req) => {
             .single();
           
           const retryCount = (currentPost?.retry_count || 0) + 1;
-          
-          // For daily limit, use longer delays
-          const isDailyLimit = error.isDailyLimit || error.message?.includes('dzienny limit');
-          const retryDelays = isDailyLimit ? [60, 120, 240] : [15, 30, 60];
+          const retryDelays = [5, 15, 30];
           const delayMinutes = retryDelays[Math.min(retryCount - 1, retryDelays.length - 1)];
           const nextRetryAt = new Date(Date.now() + delayMinutes * 60 * 1000).toISOString();
           
-          const errorMessage = isDailyLimit 
-            ? `Dzienny limit publikacji X wyczerpany (${X_FREE_TIER_DAILY_LIMIT} tweetów/24h). Automatyczne ponowienie za ${delayMinutes} minut.`
-            : `Rate limit osiągnięty. Automatyczne ponowienie za ${delayMinutes} minut.`;
+          const errorMessage = `X API rate limit (429). Automatyczne ponowienie za ${delayMinutes} minut.`;
           
-          const { error: rateLimitUpdateError } = await supabaseClient
+          await supabaseClient
             .from('campaign_posts')
             .update({ 
               status: 'rate_limited',
-              error_code: isDailyLimit ? 'DAILY_LIMIT' : '429',
+              error_code: '429',
               error_message: errorMessage,
               retry_count: retryCount,
               next_retry_at: nextRetryAt
             })
             .eq('id', campaignPostId);
           
-          if (rateLimitUpdateError) {
-            console.error(`Failed to update campaign post with rate limit info:`, rateLimitUpdateError);
-          } else {
-            console.log(`✅ Rate limit info saved. Retry ${retryCount} scheduled for: ${nextRetryAt}`);
-          }
+          console.log(`✅ Rate limit info saved. Retry ${retryCount} scheduled for: ${nextRetryAt}`);
           
           return new Response(
             JSON.stringify({ 
               success: false, 
               error: errorMessage,
-              errorCode: isDailyLimit ? 'X_DAILY_LIMIT' : 'X_RATE_LIMIT',
+              errorCode: 'X_RATE_LIMIT',
               retry_count: retryCount,
               next_retry_at: nextRetryAt,
               message: errorMessage
@@ -1340,19 +1192,7 @@ Deno.serve(async (req) => {
     
     for (const id of idsToPublish) {
       try {
-        // Check daily publication limit before each book (global)
-        {
-          const dailyLimitCheck = await checkDailyPublicationLimit(supabaseClient);
-          if (!dailyLimitCheck.canPublish) {
-            console.log(`⚠️ Daily publication limit reached for book ${id}`);
-            results.push({
-              bookId: id,
-              success: false,
-              error: `Dzienny limit publikacji X wyczerpany (${dailyLimitCheck.publishedToday}/${X_FREE_TIER_DAILY_LIMIT}). Spróbuj ponownie za kilka godzin.`
-            });
-            continue;
-          }
-        }
+        // No artificial daily limit — X is pay-per-post
 
         const { data: book, error: bookError } = await supabaseClient
           .from('books')
