@@ -975,38 +975,59 @@ Deno.serve(async (req) => {
             success: true
           });
         } else if (platformFailCount > 0) {
-          // Mark as failed with detailed error message
-          const errorMessage = platformErrors.length > 0 
-            ? platformErrors.join(' | ')
-            : `Nie udało się opublikować na ${platformFailCount} z ${platforms.length} platform.`;
-          
-          // Check if the error is rate-limit related → use rate_limited instead of failed
-          const isRateError = isRateLimitErrorMessage(errorMessage);
-          const newStatus = isRateError ? 'rate_limited' : 'failed';
-          const retryAt = isRateError ? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() : null;
-          
-          const { error: updateError } = await supabase
+          // Before overwriting, check if publish-to-x already set rate_limited
+          const { data: currentPostState } = await supabase
             .from('campaign_posts')
-            .update({
-              status: newStatus,
-              error_message: errorMessage,
-              error_code: isRateError ? 'RATE_LIMITED' : 'PUBLISH_FAILED',
-              next_retry_at: retryAt
-            })
-            .eq('id', post.id);
-
-          if (updateError) {
-            console.error(`Error updating campaign post status to failed:`, updateError);
-          }
+            .select('status, next_retry_at')
+            .eq('id', post.id)
+            .single();
           
-          failCount++;
-          results.push({
-            id: post.id,
-            type: 'campaign_post',
-            platforms: platforms,
-            success: false,
-            error: errorMessage
-          });
+          if (currentPostState?.status === 'rate_limited' && currentPostState?.next_retry_at) {
+            // publish-to-x already set the correct rate_limited status with retry time
+            // Do NOT overwrite it with 'failed'
+            console.log(`⏳ Post ${post.id} already rate_limited by publish function, preserving status (retry at ${currentPostState.next_retry_at})`);
+            results.push({
+              id: post.id,
+              type: 'campaign_post',
+              platforms: platforms,
+              success: false,
+              error: 'rate_limited',
+              is_rate_limit: true
+            });
+          } else {
+            // Mark as failed with detailed error message
+            const errorMessage = platformErrors.length > 0 
+              ? platformErrors.join(' | ')
+              : `Nie udało się opublikować na ${platformFailCount} z ${platforms.length} platform.`;
+            
+            // Check if the error is rate-limit related → use rate_limited instead of failed
+            const isRateError = isRateLimitErrorMessage(errorMessage);
+            const newStatus = isRateError ? 'rate_limited' : 'failed';
+            const retryAt = isRateError ? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() : null;
+            
+            const { error: updateError } = await supabase
+              .from('campaign_posts')
+              .update({
+                status: newStatus,
+                error_message: errorMessage,
+                error_code: isRateError ? 'RATE_LIMITED' : 'PUBLISH_FAILED',
+                next_retry_at: retryAt
+              })
+              .eq('id', post.id);
+
+            if (updateError) {
+              console.error(`Error updating campaign post status to ${newStatus}:`, updateError);
+            }
+            
+            failCount++;
+            results.push({
+              id: post.id,
+              type: 'campaign_post',
+              platforms: platforms,
+              success: false,
+              error: errorMessage
+            });
+          }
         }
 
       } catch (error: any) {
