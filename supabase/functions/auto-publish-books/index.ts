@@ -834,8 +834,10 @@ Deno.serve(async (req) => {
                 data?.errorCode === 'CREDITS_DEPLETED';
               
               if (isRateLimitError) {
-                // Don't add to accountErrors - this will be handled at post level
+                // Track rate-limited accounts separately — don't treat as hard failure
                 console.log(`Rate limit detected for ${platform} account ${accountId}, will set rate_limited`);
+                accountRateLimitedCount++;
+                // Preserve the next_retry_at from publish-to-x if it was set
               } else {
                 accountErrors.push(`Konto ${accountId.substring(0, 8)}: ${errorMsg}`);
               }
