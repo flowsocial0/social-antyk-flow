@@ -1,63 +1,73 @@
+<final-text>Co ustaliłem
 
-Co ustaliłem:
-- To nie wygląda na globalny brak publikacji „od 3 kwietnia”. W danych `platform_publications` dla tego użytkownika widać realne publikacje:
-  - X: do 2026-04-07 21:00 UTC, 40 publikacji
-  - Facebook: do 2026-04-07 21:00 UTC, 152 publikacje
-  - Instagram: 3 publikacje 2026-04-03
-- Problem dotyczy głównie konkretnych kampanii po ponownym podłączeniu kont społecznościowych 2026-04-08.
+1. X nie stał już przez dawny limit `1 post / 30 min` w `auto-publish-books`. Ten fragment jest teraz podniesiony do `100 / 1 min`, więc to nie on blokował wczoraj.
+2. Nadal istnieją jednak dwie inne blokady X:
+   - `publish-to-x` ma twardo wpisany limit `15 tweetów / 24h`
+   - ta sama funkcja reaguje też na API 429 / daily-limit i ustawia `campaign_posts.status = rate_limited` z `next_retry_at`
+3. Najważniejszy błąd jest potem w `auto-publish-books`: gdy `publish-to-x` zwraca odpowiedź limitową, scheduler rozpoznaje, że to rate-limit, ale gubi tę informację przy finalnym zapisie statusu. W praktyce:
+   - nie zapisuje szczegółu limitu do `accountErrors`
+   - tworzy ogólny komunikat `X (Twitter): Nie udało się opublikować na żadne konto.`
+   - na końcu nadpisuje post na `failed / PUBLISH_FAILED`
+4. To dokładnie tłumaczy objaw zgłoszony przez użytkownika:
+   - backend chwilowo wie, że trzeba poczekać i ma `next_retry_at`
+   - ale scheduler kasuje ten stan
+   - post nie wznawia się sam
+   - użytkownik musi klikać ręczne „Wyślij ponownie”
 
-Główna przyczyna:
-- Kampanie zapisują konta na sztywno przez UUID w:
-  - `campaigns.selected_accounts`
-  - `campaign_posts.target_accounts`
-- Po ponownym połączeniu kont 8 kwietnia utworzyły się nowe rekordy tokenów z nowymi ID.
-- Stare kampanie nadal wskazują stare, już nieistniejące ID, więc auto-publish kończy się błędem:
-  `Konto nie istnieje. Połącz ponownie w ustawieniach.`
+Dlaczego więc X stanął wczoraj
 
-Najmocniejszy dowód:
-- Kampania `x oraz Instagram Facebook Linkedin 1,5 % na rzecz RKW` nadal celuje w stare ID:
-  - X `22daa0ba-...`
-  - Instagram `ca626cbc-...`
-  - LinkedIn `ada9478d-...`
-  - Facebook `ea5e3da9-...`, `e943cb0b-...`, `4e4847a5-...`, `2c3bdbdb-...`
-- Tymczasem aktualnie podłączone konta mają już inne ID:
-  - X `82fc46ce-...`
-  - Instagram `eeea0325-...`
-  - LinkedIn `b4e0c988-...`
-  - Facebook nowe ID z 2026-04-08
+Najbardziej prawdopodobny scenariusz jest taki:
+```text
+X wpada w ścieżkę limitu / 429 / daily-limit
+-> publish-to-x ustawia rate_limited + next_retry_at
+-> auto-publish-books odbiera success:false
+-> gubi informację, że to limit
+-> zamienia to na zwykły failed
+-> auto retry przestaje działać
+-> użytkownik ręcznie ponawia
+```
 
-Dodatkowe ustalenia:
-- Część kampanii ma status `paused`, więc one i tak nie będą publikować, dopóki nie zostaną wznowione.
-- Osobno istnieje też kampania YouTube, która pada na wygasłym tokenie:
-  `Token YouTube wygasł. Połącz konto ponownie.`
-- Czyli to nie jest jeden wspólny problem silnika publikacji, tylko głównie:
-  1. stare ID kont po reconnect,
-  2. część kampanii w `paused`,
-  3. pojedyncze osobne problemy z tokenami.
+Dodatkowe rzeczy, które to pogarszają
 
-Plan naprawy:
-1. Dodać automatyczne wykrywanie „osieroconych” kont w `auto-publish-books`
-   - jeśli `target_accounts` wskazuje nieistniejące konto, system ma rozpoznać to jako stale reference zamiast zwykłego `PUBLISH_FAILED`
-2. Dodać automatyczne przepinanie na aktualne konto użytkownika
-   - X po `screen_name`
-   - Instagram po `instagram_username` / `account_name`
-   - LinkedIn po `display_name` / `account_name`
-   - Facebook po `page_name`
-3. Przygotować jednorazową naprawę istniejących danych kampanii
-   - zaktualizować `campaigns.selected_accounts`
-   - zaktualizować `campaign_posts.target_accounts`
-   - tylko tam, gdzie stare ID już nie istnieją
-4. Poprawić UI kampanii
-   - wyraźny komunikat: „Kampania wskazuje stare konto po ponownym połączeniu”
-   - akcja typu „Odśwież konta w kampanii”
-5. Poprawić `ResumeCampaignDialog`
-   - teraz kopiuje stare `selected_accounts` / `target_accounts` 1:1, więc może utrwalać problem po reconnect
+- `publish-to-x` i `get-x-rate-limits` nadal bazują na sztywnej wartości `15/doba`, więc samo „przesunięcie wewnętrznych limitów” nie usunęło wszystkich blokad X.
+- UI kampanii ma osobne ręczne retry:
+  - pojedynczy post ustawia retry za 2 minuty
+  - „Ponów wszystkie” rozkłada błędne posty co 30 minut
+  To dodatkowo wzmacnia wrażenie, że system działa tylko po ręcznym szturchaniu.
 
-Pliki do zmiany:
+Pliki wskazujące na problem
+
+- `supabase/functions/publish-to-x/index.ts`
+  - hardcoded `15/24h`
+  - ustawianie `rate_limited` i `next_retry_at`
 - `supabase/functions/auto-publish-books/index.ts`
+  - wykrycie rate-limit bez zachowania statusu
+  - późniejsze nadpisanie na `failed`
 - `src/pages/CampaignDetails.tsx`
-- `src/components/campaigns/ResumeCampaignDialog.tsx`
+  - ręczne retry failed posts z rozstawem 30 min
 
-Najważniejszy wniosek:
-- Problem nie polega na tym, że cały system publikacji przestał działać po 3 kwietnia.
-- Problem polega na tym, że po ponownym podłączeniu kont stare kampanie nadal próbują publikować na nieistniejące rekordy kont, więc automatyczna publikacja z tych kampanii jest skazana na błąd mimo tego, że nowe konta są już poprawnie podłączone.
+Plan naprawy
+
+1. Poprawić `auto-publish-books`, żeby nie nadpisywał limitów X na zwykły `failed`
+   - zachować `rate_limited`
+   - zachować `next_retry_at`
+   - nie generować ogólnego błędu „nie udało się na żadne konto”, jeśli przyczyna była limitowa
+2. Ujednolicić kody błędów X między funkcjami
+   - obecnie mieszają się `DAILY_LIMIT`, `X_API_DAILY_LIMIT`, `X_DAILY_LIMIT`, `429`, `X_RATE_LIMIT`
+   - scheduler ma dostać jeden spójny sygnał: „to jest auto-retry, nie failure”
+3. Zweryfikować limit `15/24h` w `publish-to-x` oraz `get-x-rate-limits`
+   - jeśli ten limit ma zostać, musi być jasno komunikowany
+   - jeśli nie jest już aktualny, trzeba go usunąć z obu miejsc, nie tylko z `auto-publish-books`
+4. Doprecyzować UI kampanii
+   - osobno pokazywać `failed` i `rate_limited`
+   - wyraźnie pokazać: „system wznowi automatycznie o ...”
+   - ograniczyć potrzebę ręcznego retry
+5. Po wdrożeniu zrobić test end-to-end
+   - wymusić odpowiedź limitową z X
+   - sprawdzić, że post zostaje w `rate_limited`
+   - sprawdzić, że cron podnosi go automatycznie po `next_retry_at`
+   - potwierdzić, że użytkownik nie musi nic klikać
+
+Uwaga techniczna
+
+W repo jest też bieżący problem builda z `megajs` w `auto-publish-books`. To nie wygląda na główną przyczynę wczorajszego zatrzymania X, ale trzeba to naprawić w tym samym podejściu, bo może blokować bezpieczne wdrożenie kolejnej poprawki.</final-text>
