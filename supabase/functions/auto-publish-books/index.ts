@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { File as MegaFile } from 'https://esm.sh/megajs@1.3.9';
 
 const MEGA_REGEX = /^https?:\/\/mega\.nz\/(file|folder)\//;
 
@@ -14,6 +13,16 @@ async function resolveMegaUrl(
   }
 
   console.log(`Resolving Mega.nz URL for post ${postId}...`);
+  
+  // Dynamic import to avoid build failures when megajs is unavailable
+  let MegaFile: any;
+  try {
+    const megaModule = await import('https://esm.sh/megajs@1.3.9');
+    MegaFile = megaModule.File;
+  } catch (err: any) {
+    throw new Error(`Mega.nz resolver unavailable: ${err.message}. Use a direct .mp4 URL instead.`);
+  }
+  
   const tempPath = `temp-videos/${postId}-${Date.now()}.mp4`;
 
   const file = MegaFile.fromURL(videoUrl);
