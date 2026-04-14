@@ -8,14 +8,15 @@ const corsHeaders = {
 
 // Platform limits configuration
 const PLATFORM_LIMITS = {
+  // X is pay-per-post — no artificial limits
   x: {
     free: {
-      daily: 17,      // 17 tweets per 24h
-      monthly: 500,   // 500 tweets per month (estimated for free tier)
+      daily: 999999,
+      monthly: 999999,
     },
     basic: {
-      daily: 100,     // Basic tier
-      monthly: 3000,
+      daily: 999999,
+      monthly: 999999,
     }
   },
   facebook: {

@@ -79,8 +79,8 @@ export const CampaignSetup = ({
     setConnectedPlatforms(connectionStatus as Record<PlatformId, boolean>);
   };
   const handlePostsPerDayChange = (value: number) => {
-    // Limit to max 10 posts per day (X/Twitter daily limit for free tier)
-    const limitedValue = Math.min(value, 10);
+    // Allow up to 50 posts per day (no platform limit restriction)
+    const limitedValue = Math.min(value, 50);
     setPostsPerDay(limitedValue);
 
     // Generate unique odd hours for posting times
