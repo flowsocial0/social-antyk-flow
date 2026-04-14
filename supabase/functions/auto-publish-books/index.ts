@@ -748,6 +748,7 @@ Deno.serve(async (req) => {
           console.log(`Publishing to ${accountsForPlatform.length} accounts on ${platform}`);
           let accountSuccessCount = 0;
           const accountErrors: string[] = [];
+          let accountRateLimitedCount = 0;
           
           for (let accountId of accountsForPlatform) {
             console.log(`Publishing to account ${accountId} on ${platform}`);
