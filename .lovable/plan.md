@@ -1,73 +1,63 @@
-<final-text>Co ustaliłem
 
-1. X nie stał już przez dawny limit `1 post / 30 min` w `auto-publish-books`. Ten fragment jest teraz podniesiony do `100 / 1 min`, więc to nie on blokował wczoraj.
-2. Nadal istnieją jednak dwie inne blokady X:
-   - `publish-to-x` ma twardo wpisany limit `15 tweetów / 24h`
-   - ta sama funkcja reaguje też na API 429 / daily-limit i ustawia `campaign_posts.status = rate_limited` z `next_retry_at`
-3. Najważniejszy błąd jest potem w `auto-publish-books`: gdy `publish-to-x` zwraca odpowiedź limitową, scheduler rozpoznaje, że to rate-limit, ale gubi tę informację przy finalnym zapisie statusu. W praktyce:
-   - nie zapisuje szczegółu limitu do `accountErrors`
-   - tworzy ogólny komunikat `X (Twitter): Nie udało się opublikować na żadne konto.`
-   - na końcu nadpisuje post na `failed / PUBLISH_FAILED`
-4. To dokładnie tłumaczy objaw zgłoszony przez użytkownika:
-   - backend chwilowo wie, że trzeba poczekać i ma `next_retry_at`
-   - ale scheduler kasuje ten stan
-   - post nie wznawia się sam
-   - użytkownik musi klikać ręczne „Wyślij ponownie”
 
-Dlaczego więc X stanął wczoraj
+## Plan: Usunięcie wszystkich limitów X z aplikacji
 
-Najbardziej prawdopodobny scenariusz jest taki:
-```text
-X wpada w ścieżkę limitu / 429 / daily-limit
--> publish-to-x ustawia rate_limited + next_retry_at
--> auto-publish-books odbiera success:false
--> gubi informację, że to limit
--> zamienia to na zwykły failed
--> auto retry przestaje działać
--> użytkownik ręcznie ponawia
-```
+X jest teraz płatny za każdy post — nie ma już żadnych limitów dziennych/miesięcznych. Jedyne limity, które powinny pozostać, to te zwracane przez samo API X (429), ale nasza aplikacja nie powinna ich sztucznie wymuszać.
 
-Dodatkowe rzeczy, które to pogarszają
+### Zlokalizowane miejsca z limitami X
 
-- `publish-to-x` i `get-x-rate-limits` nadal bazują na sztywnej wartości `15/doba`, więc samo „przesunięcie wewnętrznych limitów” nie usunęło wszystkich blokad X.
-- UI kampanii ma osobne ręczne retry:
-  - pojedynczy post ustawia retry za 2 minuty
-  - „Ponów wszystkie” rozkłada błędne posty co 30 minut
-  To dodatkowo wzmacnia wrażenie, że system działa tylko po ręcznym szturchaniu.
+| # | Plik | Co robi | Linia(e) |
+|---|------|---------|----------|
+| 1 | `supabase/functions/publish-to-x/index.ts` | `X_FREE_TIER_DAILY_LIMIT = 50` — blokuje publikację po 50 postach/24h | 7-11 |
+| 2 | `supabase/functions/publish-to-x/index.ts` | `X_FREE_TIER_MONTHLY_LIMIT = 500` — blokuje po 500/miesiąc | 11 |
+| 3 | `supabase/functions/publish-to-x/index.ts` | `checkDailyPublicationLimit()` — cała funkcja licząca posty w 24h | 233-277 |
+| 4 | `supabase/functions/publish-to-x/index.ts` | `checkMonthlyPublicationLimit()` — cała funkcja licząca posty w 30 dni | 280-328 |
+| 5 | `supabase/functions/publish-to-x/index.ts` | Wywołanie `checkDailyPublicationLimit` przed kampanią — blokuje post | 1012-1042 |
+| 6 | `supabase/functions/publish-to-x/index.ts` | Wywołanie `checkDailyPublicationLimit` przed każdą książką | 1344-1355 |
+| 7 | `supabase/functions/publish-to-x/index.ts` | Obsługa 429 z komunikatem o "Free tier" i dziennym limicie | 710-718 |
+| 8 | `supabase/functions/publish-to-x/index.ts` | `isDailyLimit` w catch — ustawia `DAILY_LIMIT`, retry z długimi opóźnieniami | 1243-1298 |
+| 9 | `supabase/functions/get-x-rate-limits/index.ts` | `X_APP_DAILY_LIMIT = 50` — cała edge function służy do pokazywania limitu | cały plik |
+| 10 | `supabase/functions/get-platform-limits/index.ts` | `x.free.daily: 17, x.free.monthly: 500, x.basic.daily: 100` | 12-19 |
+| 11 | `src/components/platforms/XRateLimitStatus.tsx` | Cały komponent UI pokazujący "Limit aplikacji X (24h)" | cały plik |
+| 12 | `src/pages/platforms/PlatformX.tsx` | `<XRateLimitStatus />` — import i wyświetlanie widgetu | 8, 27 |
+| 13 | `src/components/campaigns/CampaignSetup.tsx` | `Math.min(value, 10)` z komentarzem "X/Twitter daily limit for free tier" | 82-83 |
+| 14 | `supabase/functions/auto-publish-books/index.ts` | `x: { maxPosts: 100, windowMinutes: 1 }` z komentarzem "max 15/day on free tier" | 140 |
 
-Pliki wskazujące na problem
+### Plan zmian
 
-- `supabase/functions/publish-to-x/index.ts`
-  - hardcoded `15/24h`
-  - ustawianie `rate_limited` i `next_retry_at`
-- `supabase/functions/auto-publish-books/index.ts`
-  - wykrycie rate-limit bez zachowania statusu
-  - późniejsze nadpisanie na `failed`
-- `src/pages/CampaignDetails.tsx`
-  - ręczne retry failed posts z rozstawem 30 min
+**1. `supabase/functions/publish-to-x/index.ts`**
+- Usunąć stałe `X_FREE_TIER_DAILY_LIMIT` i `X_FREE_TIER_MONTHLY_LIMIT`
+- Usunąć funkcje `checkDailyPublicationLimit()` i `checkMonthlyPublicationLimit()`
+- Usunąć wywołania tych funkcji przed kampanią (linie 1012-1042) i przed książkami (1344-1355)
+- W obsłudze 429: zostawić sam retry na API 429 (to realne limity od X), ale usunąć komunikaty o "Free tier" i "dziennym limicie"
+- W catch: uprościć — usunąć `isDailyLimit` ścieżkę, traktować 429 jako zwykły API rate-limit z krótkim retry
+- Zachować `savePublication()` (tracking do `x_daily_publications`) — przydatne do statystyk, ale nie do blokowania
 
-Plan naprawy
+**2. `supabase/functions/get-x-rate-limits/index.ts`**
+- Usunąć stałą `X_APP_DAILY_LIMIT`
+- Przerobić funkcję: zamiast zwracać "remaining vs limit", zwracać tylko statystyki publikacji (ile opublikowano w 24h) bez oznaczania jako "is_limited"
+- Albo usunąć tę edge function całkowicie, jeśli UI widget też usuwamy
 
-1. Poprawić `auto-publish-books`, żeby nie nadpisywał limitów X na zwykły `failed`
-   - zachować `rate_limited`
-   - zachować `next_retry_at`
-   - nie generować ogólnego błędu „nie udało się na żadne konto”, jeśli przyczyna była limitowa
-2. Ujednolicić kody błędów X między funkcjami
-   - obecnie mieszają się `DAILY_LIMIT`, `X_API_DAILY_LIMIT`, `X_DAILY_LIMIT`, `429`, `X_RATE_LIMIT`
-   - scheduler ma dostać jeden spójny sygnał: „to jest auto-retry, nie failure”
-3. Zweryfikować limit `15/24h` w `publish-to-x` oraz `get-x-rate-limits`
-   - jeśli ten limit ma zostać, musi być jasno komunikowany
-   - jeśli nie jest już aktualny, trzeba go usunąć z obu miejsc, nie tylko z `auto-publish-books`
-4. Doprecyzować UI kampanii
-   - osobno pokazywać `failed` i `rate_limited`
-   - wyraźnie pokazać: „system wznowi automatycznie o ...”
-   - ograniczyć potrzebę ręcznego retry
-5. Po wdrożeniu zrobić test end-to-end
-   - wymusić odpowiedź limitową z X
-   - sprawdzić, że post zostaje w `rate_limited`
-   - sprawdzić, że cron podnosi go automatycznie po `next_retry_at`
-   - potwierdzić, że użytkownik nie musi nic klikać
+**3. `supabase/functions/get-platform-limits/index.ts`**
+- Usunąć sekcję `x.free` i `x.basic` z `PLATFORM_LIMITS` albo ustawić bardzo wysokie wartości (np. 99999) żeby nie blokować
 
-Uwaga techniczna
+**4. `src/components/platforms/XRateLimitStatus.tsx`**
+- Usunąć cały komponent (nie ma sensu pokazywać limitu, który nie istnieje)
 
-W repo jest też bieżący problem builda z `megajs` w `auto-publish-books`. To nie wygląda na główną przyczynę wczorajszego zatrzymania X, ale trzeba to naprawić w tym samym podejściu, bo może blokować bezpieczne wdrożenie kolejnej poprawki.</final-text>
+**5. `src/pages/platforms/PlatformX.tsx`**
+- Usunąć import i użycie `<XRateLimitStatus />`
+
+**6. `src/components/campaigns/CampaignSetup.tsx`**
+- Usunąć `Math.min(value, 10)` — pozwolić na dowolną liczbę postów dziennie (lub ustawić rozsądny max UI np. 50)
+- Usunąć komentarz o "X/Twitter daily limit for free tier"
+
+**7. `supabase/functions/auto-publish-books/index.ts`**
+- Usunąć komentarz "max 15/day on free tier" przy `x: { maxPosts: 100, windowMinutes: 1 }`
+- Zachować sam throttling (100/1min) jako ochronę przed spamem — to nie jest limit X, to nasz wewnętrzny throttle
+
+**Co zostaje:**
+- Obsługa API 429 od X (realne limity serwera) — ale bez komunikatów o "Free tier"
+- Zapis do `x_daily_publications` — do statystyk
+- Wewnętrzny throttling w `auto-publish-books` — ochrona przed spamem
+- Tabela `platform_rate_limits` — do śledzenia API headers
+
