@@ -145,6 +145,7 @@ export const CampaignsList = () => {
 
   const { data: campaigns, isLoading } = useQuery({
     queryKey: ['campaigns'],
+    staleTime: 0,
     queryFn: async () => {
       const { data: campaignsData, error: campaignsError } = await (supabase as any)
         .from('campaigns')
@@ -153,18 +154,21 @@ export const CampaignsList = () => {
 
       if (campaignsError) throw campaignsError;
 
-      // Single aggregated RPC call avoids the 1000-row default limit and N+1 queries
-      const { data: countsData, error: countsError } = await (supabase as any)
-        .rpc('get_campaign_post_counts');
+      const ids = (campaignsData || []).map((c: any) => c.id);
+
+      // Single aggregated RPC call (SECURITY DEFINER) avoids 1000-row default limit and N+1
+      const { data: countsData, error: countsError } = ids.length
+        ? await (supabase as any).rpc('get_campaign_post_counts', { _campaign_ids: ids })
+        : { data: [], error: null };
 
       if (countsError) {
-        console.error('Failed to fetch campaign post counts:', countsError);
+        console.error('[CampaignsList] get_campaign_post_counts RPC error:', countsError);
       }
 
       const countsByCampaign: Record<string, Record<string, number>> = {};
       (countsData || []).forEach((row: any) => {
         if (!countsByCampaign[row.campaign_id]) countsByCampaign[row.campaign_id] = {};
-        countsByCampaign[row.campaign_id][row.status] = Number(row.count) || 0;
+        countsByCampaign[row.campaign_id][row.status] = Number(row.cnt) || 0;
       });
 
       const campaignsWithCounts = (campaignsData || []).map((campaign: any) => {
