@@ -585,7 +585,12 @@ const CampaignDetails = () => {
 
   const retryAllFailedMutation = useMutation({
     mutationFn: async () => {
-      const retryablePosts = posts?.filter((p: any) => p.status === 'failed' || p.status === 'rate_limited') || [];
+      // Exclude X_CREDITS_DEPLETED — retrying without user topping up credits = guaranteed re-failure
+      const retryablePosts = posts?.filter((p: any) =>
+        (p.status === 'failed' || p.status === 'rate_limited') &&
+        p.error_code !== 'X_CREDITS_DEPLETED' &&
+        !(p.error_message || '').includes('CreditsDepleted')
+      ) || [];
       if (retryablePosts.length === 0) return;
 
       // Stagger posts: each post gets scheduled 5 minutes after the previous one
