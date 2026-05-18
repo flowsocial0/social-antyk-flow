@@ -671,6 +671,11 @@ async function sendTweetWithRateLimitTracking(
         await saveRateLimitInfo(supabaseClient, accountId, 'tweets', error.response);
       }
       
+      // Permanent errors (like 402 CreditsDepleted) — do not retry
+      if (error.permanent) {
+        throw error;
+      }
+      
       if (error.message.includes('429')) {
         // Check if this is a daily limit error (not API rate limit)
         if (error.isDailyLimit) {
