@@ -846,15 +846,25 @@ Deno.serve(async (req) => {
               const errorMsg = data?.message || data?.error || publishError?.message || 'Nieznany błąd';
               console.error(`Failed to publish campaign post ${post.id} to ${platform} account ${accountId}:`, errorMsg);
               
-              // Check if it's a rate limit error (expanded patterns)
-              const isRateLimitError = isRateLimitErrorMessage(errorMsg) ||
+              // Permanent errors (e.g. X CreditsDepleted 402) — don't retry, mark account depleted for this cycle
+              const isPermanentError = isPermanentErrorMessage(errorMsg) ||
+                data?.errorCode === 'X_CREDITS_DEPLETED' ||
+                data?.errorCode === 'CREDITS_DEPLETED';
+
+              // Check if it's a rate limit error (expanded patterns) — only if not permanent
+              const isRateLimitError = !isPermanentError && (
+                isRateLimitErrorMessage(errorMsg) ||
                 data?.error === 'rate_limit' ||
                 data?.errorCode === 'RATE_LIMITED' ||
                 data?.errorCode === 'DAILY_LIMIT' ||
-                data?.errorCode === 'X_API_DAILY_LIMIT' ||
-                data?.errorCode === 'CREDITS_DEPLETED';
-              
-              if (isRateLimitError) {
+                data?.errorCode === 'X_API_DAILY_LIMIT'
+              );
+
+              if (isPermanentError) {
+                console.error(`⛔ Permanent error for ${platform} account ${accountId.substring(0,8)} — flagging depleted, no retry: ${errorMsg}`);
+                depletedAccountsThisCycle.add(`${platform}:${accountId}`);
+                accountErrors.push(`Konto ${accountId.substring(0, 8)}: brak kredytów na X — doładuj konto na developer.x.com`);
+              } else if (isRateLimitError) {
                 // Track rate-limited accounts separately — don't treat as hard failure
                 console.log(`Rate limit detected for ${platform} account ${accountId}, will set rate_limited`);
                 accountRateLimitedCount++;
