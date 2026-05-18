@@ -1699,10 +1699,10 @@ export type Database = {
     }
     Functions: {
       get_campaign_post_counts: {
-        Args: never
+        Args: { _campaign_ids: string[] }
         Returns: {
           campaign_id: string
-          count: number
+          cnt: number
           status: string
         }[]
       }
