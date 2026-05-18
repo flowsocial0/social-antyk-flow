@@ -568,6 +568,10 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Track accounts that returned a permanent error (e.g. X CreditsDepleted) within this cycle —
+    // skip them for the rest of the cycle to avoid hammering the API and spamming logs.
+    const depletedAccountsThisCycle = new Set<string>(); // key: `${platform}:${accountId}`
+
     // Publish campaign posts
     for (const post of (campaignPostsToPublish || []) as CampaignPost[]) {
       console.log(`Publishing campaign post: ${post.id}`);
