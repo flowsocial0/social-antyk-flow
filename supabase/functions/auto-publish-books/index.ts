@@ -151,13 +151,24 @@ const RATE_LIMIT_ERROR_PATTERNS = [
   'too many actions', 'throttle', 'ograniczamy liczbę', 'rate limit',
   '429', 'Too Many Requests', 'spam', 'try again later',
   'limit exceeded', 'Please wait', 'slow down',
-  'DAILY_LIMIT', 'X_API_DAILY_LIMIT', 'CreditsDepleted', 'credits depleted',
+  'DAILY_LIMIT', 'X_API_DAILY_LIMIT',
   'APPLICATION_AND_MEMBER DAY', 'member day', 'application day',
   'zbyt wiele', 'za dużo', 'poczekaj', 'spróbuj później',
   'too many requests', 'too_many_requests', 'temporarily blocked',
   'User request limit reached', 'quota', 'exceeded the rate limit',
   '15/15 dzienny limit', 'dzienny limit',
 ];
+
+// Permanent (non-recoverable until user acts) error patterns — do NOT retry
+const PERMANENT_ERROR_PATTERNS = [
+  'CreditsDepleted', 'credits depleted', 'X_CREDITS_DEPLETED',
+  '402', 'does not have any credits',
+];
+
+function isPermanentErrorMessage(msg: string): boolean {
+  const lower = msg.toLowerCase();
+  return PERMANENT_ERROR_PATTERNS.some(p => lower.includes(p.toLowerCase()));
+}
 
 function isRateLimitErrorMessage(msg: string): boolean {
   const lower = msg.toLowerCase();
