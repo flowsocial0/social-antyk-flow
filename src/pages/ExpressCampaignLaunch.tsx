@@ -188,7 +188,7 @@ export default function ExpressCampaignLaunch() {
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/dashboard")}
               className="text-primary-foreground hover:bg-white/10"
               disabled={launching}
             >
