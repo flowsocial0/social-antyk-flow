@@ -766,6 +766,12 @@ Deno.serve(async (req) => {
           let accountRateLimitedCount = 0;
           
           for (let accountId of accountsForPlatform) {
+            // Skip accounts already known to be out of credits / permanently failing in this cycle
+            if (depletedAccountsThisCycle.has(`${platform}:${accountId}`)) {
+              console.log(`⏭️ Skipping ${platform} account ${accountId.substring(0,8)} — marked as depleted in this cycle`);
+              accountErrors.push(`Konto ${accountId.substring(0, 8)}: brak kredytów na X (pominięto w tym cyklu)`);
+              continue;
+            }
             console.log(`Publishing to account ${accountId} on ${platform}`);
             
             // ====== AUTO-REMAP ORPHANED ACCOUNTS ======
