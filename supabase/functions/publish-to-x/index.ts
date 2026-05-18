@@ -1164,6 +1164,7 @@ Deno.serve(async (req) => {
           );
         }
 
+        if (isRateLimitError) {
           const { data: currentPost } = await supabaseClient
             .from('campaign_posts')
             .select('retry_count')
