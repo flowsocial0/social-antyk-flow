@@ -73,7 +73,7 @@ const Platforms = () => {
               Wybierz platformę, aby zarządzać publikacjami i harmonogramem
             </p>
           </div>
-          <Button variant="outline" onClick={() => navigate('/')}>
+          <Button variant="outline" onClick={() => navigate("/dashboard")}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Powrót
           </Button>

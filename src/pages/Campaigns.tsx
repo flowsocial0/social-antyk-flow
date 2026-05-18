@@ -54,7 +54,7 @@ const Campaigns = () => {
             <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
-                onClick={() => navigate("/")}
+                onClick={() => navigate("/dashboard")}
                 className="text-primary-foreground hover:bg-white/10"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
