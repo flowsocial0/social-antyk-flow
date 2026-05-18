@@ -1698,6 +1698,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_campaign_post_counts: {
+        Args: never
+        Returns: {
+          campaign_id: string
+          count: number
+          status: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
