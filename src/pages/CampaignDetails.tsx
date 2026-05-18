@@ -964,7 +964,12 @@ const CampaignDetails = () => {
                   const errorGroups: Record<string, number> = {};
                   problemPosts.forEach((p: any) => {
                     const msg = p.error_message || 'Nieznany błąd';
-                    const key = p.status === 'rate_limited'
+                    const code = p.error_code || '';
+                    const isCreditsDepleted = code === 'X_CREDITS_DEPLETED' ||
+                      msg.includes('CreditsDepleted') || msg.includes('kredytów') || msg.includes('402');
+                    const key = isCreditsDepleted
+                      ? '💳 Brak kredytów na X — doładuj konto na developer.x.com'
+                      : p.status === 'rate_limited'
                       ? '⏱ Limit platformy (auto-retry)'
                       : msg.includes('rate limit') || msg.includes('too many') || msg.includes('429') || msg.includes('throttle')
                       ? '⏱ Limit platformy (rate limit)'
