@@ -1126,12 +1126,44 @@ Deno.serve(async (req) => {
       } catch (error: any) {
         console.error(`Error publishing campaign post ${campaignPostId}:`, error);
         
-        const isRateLimitError = error.statusCode === 429 || 
+        const isCreditsDepletedError = error.errorCode === 'X_CREDITS_DEPLETED' ||
+          error.statusCode === 402 ||
+          error.message?.includes('402') ||
+          error.message?.includes('CreditsDepleted') ||
+          error.message?.includes('credits');
+
+        const isRateLimitError = !isCreditsDepletedError && (
+          error.statusCode === 429 || 
           error.message?.includes('429') || 
           error.message?.includes('Too Many Requests') ||
-          error.message?.includes('rate limit');
-        
-        if (isRateLimitError) {
+          error.message?.includes('rate limit')
+        );
+
+        if (isCreditsDepletedError) {
+          const errorMessage = 'Brak kredytów na koncie X API. X jest płatne za każdy post — doładuj konto na developer.x.com lub wyłącz publikację na X w tej kampanii.';
+          await supabaseClient
+            .from('campaign_posts')
+            .update({
+              status: 'failed',
+              error_code: 'X_CREDITS_DEPLETED',
+              error_message: errorMessage,
+              next_retry_at: null,
+            })
+            .eq('id', campaignPostId);
+
+          console.error('⛔ X CreditsDepleted — post marked as failed, no retry scheduled');
+
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: errorMessage,
+              errorCode: 'X_CREDITS_DEPLETED',
+              message: errorMessage,
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
           const { data: currentPost } = await supabaseClient
             .from('campaign_posts')
             .select('retry_count')
