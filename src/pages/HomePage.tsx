@@ -57,6 +57,26 @@ const steps = [
 ];
 
 const HomePage = () => {
+  const [authState, setAuthState] = useState<"loading" | "in" | "out">("loading");
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthState(session ? "in" : "out");
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setAuthState(session ? "in" : "out");
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (authState === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+  if (authState === "in") return <Navigate to="/dashboard" replace />;
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Helmet>
