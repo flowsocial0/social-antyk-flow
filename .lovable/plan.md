@@ -1,84 +1,87 @@
-## Przegląd zgłoszeń od użytkowników
+## Plan: Porządki w kampaniach X + nowy widok listy/filtry w Kampaniach AI
 
-Sprawdziłem tabelę `bug_reports`. Najnowsze, otwarte zgłoszenie (07.05.2026):
+### Część 1 — Dokończenie sprzątania po błędach X (402 CreditsDepleted)
 
-**„Nie dziala wznowienie kampanii"** — kampania `dfd66aac…` na X, użytkownik wznawia i posty się nie publikują.
+W poprzednim kroku dodano obsługę `X_CREDITS_DEPLETED`, ale zostały stare dane w bazie. Teraz wykonujemy jednorazową migrację danych:
 
-Sprawdziłem kampanię w bazie:
-- 56 postów `failed`, wszystkie z identycznym błędem:
-- `Failed to send tweet: 402, body: {"title":"CreditsDepleted","detail":"Your enrolled account ... does not have any credits to fulfill this request.","type":".../credits"}`
-- 304 postów wciąż `scheduled` — czekają w kolejce i będą padać tak samo
+1. **Backfill 56 starych błędów** w kampanii `dfd66aac-14b1-44cc-abc7-d49a45604664`:
+   - Wszystkie posty X ze statusem `failed` + `error_code = 'unknown'` + `error_message` zawierającym `CreditsDepleted` / `402` → ustawić `error_code = 'X_CREDITS_DEPLETED'`, wyczyścić `next_retry_at`.
+2. **Wstrzymanie 304 oczekujących postów X** w tej kampanii:
+   - Posty X ze statusem `scheduled` → zmiana statusu na `paused` (lub `failed` z `error_code='X_CREDITS_DEPLETED'`) żeby nie szły do kolejki publikacji.
+   - Po doładowaniu konta X użytkownik kliknie "Wznów" w widoku kampanii.
 
-To nie jest błąd aplikacji — X **wyłączył darmowe API**, a konto użytkownika nie ma wykupionych kredytów. Ale aplikacja:
+(Operacja wykonana przez `supabase--read_query`/`insert` po Twojej zgodzie — nie ruszamy struktury bazy.)
 
-1. Pokazuje to jako `error_code = 'unknown'` zamiast jasnego „brak kredytów na X"
-2. Wciąż próbuje publikować (302 postów w kolejce → 302 kolejnych failów, marnowanie wywołań API)
-3. Nie informuje użytkownika, że musi doładować konto X — on widzi tylko „nie dziala" i się denerwuje
+---
 
-Starsze zgłoszenia (z marca/kwietnia) dotyczyły wygasłych tokenów, problemów FB i kampanii — w międzyczasie były naprawiane.
+### Część 2 — Nowa nawigacja w `/campaigns` (CampaignsList)
 
-## Co zrobić
+Strona dostaje jeden zestaw kontrolek u góry:
 
-### 1. `supabase/functions/publish-to-x/index.ts` — rozpoznać 402
-
-W `sendTweet()` (linie 583-616) dodać przed `default error`:
-
-```ts
-if (response.status === 402) {
-  let detail = responseText;
-  try {
-    const parsed = JSON.parse(responseText);
-    detail = parsed?.detail || parsed?.title || responseText;
-  } catch {}
-  const error = new Error(
-    `Brak kredytów na koncie X. X API jest płatne — doładuj konto na https://developer.x.com lub wyłącz publikację na X. Szczegóły: ${detail}`
-  );
-  (error as any).statusCode = 402;
-  (error as any).errorCode = 'X_CREDITS_DEPLETED';
-  (error as any).permanent = true;  // nie retryować
-  throw error;
-}
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ [🔍 Szukaj kampanii...]  [Status ▾] [Sortuj ▾]   [▦ Karty] [☰ Lista] │
+├─────────────────────────────────────────────────────────────────┤
+│ Foldery platform (poziome chipsy z licznikiem):                 │
+│ [Wszystkie 42] [𝕏 X 18] [📘 Facebook 9] [📸 IG 7] [▶ YT 3] ... │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-W `sendTweetWithRateLimitTracking()` — nie wchodzić w pętlę retry gdy `error.permanent === true`.
+#### 2a. Foldery po platformach
+- Chipsy/zakładki z platform (X, Facebook, Instagram, YouTube, LinkedIn, TikTok + pozostałe) wygenerowane z `campaigns.target_platforms` / `selected_accounts`.
+- Każdy chip pokazuje liczbę kampanii dla tej platformy.
+- Kampania pojawia się w każdym folderze platformy, którą ma w celach (multi-platform → wiele folderów).
+- Domyślnie „Wszystkie".
 
-W głównym handlerze (linie ~1100-1170) dodać gałąź:
-```ts
-if (error.errorCode === 'X_CREDITS_DEPLETED' || error.statusCode === 402) {
-  // zapisz post jako failed z error_code='X_CREDITS_DEPLETED'
-  // NIE ustawiaj next_retry_at — to nie jest rate limit, tylko brak środków
-}
-```
+#### 2b. Wyszukiwarka
+- Pole tekstowe — filtruje po `name` i `description` (case-insensitive, lokalnie, bo lista już w pamięci).
 
-### 2. `supabase/functions/auto-publish-books/index.ts` — zatrzymać masakrę
+#### 2c. Filtr statusu
+- Dropdown: Wszystkie / Szkic / Zaplanowana / Aktywna / Zakończona / Anulowana.
 
-Gdy w ciągu jednego cyklu cron napotka post X z `error_code = 'X_CREDITS_DEPLETED'`, pominąć wszystkie pozostałe posty X tej samej kampanii dla tego konta w tym cyklu (i kolejnych — dopóki user nie zresetuje statusu ręcznie). Zapobiega to:
-- marnowaniu prób na 304 zaplanowanych postach,
-- spamowaniu logów,
-- mnożeniu identycznych failów w UI.
+#### 2d. Przełącznik widoku Karty ⇄ Lista (toggle, zapisany w `localStorage`)
 
-Dodać `'X_CREDITS_DEPLETED'` do mapy znanych error_codes, żeby UI go ładnie etykietował.
+**Widok Karty** — bez zmian względem obecnego.
 
-### 3. `src/pages/CampaignDetails.tsx` — przyjazny komunikat
+**Widok Lista** — sortowalna tabela (`@/components/ui/table`) z kolumnami:
 
-W sekcji kategorii błędów dodać kategorię „Brak kredytów na X" z:
-- ikoną i kolorem ostrzegawczym,
-- jednozdaniowym wyjaśnieniem „X API jest płatne. Konto nie ma kredytów — doładuj na developer.x.com",
-- linkiem do dokumentacji X,
-- przyciskiem „Wyłącz X w tej kampanii" zamiast bezsensownego „Spróbuj ponownie".
+| Kolumna | Sortowalna | Źródło |
+|---|---|---|
+| Tytuł | ✓ | `name` |
+| Status | ✓ | `status` (badge) |
+| Platformy | – | ikony z `selected_accounts` |
+| Data startu | ✓ | `start_date` |
+| Czas trwania | ✓ | `duration_days` |
+| Posty (opublikowane / łącznie) | ✓ | `published_posts` / `total_posts` |
+| Postęp | – | mini progress bar |
+| Utworzono | ✓ | `created_at` |
 
-Ukryć ten typ błędu z licznika „błędów do retry" — to nie jest błąd techniczny.
+- Klik w nagłówek kolumny → sortuje rosnąco/malejąco (strzałka ▲▼).
+- Klik w wiersz → przejście do `/campaigns/:id` (jak teraz w karcie).
+- Sortowanie też dostępne jako dropdown „Sortuj" w widoku Karty.
 
-### 4. Jednorazowy backfill (opcjonalnie, do potwierdzenia)
+#### 2e. UX
+- Preferencje (widok karty/lista, ostatnio wybrany folder, sortowanie) zapamiętane w `localStorage` pod kluczem `campaigns:view-prefs`.
+- Pusty wynik filtrowania → komunikat „Brak kampanii pasujących do filtrów" + przycisk „Wyczyść filtry".
+- Responsywność: na mobile lista przechodzi w kompaktową kartę-wiersz (ukrywamy mniej istotne kolumny).
 
-Czy chce Pan, żebym przy okazji oznaczył 56 istniejących failów w kampanii `dfd66aac…` jako `X_CREDITS_DEPLETED` i opcjonalnie wstrzymał 304 oczekujące posty X tej kampanii do czasu, aż użytkownik doładuje X lub usunie X z platform? Jeśli tak — dodam to jako migrację.
+---
 
-## Po wdrożeniu — test
+### Pliki do zmiany
 
-1. Wymusić błąd 402 (mock) → potwierdzić, że post dostaje `error_code = 'X_CREDITS_DEPLETED'`, nie ma `next_retry_at`, cron go pomija.
-2. Otworzyć kampanię w UI → widać kategorię „Brak kredytów na X" z linkiem i przyciskiem „Wyłącz X".
-3. Sprawdzić, że pozostałe posty (FB/IG/LinkedIn) tej samej kampanii publikują się normalnie.
+| Plik | Zmiana |
+|---|---|
+| `src/components/campaigns/CampaignsList.tsx` | Refaktor: dodać stan filtrów/sortowania/widoku, podzielić render na `CampaignsGrid` i `CampaignsTable`. |
+| `src/components/campaigns/CampaignsGrid.tsx` *(nowy)* | Wyciągnięty obecny widok kart. |
+| `src/components/campaigns/CampaignsTable.tsx` *(nowy)* | Tabela z sortowaniem. |
+| `src/components/campaigns/CampaignsToolbar.tsx` *(nowy)* | Search + filtry + toggle widoku + foldery platform. |
+| (opcjonalnie) `src/hooks/useCampaignsViewPrefs.ts` | Hook do `localStorage`. |
 
-## Uwaga techniczna
+**Brak zmian schematu DB.** Brak nowych edge functions.
 
-Wzorzec `'CreditsDepleted'` jest już w `RATE_LIMIT_ERROR_PATTERNS` w `auto-publish-books`, ale to błędna klasyfikacja — to nie rate limit, tylko brak środków. Należy go stamtąd usunąć i obsłużyć osobno (jak wyżej), inaczej cron retryuje to w nieskończoność co 2 minuty.
+### Test plan
+1. `/campaigns` → widać chipsy platform z licznikami; klik w „X" pokazuje tylko kampanie z X.
+2. Search „test" filtruje listę na bieżąco; działa razem z folderem.
+3. Toggle „Lista" → tabela z sortowalnymi kolumnami; klik „Data startu" sortuje, drugi klik odwraca kierunek.
+4. Odświeżenie strony → ostatnio wybrany widok/folder/sort przywrócone.
+5. Kampania `dfd66aac…` → 56 błędów ma `X_CREDITS_DEPLETED`, 304 scheduled posty już nie próbują się publikować.
