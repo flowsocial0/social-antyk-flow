@@ -585,7 +585,12 @@ const CampaignDetails = () => {
 
   const retryAllFailedMutation = useMutation({
     mutationFn: async () => {
-      const retryablePosts = posts?.filter((p: any) => p.status === 'failed' || p.status === 'rate_limited') || [];
+      // Exclude X_CREDITS_DEPLETED — retrying without user topping up credits = guaranteed re-failure
+      const retryablePosts = posts?.filter((p: any) =>
+        (p.status === 'failed' || p.status === 'rate_limited') &&
+        p.error_code !== 'X_CREDITS_DEPLETED' &&
+        !(p.error_message || '').includes('CreditsDepleted')
+      ) || [];
       if (retryablePosts.length === 0) return;
 
       // Stagger posts: each post gets scheduled 5 minutes after the previous one
@@ -964,7 +969,12 @@ const CampaignDetails = () => {
                   const errorGroups: Record<string, number> = {};
                   problemPosts.forEach((p: any) => {
                     const msg = p.error_message || 'Nieznany błąd';
-                    const key = p.status === 'rate_limited'
+                    const code = p.error_code || '';
+                    const isCreditsDepleted = code === 'X_CREDITS_DEPLETED' ||
+                      msg.includes('CreditsDepleted') || msg.includes('kredytów') || msg.includes('402');
+                    const key = isCreditsDepleted
+                      ? '💳 Brak kredytów na X — doładuj konto na developer.x.com'
+                      : p.status === 'rate_limited'
                       ? '⏱ Limit platformy (auto-retry)'
                       : msg.includes('rate limit') || msg.includes('too many') || msg.includes('429') || msg.includes('throttle')
                       ? '⏱ Limit platformy (rate limit)'

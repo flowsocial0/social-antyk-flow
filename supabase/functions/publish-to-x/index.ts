@@ -601,6 +601,25 @@ async function sendTweet(
       throw error;
     }
 
+    // Handle 402 Payment Required - X API is pay-per-post and account has no credits
+    if (response.status === 402) {
+      let detail = responseText;
+      try {
+        const parsed = JSON.parse(responseText);
+        detail = parsed?.detail || parsed?.title || responseText;
+      } catch {
+        // keep raw text
+      }
+      const error = new Error(
+        `Brak kredytów na koncie X API. X jest płatne za każdy post — doładuj konto na https://developer.x.com lub wyłącz publikację na X w tej kampanii. Szczegóły: ${detail}`
+      );
+      (error as any).statusCode = 402;
+      (error as any).errorCode = 'X_CREDITS_DEPLETED';
+      (error as any).permanent = true;
+      (error as any).response = response;
+      throw error;
+    }
+
     // Handle 429 rate limit from X API
     if (response.status === 429) {
       const resetHeader = response.headers.get('x-rate-limit-reset');
@@ -650,6 +669,11 @@ async function sendTweetWithRateLimitTracking(
       // Save rate limit info even from error responses
       if (error.response) {
         await saveRateLimitInfo(supabaseClient, accountId, 'tweets', error.response);
+      }
+      
+      // Permanent errors (like 402 CreditsDepleted) — do not retry
+      if (error.permanent) {
+        throw error;
       }
       
       if (error.message.includes('429')) {
@@ -1102,11 +1126,44 @@ Deno.serve(async (req) => {
       } catch (error: any) {
         console.error(`Error publishing campaign post ${campaignPostId}:`, error);
         
-        const isRateLimitError = error.statusCode === 429 || 
+        const isCreditsDepletedError = error.errorCode === 'X_CREDITS_DEPLETED' ||
+          error.statusCode === 402 ||
+          error.message?.includes('402') ||
+          error.message?.includes('CreditsDepleted') ||
+          error.message?.includes('credits');
+
+        const isRateLimitError = !isCreditsDepletedError && (
+          error.statusCode === 429 || 
           error.message?.includes('429') || 
           error.message?.includes('Too Many Requests') ||
-          error.message?.includes('rate limit');
-        
+          error.message?.includes('rate limit')
+        );
+
+        if (isCreditsDepletedError) {
+          const errorMessage = 'Brak kredytów na koncie X API. X jest płatne za każdy post — doładuj konto na developer.x.com lub wyłącz publikację na X w tej kampanii.';
+          await supabaseClient
+            .from('campaign_posts')
+            .update({
+              status: 'failed',
+              error_code: 'X_CREDITS_DEPLETED',
+              error_message: errorMessage,
+              next_retry_at: null,
+            })
+            .eq('id', campaignPostId);
+
+          console.error('⛔ X CreditsDepleted — post marked as failed, no retry scheduled');
+
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: errorMessage,
+              errorCode: 'X_CREDITS_DEPLETED',
+              message: errorMessage,
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
         if (isRateLimitError) {
           const { data: currentPost } = await supabaseClient
             .from('campaign_posts')

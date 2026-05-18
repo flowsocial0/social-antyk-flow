@@ -151,13 +151,24 @@ const RATE_LIMIT_ERROR_PATTERNS = [
   'too many actions', 'throttle', 'ograniczamy liczbę', 'rate limit',
   '429', 'Too Many Requests', 'spam', 'try again later',
   'limit exceeded', 'Please wait', 'slow down',
-  'DAILY_LIMIT', 'X_API_DAILY_LIMIT', 'CreditsDepleted', 'credits depleted',
+  'DAILY_LIMIT', 'X_API_DAILY_LIMIT',
   'APPLICATION_AND_MEMBER DAY', 'member day', 'application day',
   'zbyt wiele', 'za dużo', 'poczekaj', 'spróbuj później',
   'too many requests', 'too_many_requests', 'temporarily blocked',
   'User request limit reached', 'quota', 'exceeded the rate limit',
   '15/15 dzienny limit', 'dzienny limit',
 ];
+
+// Permanent (non-recoverable until user acts) error patterns — do NOT retry
+const PERMANENT_ERROR_PATTERNS = [
+  'CreditsDepleted', 'credits depleted', 'X_CREDITS_DEPLETED',
+  '402', 'does not have any credits',
+];
+
+function isPermanentErrorMessage(msg: string): boolean {
+  const lower = msg.toLowerCase();
+  return PERMANENT_ERROR_PATTERNS.some(p => lower.includes(p.toLowerCase()));
+}
 
 function isRateLimitErrorMessage(msg: string): boolean {
   const lower = msg.toLowerCase();
@@ -557,6 +568,10 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Track accounts that returned a permanent error (e.g. X CreditsDepleted) within this cycle —
+    // skip them for the rest of the cycle to avoid hammering the API and spamming logs.
+    const depletedAccountsThisCycle = new Set<string>(); // key: `${platform}:${accountId}`
+
     // Publish campaign posts
     for (const post of (campaignPostsToPublish || []) as CampaignPost[]) {
       console.log(`Publishing campaign post: ${post.id}`);
@@ -751,6 +766,12 @@ Deno.serve(async (req) => {
           let accountRateLimitedCount = 0;
           
           for (let accountId of accountsForPlatform) {
+            // Skip accounts already known to be out of credits / permanently failing in this cycle
+            if (depletedAccountsThisCycle.has(`${platform}:${accountId}`)) {
+              console.log(`⏭️ Skipping ${platform} account ${accountId.substring(0,8)} — marked as depleted in this cycle`);
+              accountErrors.push(`Konto ${accountId.substring(0, 8)}: brak kredytów na X (pominięto w tym cyklu)`);
+              continue;
+            }
             console.log(`Publishing to account ${accountId} on ${platform}`);
             
             // ====== AUTO-REMAP ORPHANED ACCOUNTS ======
@@ -825,15 +846,25 @@ Deno.serve(async (req) => {
               const errorMsg = data?.message || data?.error || publishError?.message || 'Nieznany błąd';
               console.error(`Failed to publish campaign post ${post.id} to ${platform} account ${accountId}:`, errorMsg);
               
-              // Check if it's a rate limit error (expanded patterns)
-              const isRateLimitError = isRateLimitErrorMessage(errorMsg) ||
+              // Permanent errors (e.g. X CreditsDepleted 402) — don't retry, mark account depleted for this cycle
+              const isPermanentError = isPermanentErrorMessage(errorMsg) ||
+                data?.errorCode === 'X_CREDITS_DEPLETED' ||
+                data?.errorCode === 'CREDITS_DEPLETED';
+
+              // Check if it's a rate limit error (expanded patterns) — only if not permanent
+              const isRateLimitError = !isPermanentError && (
+                isRateLimitErrorMessage(errorMsg) ||
                 data?.error === 'rate_limit' ||
                 data?.errorCode === 'RATE_LIMITED' ||
                 data?.errorCode === 'DAILY_LIMIT' ||
-                data?.errorCode === 'X_API_DAILY_LIMIT' ||
-                data?.errorCode === 'CREDITS_DEPLETED';
-              
-              if (isRateLimitError) {
+                data?.errorCode === 'X_API_DAILY_LIMIT'
+              );
+
+              if (isPermanentError) {
+                console.error(`⛔ Permanent error for ${platform} account ${accountId.substring(0,8)} — flagging depleted, no retry: ${errorMsg}`);
+                depletedAccountsThisCycle.add(`${platform}:${accountId}`);
+                accountErrors.push(`Konto ${accountId.substring(0, 8)}: brak kredytów na X — doładuj konto na developer.x.com`);
+              } else if (isRateLimitError) {
                 // Track rate-limited accounts separately — don't treat as hard failure
                 console.log(`Rate limit detected for ${platform} account ${accountId}, will set rate_limited`);
                 accountRateLimitedCount++;
