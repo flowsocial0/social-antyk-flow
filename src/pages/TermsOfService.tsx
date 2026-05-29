@@ -6,13 +6,19 @@ import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 
 const TermsOfService = () => {
+  const currentDate = new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Helmet>
-        <title>Regulamin Social Auto Flow (Terms of Service)</title>
+        <title>Terms of Service | Social Auto Flow</title>
         <meta
           name="description"
-          content="Regulamin korzystania z serwisu Social Auto Flow - automatyzacja publikacji w mediach społecznościowych"
+          content="Terms of Service for Social Auto Flow - Social media automation platform"
         />
       </Helmet>
 
@@ -22,232 +28,206 @@ const TermsOfService = () => {
             <Button variant="outline" asChild>
               <Link to="/">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Powrót do strony głównej
+                Back to Homepage
               </Link>
             </Button>
           </div>
+
           <Card>
-            <CardHeader>
-              <CardTitle className="text-3xl font-bold text-center">
-                Regulamin Social Auto Flow
+            <CardHeader className="text-center">
+              {/* === LOGO === */}
+              <div className="flex justify-center mb-4">
+                <img 
+                  src="/favicon.ico" 
+                  alt="Social Auto Flow Logo" 
+                  className="h-20 w-20 rounded-lg" 
+                />
+              </div>
+
+              <CardTitle className="text-4xl font-bold">
+                Terms of Service
               </CardTitle>
-              <p className="text-center text-muted-foreground mt-2">
-                (Terms of Service)
+              <p className="text-xl text-muted-foreground mt-2">
+                Social Auto Flow
               </p>
-              <p className="text-center text-sm text-muted-foreground mt-4">
-                Niniejszy dokument stanowi Regulamin (Terms of Service) aplikacji{" "}
-                <strong>SocialAutoFlow</strong> dostępnej pod adresem{" "}
-                <a href="https://socialautoflow.pl" className="text-primary hover:underline">
-                  socialautoflow.pl
-                </a>
-              </p>
-              <p className="text-center text-muted-foreground mt-4">
-                Ostatnia aktualizacja: {new Date().toLocaleDateString("pl-PL")}
-              </p>
+
+              <div className="mt-6 max-w-2xl mx-auto">
+                <p className="text-muted-foreground">
+                  These Terms of Service ("Terms") govern your use of the{" "}
+                  <strong>Social Auto Flow</strong> application and website available at{" "}
+                  <a 
+                    href="https://socialautoflow.pl" 
+                    className="text-primary hover:underline font-medium"
+                  >
+                    https://socialautoflow.pl
+                  </a>.
+                </p>
+                <p className="text-sm text-muted-foreground mt-4">
+                  Last updated: {currentDate}
+                </p>
+              </div>
             </CardHeader>
 
-            <CardContent className="prose prose-slate dark:prose-invert max-w-none space-y-6">
+            <CardContent className="prose prose-slate dark:prose-invert max-w-none space-y-8">
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">1. Postanowienia ogólne</h2>
-                <p className="text-muted-foreground">
-                  Niniejszy Regulamin (Terms of Service) określa zasady korzystania z aplikacji{" "}
-                  <strong>SocialAutoFlow</strong> (dalej: "Serwis" lub "Aplikacja"), 
-                  dostępnej pod adresem https://socialautoflow.pl, która umożliwia automatyzację publikacji treści 
-                  w mediach społecznościowych.
+                <h2>1. Introduction</h2>
+                <p>
+                  <strong>Social Auto Flow</strong> ("Service", "App", or "we") is a social media automation platform 
+                  that allows users to schedule, publish, and manage content across multiple social networks including TikTok, 
+                  Instagram, Facebook, X (Twitter), and LinkedIn.
                 </p>
-                <p className="text-muted-foreground">
-                  Właścicielem i operatorem Serwisu Social Auto Flow jest Księgarnia Antyk (dalej: "Operator").
+                <p>
+                  By using our Service, you agree to these Terms. If you do not agree, please do not use the Service.
                 </p>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">2. Definicje</h2>
-                <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li><strong>Serwis/Aplikacja</strong> - platforma SocialAutoFlow dostępna pod adresem socialautoflow.pl</li>
-                  <li><strong>Użytkownik</strong> - osoba fizyczna, prawna lub jednostka organizacyjna korzystająca z Serwisu</li>
-                  <li><strong>Konto</strong> - indywidualne konto Użytkownika w Serwisie</li>
-                  <li><strong>Platforma społecznościowa</strong> - zewnętrzny serwis (Facebook, X/Twitter, TikTok, Instagram, LinkedIn itp.)</li>
-                  <li><strong>Treść</strong> - materiały tekstowe, graficzne lub multimedialne publikowane za pośrednictwem Serwisu</li>
+                <h2>2. Definitions</h2>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li><strong>Service / App</strong> — Social Auto Flow platform available at socialautoflow.pl</li>
+                  <li><strong>User</strong> — any individual or entity using the Service</li>
+                  <li><strong>Account</strong> — personal account created in the Service</li>
+                  <li><strong>Social Platform</strong> — third-party services (TikTok, Instagram, Facebook, X, LinkedIn, etc.)</li>
+                  <li><strong>Content</strong> — text, images, videos, or other materials published via the Service</li>
                 </ul>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">3. Warunki korzystania z Serwisu</h2>
-                <p className="text-muted-foreground">
-                  Korzystanie z aplikacji Social Auto Flow wymaga:
-                </p>
-                <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li>Ukończenia 18 lat lub posiadania zgody opiekuna prawnego</li>
-                  <li>Założenia Konta w Serwisie</li>
-                  <li>Akceptacji niniejszego Regulaminu oraz Polityki Prywatności</li>
-                  <li>Posiadania aktywnego konta na co najmniej jednej platformie społecznościowej</li>
+                <h2>3. Eligibility</h2>
+                <p>You must:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Be at least 18 years old (or have parental consent)</li>
+                  <li>Create an Account</li>
+                  <li>Accept these Terms and our Privacy Policy</li>
+                  <li>Have at least one active social media account to connect</li>
                 </ul>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">4. Rejestracja i Konto</h2>
-                <p className="text-muted-foreground">
-                  Użytkownik zobowiązuje się do:
-                </p>
-                <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li>Podania prawdziwych i aktualnych danych podczas rejestracji</li>
-                  <li>Zachowania poufności danych logowania do Konta</li>
-                  <li>Niezwłocznego powiadomienia Operatora o nieautoryzowanym dostępie do Konta</li>
-                  <li>Nieudostępniania Konta osobom trzecim</li>
+                <h2>4. Account Registration and Security</h2>
+                <p>You agree to:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Provide accurate and up-to-date information</li>
+                  <li>Keep your login credentials confidential</li>
+                  <li>Notify us immediately of any unauthorized access</li>
+                  <li>Not share your Account with third parties</li>
                 </ul>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">5. Funkcjonalności Serwisu</h2>
-                <p className="text-muted-foreground">Aplikacja Social Auto Flow umożliwia:</p>
-                <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li>Łączenie kont z platformami społecznościowymi (Facebook, X/Twitter, TikTok, Instagram, LinkedIn)</li>
-                  <li>Tworzenie i planowanie publikacji treści</li>
-                  <li>Automatyczną publikację postów według harmonogramu</li>
-                  <li>Zarządzanie kampaniami promocyjnymi</li>
-                  <li>Generowanie treści z wykorzystaniem sztucznej inteligencji</li>
-                  <li>Monitorowanie opublikowanych treści</li>
+                <h2>5. Service Features</h2>
+                <p>Social Auto Flow allows you to:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Connect accounts from TikTok, Instagram, Facebook, X, and LinkedIn</li>
+                  <li>Create, schedule, and publish posts automatically</li>
+                  <li>Use AI to generate content</li>
+                  <li>Manage multiple social media campaigns in one place</li>
+                  <li>Monitor published content performance</li>
                 </ul>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">6. Integracja z platformami społecznościowymi</h2>
-                <p className="text-muted-foreground">
-                  Użytkownik korzystający z integracji z platformami społecznościowymi:
-                </p>
-                <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li>Upoważnia Serwis do publikowania treści w jego imieniu</li>
-                  <li>Akceptuje regulaminy i zasady tych platform</li>
-                  <li>Ponosi odpowiedzialność za zgodność publikowanych treści z regulaminami platform</li>
-                  <li>Może w każdej chwili odłączyć konto platformy społecznościowej od Serwisu</li>
+                <h2>6. Integration with Social Platforms</h2>
+                <p>When connecting your social accounts, you:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Authorize Social Auto Flow to publish content on your behalf</li>
+                  <li>Accept the terms and policies of each connected platform</li>
+                  <li>Remain fully responsible for the content you publish</li>
+                  <li>Can disconnect any platform at any time</li>
                 </ul>
-                <p className="text-muted-foreground mt-4">
-                  <strong>Ważne:</strong> Serwis korzysta z oficjalnych API platform społecznościowych. 
-                  Użytkownik akceptuje warunki korzystania z tych API, w szczególności:
-                </p>
-                <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li><strong>Facebook/Instagram:</strong> Meta Platform Terms</li>
-                  <li><strong>X/Twitter:</strong> Twitter Developer Agreement</li>
-                  <li><strong>TikTok:</strong> TikTok for Developers Terms of Service</li>
-                  <li><strong>LinkedIn:</strong> LinkedIn API Terms of Use</li>
+                <p className="mt-4 font-medium">We use official APIs only. You agree to comply with:</p>
+                <ul className="list-disc pl-6 space-y-1 text-sm">
+                  <li>TikTok for Developers Terms of Service</li>
+                  <li>Meta Platform Terms (Facebook & Instagram)</li>
+                  <li>X Developer Agreement</li>
+                  <li>LinkedIn API Terms of Use</li>
                 </ul>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">7. Obowiązki Użytkownika</h2>
-                <p className="text-muted-foreground">Użytkownik zobowiązuje się do:</p>
-                <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li>Korzystania z Serwisu zgodnie z prawem i niniejszym Regulaminem</li>
-                  <li>Niepublikowania treści naruszających prawa osób trzecich</li>
-                  <li>Niepublikowania treści niezgodnych z prawem, obraźliwych lub szkodliwych</li>
-                  <li>Nienaruszania zasad platform społecznościowych</li>
-                  <li>Niepodejmowania działań mogących zakłócić działanie Serwisu</li>
-                  <li>Nieużywania Serwisu do spamu lub nieuczciwych praktyk marketingowych</li>
+                <h2>7. User Responsibilities</h2>
+                <p>You agree not to:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Publish content that violates any laws or third-party rights</li>
+                  <li>Post offensive, harmful, misleading, or illegal content</li>
+                  <li>Violate the rules of any connected social platform</li>
+                  <li>Use the Service for spam or deceptive marketing</li>
+                  <li>Interfere with the normal operation of the Service</li>
                 </ul>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">8. Treści publikowane przez Użytkownika</h2>
-                <p className="text-muted-foreground">
-                  Użytkownik oświadcza, że:
-                </p>
-                <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li>Posiada prawa do wszystkich publikowanych treści</li>
-                  <li>Treści nie naruszają praw autorskich, znaków towarowych ani innych praw własności intelektualnej</li>
-                  <li>Treści nie zawierają informacji nieprawdziwych, wprowadzających w błąd lub szkodliwych</li>
-                  <li>Ponosi pełną odpowiedzialność za publikowane treści</li>
+                <h2>8. Content Ownership and Responsibility</h2>
+                <p>You represent and warrant that:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>You own or have rights to all content you publish</li>
+                  <li>Content does not infringe copyrights, trademarks, or other rights</li>
+                  <li>You are solely responsible for all content published through the Service</li>
                 </ul>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">9. Odpowiedzialność Operatora</h2>
-                <p className="text-muted-foreground">
-                  Operator:
-                </p>
-                <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li>Dokłada starań, aby Serwis działał nieprzerwanie i prawidłowo</li>
-                  <li>Nie ponosi odpowiedzialności za treści publikowane przez Użytkowników</li>
-                  <li>Nie ponosi odpowiedzialności za działania platform społecznościowych</li>
-                  <li>Nie gwarantuje dostępności Serwisu 24/7</li>
-                  <li>Zastrzega prawo do czasowych przerw technicznych</li>
-                  <li>Nie ponosi odpowiedzialności za szkody wynikające z działań Użytkownika niezgodnych z Regulaminem</li>
+                <h2>9. Limitation of Liability</h2>
+                <p>Social Auto Flow:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Strives to keep the Service available and reliable</li>
+                  <li>Is not responsible for content published by users</li>
+                  <li>Is not liable for actions or changes made by social platforms</li>
+                  <li>Does not guarantee 24/7 uptime</li>
+                  <li>Reserves the right to perform maintenance</li>
                 </ul>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">10. Ochrona danych osobowych</h2>
-                <p className="text-muted-foreground">
-                  Zasady przetwarzania danych osobowych określa <a href="/privacy" className="text-primary hover:underline">Polityka Prywatności Social Auto Flow</a>.
+                <h2>10. Privacy and Data Protection</h2>
+                <p>
+                  Our data processing practices are described in the{" "}
+                  <Link to="/privacy-policy" className="text-primary hover:underline font-medium">
+                    Privacy Policy
+                  </Link>.
                 </p>
-                <p className="text-muted-foreground">
-                  Użytkownik ma prawo do:
-                </p>
-                <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li>Dostępu do swoich danych</li>
-                  <li>Sprostowania danych</li>
-                  <li>Usunięcia danych</li>
-                  <li>Ograniczenia przetwarzania</li>
-                  <li>Przenoszenia danych</li>
-                  <li>Sprzeciwu wobec przetwarzania</li>
+                <p>You have the right to access, correct, delete, restrict, or object to the processing of your personal data.</p>
+              </section>
+
+              <section>
+                <h2>11. Account Termination</h2>
+                <p>You may delete your Account at any time by contacting us. Upon deletion:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>All your data will be permanently deleted</li>
+                  <li>Access tokens to social platforms will be revoked</li>
+                  <li>Scheduled posts will be cancelled</li>
                 </ul>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">11. Usunięcie konta</h2>
-                <p className="text-muted-foreground">
-                  Użytkownik może w każdej chwili usunąć swoje Konto, kontaktując się z Operatorem.
-                  Po usunięciu Konta:
-                </p>
-                <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li>Wszystkie dane Użytkownika zostaną trwale usunięte</li>
-                  <li>Tokeny dostępu do platform społecznościowych zostaną usunięte</li>
-                  <li>Zaplanowane publikacje zostaną anulowane</li>
-                </ul>
-              </section>
-
-              <section>
-                <h2 className="text-2xl font-semibold text-foreground">12. Zmiany Regulaminu</h2>
-                <p className="text-muted-foreground">
-                  Operator zastrzega sobie prawo do wprowadzania zmian w Regulaminie. 
-                  O zmianach Użytkownicy zostaną powiadomieni z co najmniej 14-dniowym wyprzedzeniem.
-                  Dalsze korzystanie z Serwisu po wejściu zmian w życie oznacza akceptację nowego Regulaminu.
+                <h2>12. Changes to These Terms</h2>
+                <p>
+                  We may update these Terms. We will notify you at least 14 days in advance. 
+                  Continued use of the Service after changes take effect means you accept the new Terms.
                 </p>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">13. Rozwiązywanie sporów</h2>
-                <p className="text-muted-foreground">
-                  Wszelkie spory wynikające z korzystania z Serwisu będą rozstrzygane polubownie.
-                  W przypadku braku porozumienia, spory rozstrzygać będzie sąd właściwy dla siedziby Operatora.
+                <h2>13. Governing Law</h2>
+                <p>
+                  These Terms are governed by the laws of Poland. Any disputes will first be attempted to be resolved amicably. 
+                  If no agreement is reached, disputes will be resolved by the competent court in Poland.
                 </p>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">14. Postanowienia końcowe</h2>
-                <p className="text-muted-foreground">
-                  W sprawach nieuregulowanych niniejszym Regulaminem zastosowanie mają przepisy prawa polskiego,
-                  w szczególności Kodeks cywilny, Ustawa o świadczeniu usług drogą elektroniczną oraz RODO.
-                </p>
-              </section>
-
-              <section>
-                <h2 className="text-2xl font-semibold text-foreground">15. Kontakt</h2>
-                <p className="text-muted-foreground">
-                  W przypadku pytań dotyczących Regulaminu, prosimy o kontakt:
-                </p>
-                <div className="bg-muted p-4 rounded-lg mt-4">
-                  <p className="text-foreground">
-                    <strong>Księgarnia Antyk</strong>
-                  </p>
-                  <p className="text-muted-foreground">Email: flowsocial0@gmail.com</p>
-                  <p className="text-muted-foreground">Strona: socialautoflow.pl</p>
+                <h2>14. Contact</h2>
+                <div className="bg-muted p-6 rounded-xl mt-4">
+                  <p className="font-semibold text-lg">Księgarnia Antyk</p>
+                  <p className="mt-2">Email: <a href="mailto:flowsocial0@gmail.com" className="text-primary">flowsocial0@gmail.com</a></p>
+                  <p>Website: <a href="https://socialautoflow.pl" className="text-primary">socialautoflow.pl</a></p>
                 </div>
               </section>
             </CardContent>
           </Card>
         </div>
       </main>
-      
+
       <Footer />
     </div>
   );

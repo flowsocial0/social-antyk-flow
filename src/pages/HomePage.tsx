@@ -80,7 +80,7 @@ const HomePage = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Helmet>
-        <title>Social Auto Flow — Automatyzacja mediów społecznościowych</title>
+        <title>Social Auto Flow</title>
         <meta
           name="description"
           content="Social Auto Flow automatyzuje publikację w mediach społecznościowych dla księgarni. Publikuj na Facebooku, Instagramie, X, TikToku, YouTube i wielu innych platformach."

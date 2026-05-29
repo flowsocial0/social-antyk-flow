@@ -162,10 +162,10 @@ const DataDeletion = () => {
 
             {/* Additional links */}
             <div className="flex flex-wrap gap-4 justify-center pt-4">
-              <Link to="/privacy" className="text-primary hover:underline text-sm">
+              <Link to="/privacy-policy" className="text-primary hover:underline text-sm">
                 Polityka Prywatności SocialAutoFlow
               </Link>
-              <Link to="/terms" className="text-primary hover:underline text-sm">
+              <Link to="/terms-of-service" className="text-primary hover:underline text-sm">
                 Regulamin SocialAutoFlow
               </Link>
             </div>

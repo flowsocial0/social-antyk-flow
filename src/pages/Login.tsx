@@ -112,11 +112,11 @@ const Login = () => {
             {/* Footer links */}
             <div className="mt-6 pt-4 border-t border-border text-center text-sm text-muted-foreground">
               <div className="flex items-center justify-center gap-2 flex-wrap">
-                <Link to="/terms" className="hover:text-foreground transition-colors">
+                <Link to="/terms-of-service" className="hover:text-foreground transition-colors">
                   Regulamin Social Auto Flow
                 </Link>
                 <span>•</span>
-                <Link to="/privacy" className="hover:text-foreground transition-colors">
+                <Link to="/privacy-policy" className="hover:text-foreground transition-colors">
                   Polityka Prywatności Social Auto Flow
                 </Link>
                 <span>•</span>

@@ -10,14 +10,14 @@ export const Footer = () => {
           </p>
           <nav className="flex items-center gap-4 text-sm flex-wrap justify-center">
             <Link 
-              to="/terms" 
+              to="/terms-of-service" 
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               Regulamin Social Auto Flow
             </Link>
             <span className="text-muted-foreground hidden md:inline">•</span>
             <Link 
-              to="/privacy" 
+              to="/privacy-policy" 
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               Polityka Prywatności Social Auto Flow

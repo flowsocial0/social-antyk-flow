@@ -6,13 +6,19 @@ import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 
 const PrivacyPolicy = () => {
+  const currentDate = new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Helmet>
-        <title>Polityka Prywatności Social Auto Flow (Privacy Policy)</title>
+        <title>Privacy Policy | Social Auto Flow</title>
         <meta
           name="description"
-          content="Polityka prywatności Social Auto Flow - dowiedz się jak chronimy Twoje dane osobowe"
+          content="Privacy Policy for Social Auto Flow - Learn how we protect your personal data"
         />
       </Helmet>
 
@@ -22,246 +28,190 @@ const PrivacyPolicy = () => {
             <Button variant="outline" asChild>
               <Link to="/">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Powrót do strony głównej
+                Back to Homepage
               </Link>
             </Button>
           </div>
+
           <Card>
-            <CardHeader>
-              <CardTitle className="text-3xl font-bold text-center">
-                Polityka Prywatności Social Auto Flow
+            <CardHeader className="text-center">
+              {/* === LOGO === */}
+              <div className="flex justify-center mb-4">
+                <img 
+                  src="/favicon.ico" 
+                  alt="Social Auto Flow Logo" 
+                  className="h-20 w-20 rounded-lg" 
+                />
+              </div>
+
+              <CardTitle className="text-4xl font-bold">
+                Privacy Policy
               </CardTitle>
-              <p className="text-center text-muted-foreground mt-2">
-                (Privacy Policy)
+              <p className="text-xl text-muted-foreground mt-2">
+                Social Auto Flow
               </p>
-              <p className="text-center text-sm text-muted-foreground mt-4">
-                Niniejszy dokument stanowi Politykę Prywatności (Privacy Policy) aplikacji{" "}
-                <strong>SocialAutoFlow</strong> dostępnej pod adresem{" "}
-                <a href="https://socialautoflow.pl" className="text-primary hover:underline">
-                  socialautoflow.pl
-                </a>
-              </p>
-              <p className="text-center text-muted-foreground mt-4">
-                Ostatnia aktualizacja: {new Date().toLocaleDateString("pl-PL")}
-              </p>
+
+              <div className="mt-6 max-w-2xl mx-auto">
+                <p className="text-muted-foreground">
+                  This Privacy Policy describes how <strong>Social Auto Flow</strong> ("we", "us", or "our") 
+                  collects, uses, and protects your personal information when you use our Service at{" "}
+                  <a 
+                    href="https://socialautoflow.pl" 
+                    className="text-primary hover:underline font-medium"
+                  >
+                    https://socialautoflow.pl
+                  </a>.
+                </p>
+                <p className="text-sm text-muted-foreground mt-4">
+                  Last updated: {currentDate}
+                </p>
+              </div>
             </CardHeader>
 
-            <CardContent className="prose prose-slate dark:prose-invert max-w-none space-y-6">
+            <CardContent className="prose prose-slate dark:prose-invert max-w-none space-y-8">
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">1. Informacje ogólne</h2>
-                <p className="text-muted-foreground">
-                  Niniejsza Polityka Prywatności (Privacy Policy) określa zasady przetwarzania i ochrony danych osobowych przekazanych
-                  przez Użytkowników w związku z korzystaniem z aplikacji <strong>SocialAutoFlow</strong> (dalej: "Aplikacja" lub "Serwis"), 
-                  dostępnej pod adresem https://socialautoflow.pl.
+                <h2>1. Introduction</h2>
+                <p>
+                  <strong>Social Auto Flow</strong> is a social media automation platform that helps users schedule, 
+                  publish, and manage content across TikTok, Instagram, Facebook, X (Twitter), and LinkedIn.
+                </p>
+                <p>
+                  This Privacy Policy explains what data we collect, why we collect it, and how we protect it.
                 </p>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">2. Administrator danych osobowych</h2>
-                <p className="text-muted-foreground">
-                  Administratorem danych osobowych zbieranych za pośrednictwem aplikacji Social Auto Flow jest Księgarnia Antyk.
+                <h2>2. Data Controller</h2>
+                <p>
+                  The data controller is <strong>Księgarnia Antyk</strong>.
                 </p>
-                <p className="text-muted-foreground">
-                  Kontakt z Administratorem możliwy jest poprzez adres e-mail: flowsocial0@gmail.com
+                <p>
+                  Contact: <a href="mailto:flowsocial0@gmail.com" className="text-primary">flowsocial0@gmail.com</a>
                 </p>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">3. Zakres zbieranych danych</h2>
-                <p className="text-muted-foreground">Aplikacja Social Auto Flow zbiera następujące dane:</p>
-                <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li>Dane autoryzacyjne (adres e-mail, hasło w formie zaszyfrowanej)</li>
-                  <li>Tokeny dostępu do połączonych platform społecznościowych (Facebook, X/Twitter, TikTok, Instagram, LinkedIn)</li>
-                  <li>Dane dotyczące publikowanych treści (teksty postów, obrazy, wideo)</li>
-                  <li>Dane techniczne (adresy IP, informacje o przeglądarce, logi systemowe)</li>
-                  <li>Dane księgarni (informacje o książkach, cenach, linkach do produktów)</li>
+                <h2>3. Information We Collect</h2>
+                <p>We collect the following data:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Account information (email address and encrypted password)</li>
+                  <li>Access tokens for connected social platforms (TikTok, Instagram, Facebook, X, LinkedIn)</li>
+                  <li>Content you create and publish (text, images, videos)</li>
+                  <li>Technical data (IP address, browser information, system logs)</li>
+                  <li>Usage data (how you interact with the Service)</li>
                 </ul>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">4. Cel i podstawa prawna przetwarzania danych</h2>
-                <p className="text-muted-foreground">Dane osobowe są przetwarzane w celu:</p>
-                <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li>
-                    <strong>Świadczenia usług</strong> - umożliwienie korzystania z funkcjonalności aplikacji Social Auto Flow (podstawa:
-                    wykonanie umowy - art. 6 ust. 1 lit. b RODO)
-                  </li>
-                  <li>
-                    <strong>Autoryzacji i autentykacji</strong> - zarządzanie kontami użytkowników (podstawa: wykonanie
-                    umowy - art. 6 ust. 1 lit. b RODO)
-                  </li>
-                  <li>
-                    <strong>Integracji z mediami społecznościowymi</strong> - publikacja treści na platformach
-                    społecznościowych (podstawa: zgoda - art. 6 ust. 1 lit. a RODO)
-                  </li>
-                  <li>
-                    <strong>Bezpieczeństwa systemu</strong> - ochrona przed nadużyciami i zapewnienie bezpieczeństwa
-                    danych (podstawa: prawnie uzasadniony interes - art. 6 ust. 1 lit. f RODO)
-                  </li>
-                  <li>
-                    <strong>Komunikacji z użytkownikami</strong> - odpowiedzi na zapytania i wsparcie techniczne
-                    (podstawa: prawnie uzasadniony interes - art. 6 ust. 1 lit. f RODO)
-                  </li>
+                <h2>4. How We Use Your Data (Legal Basis)</h2>
+                <p>We process your data for the following purposes:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li><strong>Providing the Service</strong> — to operate the automation platform (legal basis: contract performance)</li>
+                  <li><strong>Authentication</strong> — to manage user accounts and logins (legal basis: contract performance)</li>
+                  <li><strong>Social Media Integration</strong> — to publish content on your behalf (legal basis: consent)</li>
+                  <li><strong>Security</strong> — to prevent fraud and protect the platform (legal basis: legitimate interest)</li>
+                  <li><strong>Communication</strong> — to respond to your inquiries and provide support (legal basis: legitimate interest)</li>
                 </ul>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">5. Udostępnianie danych</h2>
-                <p className="text-muted-foreground">Dane osobowe mogą być udostępniane:</p>
-                <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li>
-                    <strong>Platformom społecznościowym</strong> - Facebook, X/Twitter, TikTok, Instagram, LinkedIn - w zakresie niezbędnym
-                    do publikacji treści
-                  </li>
-                  <li>
-                    <strong>Dostawcom usług IT</strong> - Supabase (hosting bazy danych), dostawcom usług chmurowych
-                  </li>
-                  <li>
-                    <strong>Podmiotom uprawnionym</strong> - na podstawie przepisów prawa (np. organom państwowym)
-                  </li>
+                <h2>5. Sharing Your Data</h2>
+                <p>We may share your data with:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li><strong>Social platforms</strong> (TikTok, Meta, X, LinkedIn) — only to publish content you requested</li>
+                  <li><strong>Service providers</strong> — such as Supabase (database hosting) and cloud infrastructure providers</li>
+                  <li><strong>Legal authorities</strong> — when required by law</li>
                 </ul>
-                <p className="text-muted-foreground mt-4">
-                  Wszystkie podmioty trzecie przetwarzające dane działają na podstawie umów powierzenia przetwarzania
-                  danych i zapewniają odpowiedni poziom ochrony.
+                <p className="mt-4">
+                  All third parties are bound by data processing agreements and provide appropriate security.
                 </p>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">6. Przekazywanie danych poza EOG</h2>
-                <p className="text-muted-foreground">
-                  Niektóre dane mogą być przekazywane do państw spoza Europejskiego Obszaru Gospodarczego (np. w związku z
-                  usługami świadczonymi przez X/Twitter). W takich przypadkach stosujemy odpowiednie zabezpieczenia, takie
-                  jak standardowe klauzule umowne zatwierdzone przez Komisję Europejską.
+                <h2>6. International Data Transfers</h2>
+                <p>
+                  Some data may be transferred outside the European Economic Area (e.g. to X/Twitter servers). 
+                  In such cases, we use Standard Contractual Clauses approved by the European Commission to ensure adequate protection.
                 </p>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">7. Okres przechowywania danych</h2>
-                <p className="text-muted-foreground">Dane osobowe przechowujemy przez okres:</p>
-                <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li>Trwania umowy o świadczenie usług</li>
-                  <li>Wymaganego przepisami prawa (np. przepisami podatkowymi)</li>
-                  <li>Do momentu wycofania zgody (w przypadku przetwarzania na podstawie zgody)</li>
-                  <li>
-                    Do momentu zgłoszenia sprzeciwu (w przypadku przetwarzania na podstawie prawnie uzasadnionego
-                    interesu)
-                  </li>
+                <h2>7. Data Retention</h2>
+                <p>We keep your data for as long as:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Your account is active</li>
+                  <li>Required by law (e.g. tax regulations)</li>
+                  <li>Necessary to fulfill the purpose for which it was collected</li>
                 </ul>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">8. Prawa użytkowników</h2>
-                <p className="text-muted-foreground">Zgodnie z RODO, użytkownik ma prawo do:</p>
-                <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li>
-                    <strong>Dostępu do danych</strong> - uzyskania informacji o przetwarzanych danych
-                  </li>
-                  <li>
-                    <strong>Sprostowania danych</strong> - poprawiania nieprawidłowych danych
-                  </li>
-                  <li>
-                    <strong>Usunięcia danych</strong> - "prawa do bycia zapomnianym"
-                  </li>
-                  <li>
-                    <strong>Ograniczenia przetwarzania</strong> - w określonych sytuacjach
-                  </li>
-                  <li>
-                    <strong>Przenoszenia danych</strong> - otrzymania danych w formacie umożliwiającym ich przeniesienie
-                  </li>
-                  <li>
-                    <strong>Sprzeciwu</strong> - wobec przetwarzania danych na podstawie prawnie uzasadnionego interesu
-                  </li>
-                  <li>
-                    <strong>Wycofania zgody</strong> - w dowolnym momencie, bez wpływu na zgodność z prawem przetwarzania
-                    dokonanego przed wycofaniem zgody
-                  </li>
-                  <li>
-                    <strong>Wniesienia skargi</strong> - do organu nadzorczego (Prezes Urzędu Ochrony Danych Osobowych)
-                  </li>
+                <h2>8. Your Rights (GDPR)</h2>
+                <p>Under GDPR, you have the right to:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Access your personal data</li>
+                  <li>Correct inaccurate data</li>
+                  <li>Delete your data ("right to be forgotten")</li>
+                  <li>Restrict processing</li>
+                  <li>Receive your data in a portable format</li>
+                  <li>Object to processing based on legitimate interest</li>
+                  <li>Withdraw consent at any time</li>
+                  <li>Lodge a complaint with a supervisory authority</li>
                 </ul>
-                <p className="text-muted-foreground mt-4">
-                  W celu realizacji powyższych praw prosimy o kontakt na adres: flowsocial0@gmail.com
+                <p className="mt-4">
+                  To exercise these rights, contact us at: <strong>flowsocial0@gmail.com</strong>
                 </p>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">9. Bezpieczeństwo danych</h2>
-                <p className="text-muted-foreground">
-                  Stosujemy odpowiednie środki techniczne i organizacyjne zapewniające bezpieczeństwo danych osobowych, w
-                  tym:
-                </p>
-                <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li>Szyfrowanie danych w transporcie (SSL/TLS)</li>
-                  <li>Szyfrowanie haseł (bcrypt)</li>
-                  <li>Regularne kopie zapasowe</li>
-                  <li>Kontrolę dostępu do systemów</li>
-                  <li>Monitoring bezpieczeństwa</li>
-                  <li>Regularne aktualizacje oprogramowania</li>
+                <h2>9. Data Security</h2>
+                <p>We implement appropriate technical and organizational measures, including:</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>SSL/TLS encryption for data in transit</li>
+                  <li>Password hashing (bcrypt)</li>
+                  <li>Regular backups</li>
+                  <li>Access controls and monitoring</li>
+                  <li>Regular security updates</li>
                 </ul>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">10. Pliki cookies</h2>
-                <p className="text-muted-foreground">Aplikacja wykorzystuje pliki cookies (ciasteczka) w celu:</p>
-                <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                  <li>Utrzymania sesji użytkownika</li>
-                  <li>Zapamiętywania preferencji</li>
-                  <li>Zapewnienia bezpieczeństwa</li>
-                  <li>Analizy sposobu korzystania z aplikacji</li>
-                </ul>
-                <p className="text-muted-foreground mt-4">
-                  Użytkownik może w każdej chwili zmienić ustawienia cookies w swojej przeglądarce.
+                <h2>10. Cookies</h2>
+                <p>
+                  We use cookies to maintain your session, remember preferences, ensure security, and analyze usage. 
+                  You can manage cookie settings in your browser at any time.
                 </p>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">
-                  11. Automatyczne podejmowanie decyzji i profilowanie
-                </h2>
-                <p className="text-muted-foreground">
-                  Aplikacja Social Auto Flow nie wykorzystuje zautomatyzowanego podejmowania decyzji ani profilowania w rozumieniu art. 22
-                  RODO, które wywołują skutki prawne lub w podobny sposób istotnie wpływają na użytkownika.
+                <h2>11. Automated Decision-Making</h2>
+                <p>
+                  Social Auto Flow does not use automated decision-making or profiling that produces legal effects 
+                  or significantly affects you (as defined in Article 22 of the GDPR).
                 </p>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">12. Zmiany w polityce prywatności</h2>
-                <p className="text-muted-foreground">
-                  Administrator zastrzega sobie prawo do wprowadzania zmian w niniejszej Polityce Prywatności. O wszelkich
-                  zmianach użytkownicy zostaną poinformowani poprzez komunikat w aplikacji lub wiadomość e-mail. Zmiany
-                  wchodzą w życie w terminie wskazanym w powiadomieniu, nie wcześniej jednak niż po upływie 14 dni od jego
-                  opublikowania.
+                <h2>12. Changes to This Policy</h2>
+                <p>
+                  We may update this Privacy Policy. We will notify you at least 14 days in advance. 
+                  Continued use of the Service after changes take effect constitutes acceptance of the new policy.
                 </p>
               </section>
 
               <section>
-                <h2 className="text-2xl font-semibold text-foreground">13. Postanowienia końcowe</h2>
-                <p className="text-muted-foreground">
-                  W sprawach nieuregulowanych niniejszą Polityką Prywatności mają zastosowanie przepisy Rozporządzenia
-                  Parlamentu Europejskiego i Rady (UE) 2016/679 z dnia 27 kwietnia 2016 r. w sprawie ochrony osób
-                  fizycznych w związku z przetwarzaniem danych osobowych i w sprawie swobodnego przepływu takich danych
-                  (RODO) oraz przepisy prawa polskiego.
-                </p>
-              </section>
-
-              <section>
-                <h2 className="text-2xl font-semibold text-foreground">14. Kontakt</h2>
-                <p className="text-muted-foreground">
-                  W przypadku pytań dotyczących ochrony danych osobowych lub chęci skorzystania z przysługujących praw,
-                  prosimy o kontakt:
-                </p>
-                <div className="bg-muted p-4 rounded-lg mt-4">
-                  <p className="text-foreground">
-                    <strong>Księgarnia Antyk</strong>
-                  </p>
-                  <p className="text-muted-foreground">Email: flowsocial0@gmail.com</p>
+                <h2>13. Contact</h2>
+                <div className="bg-muted p-6 rounded-xl mt-4">
+                  <p className="font-semibold text-lg">Księgarnia Antyk</p>
+                  <p className="mt-2">Email: <a href="mailto:flowsocial0@gmail.com" className="text-primary">flowsocial0@gmail.com</a></p>
+                  <p>Website: <a href="https://socialautoflow.pl" className="text-primary">socialautoflow.pl</a></p>
                 </div>
               </section>
             </CardContent>
           </Card>
         </div>
       </main>
-      
+
       <Footer />
     </div>
   );
