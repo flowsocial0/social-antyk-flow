@@ -749,6 +749,9 @@ Deno.serve(async (req) => {
 
           // Get selected accounts for this platform from target_accounts
           let accountsForPlatform = targetAccounts[platform] || [];
+          // Dedupe — w danych zdarzają się powtórzone UUIDs (np. facebook 5x ten sam page),
+          // co powoduje publikację tego samego posta wiele razy i natychmiastowy rate-limit.
+          accountsForPlatform = [...new Set(accountsForPlatform.filter(Boolean))];
           
           // If no specific accounts selected, get ALL accounts for the campaign owner
           if (accountsForPlatform.length === 0) {
@@ -764,7 +767,7 @@ Deno.serve(async (req) => {
               if (accountsError) {
                 console.error(`Error fetching ${platform} accounts for owner:`, accountsError);
               } else if (ownerAccounts && ownerAccounts.length > 0) {
-                accountsForPlatform = ownerAccounts.map(a => a.id);
+                accountsForPlatform = [...new Set(ownerAccounts.map(a => a.id))];
                 console.log(`Found ${accountsForPlatform.length} ${platform} accounts for campaign owner`);
               }
             }
