@@ -9,9 +9,7 @@ import { Footer } from "@/components/layout/Footer";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Badge } from "@/components/ui/badge";
 import { PlatformLimitsAdmin } from "@/components/admin/PlatformLimitsAdmin";
-import { AdminIdeas } from "@/components/admin/AdminIdeas";
 import { AdminDefaultSettings } from "@/components/admin/AdminDefaultSettings";
-import { AdminBugReports } from "@/components/admin/AdminBugReports";
 import { ResourceMonitor } from "@/components/admin/ResourceMonitor";
 import type { User } from "@supabase/supabase-js";
 
@@ -349,11 +347,6 @@ const Admin = () => {
             {/* Resource Monitor */}
             <ResourceMonitor />
 
-            {/* Bug Reports */}
-            <AdminBugReports />
-
-            {/* Admin Ideas */}
-            <AdminIdeas />
 
             {/* Default User Settings */}
             <AdminDefaultSettings />
