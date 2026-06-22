@@ -405,7 +405,11 @@ Deno.serve(async (req) => {
     const MAX_POSTS_PER_CYCLE = 25;
     const MAX_POSTS_PER_CAMPAIGN_PER_CYCLE = 3;
     const now = new Date().toISOString();
-    const { data: candidatePosts, error: campaignFetchError } = await supabase
+    const recentCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    // PRIORITY 1: posts scheduled in the last 24h (newest first) so that
+    // a large old backlog never starves fresh posts (PostgREST max-rows cap).
+    const { data: recentPosts, error: recentFetchError } = await supabase
       .from('campaign_posts')
       .select(`
         *,
@@ -413,21 +417,44 @@ Deno.serve(async (req) => {
         campaign:campaigns!inner(id, user_id, target_platforms, status)
       `)
       .lte('scheduled_at', now)
+      .gte('scheduled_at', recentCutoff)
+      .neq('campaign.status', 'paused')
+      .or(`status.eq.scheduled,and(status.eq.rate_limited,next_retry_at.lte.${now})`)
+      .not('status', 'eq', 'publishing')
+      .order('scheduled_at', { ascending: false })
+      .limit(1000);
+
+    if (recentFetchError) {
+      console.error('Error fetching recent campaign posts:', recentFetchError);
+      throw recentFetchError;
+    }
+
+    // PRIORITY 2: older backlog (oldest first).
+    const { data: olderPosts, error: olderFetchError } = await supabase
+      .from('campaign_posts')
+      .select(`
+        *,
+        book:books(id, code, title, image_url, storage_path, sale_price, promotional_price, video_url, video_storage_path),
+        campaign:campaigns!inner(id, user_id, target_platforms, status)
+      `)
+      .lt('scheduled_at', recentCutoff)
       .neq('campaign.status', 'paused')
       .or(`status.eq.scheduled,and(status.eq.rate_limited,next_retry_at.lte.${now})`)
       .not('status', 'eq', 'publishing')
       .order('scheduled_at', { ascending: true })
-      .limit(2000);
+      .limit(1000);
 
-    if (campaignFetchError) {
-      console.error('Error fetching campaign posts:', campaignFetchError);
-      throw campaignFetchError;
+    if (olderFetchError) {
+      console.error('Error fetching older campaign posts:', olderFetchError);
+      throw olderFetchError;
     }
+
+    const candidatePosts = [...(recentPosts || []), ...(olderPosts || [])];
 
     // Fair scheduling: round-robin po kampaniach, max N per kampania, max M ogółem
     const perCampaignCount: Record<string, number> = {};
     const campaignPostsToPublish: any[] = [];
-    for (const p of (candidatePosts || [])) {
+    for (const p of candidatePosts) {
       const cid = (p as any).campaign?.id || (p as any).campaign_id;
       if (!cid) continue;
       const cnt = perCampaignCount[cid] || 0;
@@ -437,7 +464,7 @@ Deno.serve(async (req) => {
       if (campaignPostsToPublish.length >= MAX_POSTS_PER_CYCLE) break;
     }
 
-    console.log(`Candidates: ${candidatePosts?.length || 0} (cap 2000), picked ${campaignPostsToPublish.length} for this cycle (cap ${MAX_POSTS_PER_CYCLE} total, ${MAX_POSTS_PER_CAMPAIGN_PER_CYCLE}/campaign)`);
+    console.log(`Candidates: ${recentPosts?.length || 0} recent + ${olderPosts?.length || 0} older, picked ${campaignPostsToPublish.length} for this cycle (cap ${MAX_POSTS_PER_CYCLE} total, ${MAX_POSTS_PER_CAMPAIGN_PER_CYCLE}/campaign)`);
 
     // RACE CONDITION FIX: Immediately mark campaign posts as "publishing" to prevent duplicate processing
     if (campaignPostsToPublish.length > 0) {
