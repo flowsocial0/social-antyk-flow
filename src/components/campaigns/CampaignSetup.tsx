@@ -263,7 +263,7 @@ export const CampaignSetup = ({
               <Input type="number" min={1} max={10} value={postsPerDay} onChange={e => handlePostsPerDayChange(Math.min(10, Math.max(1, parseInt(e.target.value) || 1)))} className="w-20" />
               <span className="text-sm text-muted-foreground">postów</span>
             </div>
-            <p className="text-xs text-muted-foreground">Maksymalnie 10 postów dziennie (limit API X)</p>
+            <p className="text-xs text-muted-foreground">Maksymalnie 10 postów dziennie</p>
           </div>
 
           {/* Start date */}
