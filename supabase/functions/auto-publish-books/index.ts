@@ -398,8 +398,14 @@ Deno.serve(async (req) => {
     // Get campaign posts that are ready to be published (scheduled OR rate_limited with retry time passed)
     // Exclude posts from paused campaigns
     // IMPORTANT: Include campaign.user_id to know who owns the campaign!
+    //
+    // FAIRNESS + BACKPRESSURE: pobieramy maks. 200 kandydatów, a potem ograniczamy
+    // do MAX_POSTS_PER_CYCLE łącznie i MAX_POSTS_PER_CAMPAIGN_PER_CYCLE per kampania,
+    // żeby jedna stara kampania z setkami zaległości nie blokowała świeższych kampanii.
+    const MAX_POSTS_PER_CYCLE = 25;
+    const MAX_POSTS_PER_CAMPAIGN_PER_CYCLE = 3;
     const now = new Date().toISOString();
-    const { data: campaignPostsToPublish, error: campaignFetchError } = await supabase
+    const { data: candidatePosts, error: campaignFetchError } = await supabase
       .from('campaign_posts')
       .select(`
         *,
@@ -410,17 +416,31 @@ Deno.serve(async (req) => {
       .neq('campaign.status', 'paused')
       .or(`status.eq.scheduled,and(status.eq.rate_limited,next_retry_at.lte.${now})`)
       .not('status', 'eq', 'publishing')
-      .order('scheduled_at', { ascending: true });
+      .order('scheduled_at', { ascending: true })
+      .limit(200);
 
     if (campaignFetchError) {
       console.error('Error fetching campaign posts:', campaignFetchError);
       throw campaignFetchError;
     }
 
-    console.log(`Found ${campaignPostsToPublish?.length || 0} campaign posts ready to publish`);
+    // Fair scheduling: round-robin po kampaniach, max N per kampania, max M ogółem
+    const perCampaignCount: Record<string, number> = {};
+    const campaignPostsToPublish: any[] = [];
+    for (const p of (candidatePosts || [])) {
+      const cid = (p as any).campaign?.id || (p as any).campaign_id;
+      if (!cid) continue;
+      const cnt = perCampaignCount[cid] || 0;
+      if (cnt >= MAX_POSTS_PER_CAMPAIGN_PER_CYCLE) continue;
+      perCampaignCount[cid] = cnt + 1;
+      campaignPostsToPublish.push(p);
+      if (campaignPostsToPublish.length >= MAX_POSTS_PER_CYCLE) break;
+    }
+
+    console.log(`Candidates: ${candidatePosts?.length || 0}, picked ${campaignPostsToPublish.length} for this cycle (cap ${MAX_POSTS_PER_CYCLE} total, ${MAX_POSTS_PER_CAMPAIGN_PER_CYCLE}/campaign)`);
 
     // RACE CONDITION FIX: Immediately mark campaign posts as "publishing" to prevent duplicate processing
-    if (campaignPostsToPublish && campaignPostsToPublish.length > 0) {
+    if (campaignPostsToPublish.length > 0) {
       const postIds = campaignPostsToPublish.map(p => p.id);
       console.log(`Locking ${postIds.length} campaign posts (setting status=publishing)`);
       await supabase
@@ -729,6 +749,9 @@ Deno.serve(async (req) => {
 
           // Get selected accounts for this platform from target_accounts
           let accountsForPlatform = targetAccounts[platform] || [];
+          // Dedupe — w danych zdarzają się powtórzone UUIDs (np. facebook 5x ten sam page),
+          // co powoduje publikację tego samego posta wiele razy i natychmiastowy rate-limit.
+          accountsForPlatform = [...new Set(accountsForPlatform.filter(Boolean))];
           
           // If no specific accounts selected, get ALL accounts for the campaign owner
           if (accountsForPlatform.length === 0) {
@@ -744,7 +767,7 @@ Deno.serve(async (req) => {
               if (accountsError) {
                 console.error(`Error fetching ${platform} accounts for owner:`, accountsError);
               } else if (ownerAccounts && ownerAccounts.length > 0) {
-                accountsForPlatform = ownerAccounts.map(a => a.id);
+                accountsForPlatform = [...new Set(ownerAccounts.map(a => a.id))];
                 console.log(`Found ${accountsForPlatform.length} ${platform} accounts for campaign owner`);
               }
             }
