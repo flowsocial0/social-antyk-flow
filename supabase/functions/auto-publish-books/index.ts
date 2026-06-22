@@ -437,7 +437,7 @@ Deno.serve(async (req) => {
       if (campaignPostsToPublish.length >= MAX_POSTS_PER_CYCLE) break;
     }
 
-    console.log(`Candidates: ${candidatePosts?.length || 0}, picked ${campaignPostsToPublish.length} for this cycle (cap ${MAX_POSTS_PER_CYCLE} total, ${MAX_POSTS_PER_CAMPAIGN_PER_CYCLE}/campaign)`);
+    console.log(`Candidates: ${candidatePosts?.length || 0} (cap 2000), picked ${campaignPostsToPublish.length} for this cycle (cap ${MAX_POSTS_PER_CYCLE} total, ${MAX_POSTS_PER_CAMPAIGN_PER_CYCLE}/campaign)`);
 
     // RACE CONDITION FIX: Immediately mark campaign posts as "publishing" to prevent duplicate processing
     if (campaignPostsToPublish.length > 0) {
