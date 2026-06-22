@@ -136,12 +136,6 @@ export const CampaignSetup = ({
   const contentPosts = Math.floor(totalPosts * (contentRatio / 100));
   const salesPosts = totalPosts - contentPosts;
 
-  // X.com has a 10 posts/day limit, so max 60 posts per campaign (6 days) - only when AI is used
-  const X_DAILY_LIMIT = 10;
-  const X_MAX_CAMPAIGN_POSTS = 60;
-  const hasX = targetPlatforms.includes('x');
-  const usesAI = useAI || useRandomContent;
-  const exceedsXLimit = hasX && usesAI && totalPosts > X_MAX_CAMPAIGN_POSTS;
   const handleSubmit = () => {
     // Sort posting times before submitting
     const sortedTimes = [...postingTimes].sort((a, b) => {
