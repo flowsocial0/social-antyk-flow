@@ -18,12 +18,24 @@ export default function TikTokCallback() {
 
       if (error) {
         console.error("TikTok OAuth error:", error, errorDescription);
-        toast.error("Błąd autoryzacji TikTok", {
-          description: errorDescription || error,
-        });
+        const isSandboxBlock =
+          error === "non_sandbox_target" ||
+          errorDescription?.toLowerCase().includes("non_sandbox_target") ||
+          errorDescription?.toLowerCase().includes("sandbox");
+        if (isSandboxBlock) {
+          toast.error("To konto TikTok nie ma dostępu do aplikacji", {
+            description:
+              "Skontaktuj się z administratorem lub spróbuj ponownie za chwilę.",
+          });
+        } else {
+          toast.error("Błąd autoryzacji TikTok", {
+            description: errorDescription || error,
+          });
+        }
         navigate("/platforms/tiktok");
         return;
       }
+
 
       if (!code) {
         toast.error("Brak kodu autoryzacji");
