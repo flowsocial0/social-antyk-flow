@@ -512,7 +512,7 @@ export default function SocialAccounts() {
     { id: 'x', name: 'X (Twitter)', icon: Twitter, color: 'text-blue-500', bgColor: 'bg-blue-500/10', connect: connectX, status: 'active' as const },
     { id: 'facebook', name: 'Facebook', icon: Facebook, color: 'text-blue-600', bgColor: 'bg-blue-600/10', connect: connectFacebook, status: 'active' as const },
     { id: 'instagram', name: 'Instagram', icon: Instagram, color: 'text-pink-500', bgColor: 'bg-pink-500/10', connect: connectInstagram, status: 'active' as const },
-    { id: 'tiktok', name: 'TikTok', icon: Video, color: 'text-black dark:text-white', bgColor: 'bg-black/10 dark:bg-white/10', connect: connectTikTok, status: 'review' as const },
+    { id: 'tiktok', name: 'TikTok', icon: Video, color: 'text-black dark:text-white', bgColor: 'bg-black/10 dark:bg-white/10', connect: connectTikTok, status: 'active' as const },
     { id: 'youtube', name: 'YouTube', icon: Youtube, color: 'text-red-500', bgColor: 'bg-red-500/10', connect: connectYouTube, status: 'review' as const },
     { id: 'linkedin', name: 'LinkedIn', icon: Linkedin, color: 'text-blue-700', bgColor: 'bg-blue-700/10', connect: connectLinkedIn, status: 'active' as const },
     { id: 'telegram', name: 'Telegram', icon: Send, color: 'text-sky-500', bgColor: 'bg-sky-500/10', connect: connectTelegram, formType: 'telegram' as const, status: 'active' as const },

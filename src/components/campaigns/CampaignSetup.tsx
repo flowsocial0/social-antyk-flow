@@ -136,12 +136,6 @@ export const CampaignSetup = ({
   const contentPosts = Math.floor(totalPosts * (contentRatio / 100));
   const salesPosts = totalPosts - contentPosts;
 
-  // X.com has a 10 posts/day limit, so max 60 posts per campaign (6 days) - only when AI is used
-  const X_DAILY_LIMIT = 10;
-  const X_MAX_CAMPAIGN_POSTS = 60;
-  const hasX = targetPlatforms.includes('x');
-  const usesAI = useAI || useRandomContent;
-  const exceedsXLimit = hasX && usesAI && totalPosts > X_MAX_CAMPAIGN_POSTS;
   const handleSubmit = () => {
     // Sort posting times before submitting
     const sortedTimes = [...postingTimes].sort((a, b) => {
@@ -169,7 +163,7 @@ export const CampaignSetup = ({
       randomContentTopic: useRandomContent ? randomContentTopic : undefined
     });
   };
-  const canSubmit = (useRandomContent || selectedBooks.length > 0) && !exceedsXLimit;
+  const canSubmit = (useRandomContent || selectedBooks.length > 0);
   return <div className="space-y-6">
       <Card className="p-6 bg-secondary/30">
         <h3 className="text-lg font-semibold mb-4">Parametry kampanii</h3>
@@ -269,7 +263,7 @@ export const CampaignSetup = ({
               <Input type="number" min={1} max={10} value={postsPerDay} onChange={e => handlePostsPerDayChange(Math.min(10, Math.max(1, parseInt(e.target.value) || 1)))} className="w-20" />
               <span className="text-sm text-muted-foreground">postów</span>
             </div>
-            <p className="text-xs text-muted-foreground">Maksymalnie 10 postów dziennie (limit API X)</p>
+            <p className="text-xs text-muted-foreground">Maksymalnie 10 postów dziennie</p>
           </div>
 
           {/* Start date */}
@@ -413,27 +407,11 @@ export const CampaignSetup = ({
             <li>• {useAI ? "Grok AI automatycznie dobierze odpowiednie typy postów" : "Treści zostaną pobrane z opisów książek w bazie"}</li>
           </ul>
         </div>
-        
-        {exceedsXLimit && <Alert variant="destructive" className="mt-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Przekroczono limit X.com!</strong>
-              <br />
-              Kampania na X.com może mieć maksymalnie {X_MAX_CAMPAIGN_POSTS} postów (limit {X_DAILY_LIMIT} postów/dzień).
-              <br />
-              Aktualnie zaplanowano: <strong>{totalPosts} postów</strong>. Zmniejsz liczbę dni lub postów dziennie.
-            </AlertDescription>
-          </Alert>}
       </Card>
 
       <Button onClick={handleSubmit} className="w-full" size="lg" disabled={!canSubmit}>
-        {exceedsXLimit ? <>
-            <AlertCircle className="mr-2 h-4 w-4" />
-            Przekroczono limit {X_MAX_CAMPAIGN_POSTS} postów dla X.com
-          </> : <>
-            Przejdź do generowania planu
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </>}
+        Przejdź do generowania planu
+        <ArrowRight className="ml-2 h-4 w-4" />
       </Button>
     </div>;
 };
