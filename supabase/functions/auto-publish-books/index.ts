@@ -417,7 +417,7 @@ Deno.serve(async (req) => {
       .or(`status.eq.scheduled,and(status.eq.rate_limited,next_retry_at.lte.${now})`)
       .not('status', 'eq', 'publishing')
       .order('scheduled_at', { ascending: true })
-      .limit(200);
+      .limit(2000);
 
     if (campaignFetchError) {
       console.error('Error fetching campaign posts:', campaignFetchError);
