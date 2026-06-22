@@ -98,19 +98,6 @@ export const platformLimits: Record<PlatformId, PlatformLimits> = {
     authType: 'oauth2',
     apiDocumentation: 'https://developers.tiktok.com/doc/content-posting-api-get-started',
   },
-  pinterest: {
-    id: 'pinterest',
-    textLimit: 500,
-    mediaRequired: true, // Pinterest requires image
-    supportedMedia: 'image+video',
-    videoMaxDuration: 60 * 60, // 60 minutes
-    videoMaxSize: 2048, // 2GB
-    imageMaxSize: 32,
-    maxImages: 1,
-    maxVideos: 1,
-    authType: 'oauth2',
-    apiDocumentation: 'https://developers.pinterest.com/docs/api/v5/',
-  },
   telegram: {
     id: 'telegram',
     textLimit: 4096,

@@ -38,7 +38,7 @@ interface PlatformAccounts {
   telegram: SocialAccount[];
   bluesky: SocialAccount[];
   mastodon: SocialAccount[];
-  pinterest: SocialAccount[];
+  
   
   discord: SocialAccount[];
   tumblr: SocialAccount[];
@@ -51,7 +51,7 @@ export default function SocialAccounts() {
   const [accounts, setAccounts] = useState<PlatformAccounts>({
     x: [], facebook: [], instagram: [], tiktok: [], youtube: [], linkedin: [],
     telegram: [], bluesky: [], mastodon: [],
-    pinterest: [], discord: [], tumblr: [], google_business: [],
+    discord: [], tumblr: [], google_business: [],
   });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; platform: string; accountId: string; accountName: string }>({
     open: false,
@@ -114,7 +114,7 @@ export default function SocialAccounts() {
     if (!session) return;
 
     // Load all accounts for each platform
-    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, telegramResult, blueskyResult, mastodonResult, pinterestResult, discordResult, tumblrResult, googleBizResult] = await Promise.all([
+    const [xResult, fbResult, igResult, tiktokResult, ytResult, linkedinResult, telegramResult, blueskyResult, mastodonResult, discordResult, tumblrResult, googleBizResult] = await Promise.all([
       supabase.from('twitter_oauth1_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('facebook_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('instagram_oauth_tokens').select('*').eq('user_id', session.user.id),
@@ -124,7 +124,6 @@ export default function SocialAccounts() {
       (supabase as any).from('telegram_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('bluesky_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('mastodon_tokens').select('*').eq('user_id', session.user.id).not('access_token', 'like', 'pending_%'),
-      (supabase as any).from('pinterest_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('discord_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('tumblr_oauth_tokens').select('*').eq('user_id', session.user.id),
       (supabase as any).from('google_business_tokens').select('*').eq('user_id', session.user.id),
@@ -175,11 +174,6 @@ export default function SocialAccounts() {
         id: a.id,
         account_name: a.account_name,
         display_name: a.username ? `@${a.username}@${new URL(a.server_url).hostname}` : a.server_url,
-      })),
-      pinterest: (pinterestResult.data || []).map((a: any) => ({
-        id: a.id,
-        account_name: a.account_name,
-        display_name: a.username ? `@${a.username}` : 'Konto Pinterest',
       })),
       discord: (discordResult.data || []).map((a: any) => ({
         id: a.id, account_name: a.account_name,
@@ -395,33 +389,6 @@ export default function SocialAccounts() {
   };
 
 
-  const connectPinterest = async () => {
-    setLoading('pinterest', true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('Musisz być zalogowany');
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke('pinterest-oauth-start', {
-        body: { userId: session.user.id },
-      });
-
-      if (error) throw error;
-
-      if (data?.url) {
-        if (data.state) sessionStorage.setItem('pinterest_oauth_state', data.state);
-        sessionStorage.setItem('pinterest_user_id', session.user.id);
-        window.location.href = data.url;
-      }
-    } catch (error: any) {
-      toast.error('Nie udało się połączyć z Pinterest', { description: error.message });
-    } finally {
-      setLoading('pinterest', false);
-    }
-  };
-
 
 
 
@@ -481,7 +448,6 @@ export default function SocialAccounts() {
         youtube: 'youtube_oauth_tokens', linkedin: 'linkedin_oauth_tokens',
         telegram: 'telegram_tokens',
         bluesky: 'bluesky_tokens', mastodon: 'mastodon_tokens',
-        pinterest: 'pinterest_oauth_tokens',
         discord: 'discord_tokens',
         tumblr: 'tumblr_oauth_tokens',
         google_business: 'google_business_tokens',
@@ -513,13 +479,12 @@ export default function SocialAccounts() {
     { id: 'facebook', name: 'Facebook', icon: Facebook, color: 'text-blue-600', bgColor: 'bg-blue-600/10', connect: connectFacebook, status: 'active' as const },
     { id: 'instagram', name: 'Instagram', icon: Instagram, color: 'text-pink-500', bgColor: 'bg-pink-500/10', connect: connectInstagram, status: 'active' as const },
     { id: 'tiktok', name: 'TikTok', icon: Video, color: 'text-black dark:text-white', bgColor: 'bg-black/10 dark:bg-white/10', connect: connectTikTok, status: 'active' as const },
-    { id: 'youtube', name: 'YouTube', icon: Youtube, color: 'text-red-500', bgColor: 'bg-red-500/10', connect: connectYouTube, status: 'review' as const },
+    { id: 'youtube', name: 'YouTube', icon: Youtube, color: 'text-red-500', bgColor: 'bg-red-500/10', connect: connectYouTube, status: 'active' as const },
     { id: 'linkedin', name: 'LinkedIn', icon: Linkedin, color: 'text-blue-700', bgColor: 'bg-blue-700/10', connect: connectLinkedIn, status: 'active' as const },
     { id: 'telegram', name: 'Telegram', icon: Send, color: 'text-sky-500', bgColor: 'bg-sky-500/10', connect: connectTelegram, formType: 'telegram' as const, status: 'active' as const },
     { id: 'bluesky', name: 'Bluesky', icon: Globe, color: 'text-sky-600', bgColor: 'bg-sky-600/10', connect: connectBluesky, formType: 'bluesky' as const, status: 'active' as const },
     { id: 'mastodon', name: 'Mastodon', icon: Globe, color: 'text-purple-600', bgColor: 'bg-purple-600/10', connect: connectMastodon, formType: 'mastodon' as const, status: 'active' as const },
     
-    { id: 'pinterest', name: 'Pinterest', icon: Image, color: 'text-red-600', bgColor: 'bg-red-600/10', connect: connectPinterest, status: 'review' as const },
     
     { id: 'discord', name: 'Discord', icon: MessageCircle, color: 'text-indigo-500', bgColor: 'bg-indigo-500/10', connect: connectDiscord, formType: 'discord' as const, status: 'active' as const },
     { id: 'tumblr', name: 'Tumblr', icon: Globe, color: 'text-blue-900', bgColor: 'bg-blue-900/10', connect: connectTumblr, status: 'active' as const },
@@ -533,7 +498,7 @@ export default function SocialAccounts() {
           <Button 
             variant="ghost" 
             onClick={() => {
-              if (sourcePlatform && ['x','facebook','instagram','tiktok','youtube','linkedin','threads','telegram','bluesky','mastodon','pinterest','discord','tumblr','google_business'].includes(sourcePlatform)) {
+              if (sourcePlatform && ['x','facebook','instagram','tiktok','youtube','linkedin','threads','telegram','bluesky','mastodon','discord','tumblr','google_business'].includes(sourcePlatform)) {
                 navigate(`/platforms/${sourcePlatform}`);
               } else {
                 navigate('/platforms');
