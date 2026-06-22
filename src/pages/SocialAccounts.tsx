@@ -530,11 +530,6 @@ export default function SocialAccounts() {
                     <div>
                       <h3 className="font-semibold flex items-center gap-2">
                         {platform.name}
-                        {platform.status === 'review' && (
-                          <Badge variant="outline" className="text-xs text-amber-600 border-amber-400 bg-amber-50 dark:bg-amber-950/30">
-                            ⏳ In Review
-                          </Badge>
-                        )}
                         {platformAccounts.length > 0 && (
                           <Badge variant="secondary" className="text-xs">
                             {platformAccounts.length} {platformAccounts.length === 1 ? 'konto' : 'kont'}
