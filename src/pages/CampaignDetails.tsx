@@ -283,20 +283,8 @@ const CampaignDetails = () => {
         });
       }
 
-      // Load Pinterest accounts
-      if (selectedAccounts.pinterest?.length) {
-        const { data } = await (supabase as any)
-          .from('pinterest_oauth_tokens')
-          .select('id, username, account_name')
-          .in('id', selectedAccounts.pinterest);
-        data?.forEach((a: any) => {
-          newAccountsMap[a.id] = {
-            id: a.id,
-            display_name: a.username ? `@${a.username}` : (a.account_name || 'Konto Pinterest'),
-            platform: 'pinterest'
-          };
-        });
-      }
+
+
 
 
       // Load Discord accounts

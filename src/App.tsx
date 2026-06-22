@@ -23,8 +23,6 @@ import YouTubeCallback from "./pages/YouTubeCallback";
 import LinkedInCallback from "./pages/LinkedInCallback";
 import MastodonCallback from "./pages/MastodonCallback";
 
-import PinterestCallback from "./pages/PinterestCallback";
-
 import TumblrCallback from "./pages/TumblrCallback";
 
 import GoogleBusinessCallback from "./pages/GoogleBusinessCallback";
@@ -39,7 +37,6 @@ import PlatformInstagram from "./pages/platforms/PlatformInstagram";
 import PlatformYouTube from "./pages/platforms/PlatformYouTube";
 import PlatformLinkedIn from "./pages/platforms/PlatformLinkedIn";
 import PlatformTikTok from "./pages/platforms/PlatformTikTok";
-import PlatformPinterest from "./pages/platforms/PlatformPinterest";
 
 import PlatformTelegram from "./pages/platforms/PlatformTelegram";
 import PlatformBluesky from "./pages/platforms/PlatformBluesky";
@@ -125,7 +122,6 @@ const App = () => (
           <Route path="/oauth/linkedin/callback" element={<LinkedInCallback />} />
           <Route path="/oauth/mastodon/callback" element={<MastodonCallback />} />
           
-          <Route path="/oauth/pinterest/callback" element={<PinterestCallback />} />
           
           <Route path="/oauth/tumblr/callback" element={<TumblrCallback />} />
           
@@ -151,7 +147,6 @@ const App = () => (
           <Route path="/platforms/youtube" element={<ProtectedRoute><PlatformYouTube /></ProtectedRoute>} />
           <Route path="/platforms/linkedin" element={<ProtectedRoute><PlatformLinkedIn /></ProtectedRoute>} />
           <Route path="/platforms/tiktok" element={<ProtectedRoute><PlatformTikTok /></ProtectedRoute>} />
-          <Route path="/platforms/pinterest" element={<ProtectedRoute><PlatformPinterest /></ProtectedRoute>} />
           
           <Route path="/platforms/telegram" element={<ProtectedRoute><PlatformTelegram /></ProtectedRoute>} />
           <Route path="/platforms/bluesky" element={<ProtectedRoute><PlatformBluesky /></ProtectedRoute>} />

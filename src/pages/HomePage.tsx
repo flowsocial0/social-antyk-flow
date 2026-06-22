@@ -20,7 +20,7 @@ const platforms = [
   { name: "TikTok", icon: "♪" },
   { name: "YouTube", icon: "▶" },
   { name: "LinkedIn", icon: "in" },
-  { name: "Pinterest", icon: "P" },
+  
   { name: "Bluesky", icon: "🦋" },
   { name: "Mastodon", icon: "🐘" },
   { name: "Telegram", icon: "✈" },

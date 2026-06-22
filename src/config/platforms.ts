@@ -12,7 +12,7 @@ export type PlatformId =
   | 'youtube' 
   | 'tiktok'
   | 'linkedin' 
-  | 'pinterest' 
+   
    
   | 'telegram' 
   | 'bluesky'
@@ -89,7 +89,7 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     gradientFrom: 'from-red-500/20',
     gradientTo: 'to-red-600/20',
     path: '/platforms/youtube',
-    status: 'review',
+    status: 'active',
     priority: 4,
     mediaType: 'video-only',
     popular: true,
@@ -122,19 +122,6 @@ export const platformConfigs: Record<PlatformId, PlatformConfig> = {
     mediaType: 'video-only',
     popular: true,
     shortDescription: 'Publikuj krótkie filmy promocyjne.',
-  },
-  pinterest: {
-    id: 'pinterest',
-    name: 'Pinterest',
-    icon: Image,
-    color: 'text-red-600',
-    gradientFrom: 'from-red-600/20',
-    gradientTo: 'to-red-700/20',
-    path: '/platforms/pinterest',
-    status: 'review',
-    priority: 8,
-    mediaType: 'image-only',
-    shortDescription: 'Przypinaj obrazki jako piny z linkiem do produktu.',
   },
   telegram: {
     id: 'telegram',

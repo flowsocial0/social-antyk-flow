@@ -102,7 +102,7 @@ function getTokenTableName(platform: string): string {
     case 'bluesky': return 'bluesky_tokens';
     case 'mastodon': return 'mastodon_tokens';
     case 'gab': return 'gab_tokens';
-    case 'pinterest': return 'pinterest_oauth_tokens';
+    
     
     case 'discord': return 'discord_tokens';
     case 'tumblr': return 'tumblr_oauth_tokens';
@@ -125,7 +125,7 @@ function getPlatformNamePL(platform: string): string {
     case 'bluesky': return 'Bluesky';
     case 'mastodon': return 'Mastodon';
     case 'gab': return 'Gab';
-    case 'pinterest': return 'Pinterest';
+    
     
     case 'discord': return 'Discord';
     case 'tumblr': return 'Tumblr';
@@ -143,7 +143,7 @@ const PLATFORM_RATE_LIMITS: Record<string, { maxPosts: number; windowMinutes: nu
   linkedin: { maxPosts: 100, windowMinutes: 1 },  // LinkedIn daily limit
   tiktok: { maxPosts: 100, windowMinutes: 1 }, 
   youtube: { maxPosts: 100, windowMinutes: 1 }, 
-  pinterest: { maxPosts: 100, windowMinutes: 1 }, 
+   
   // No limits for self-hosted: telegram, discord, bluesky, mastodon, gab, tumblr, google_business
 };
 
@@ -177,7 +177,7 @@ function isRateLimitErrorMessage(msg: string): boolean {
 
 // Token tables that have expires_at column
 const TABLES_WITH_EXPIRY = ['facebook_oauth_tokens', 'instagram_oauth_tokens', 'linkedin_oauth_tokens', 
-  'tiktok_oauth_tokens', 'youtube_oauth_tokens', 'pinterest_oauth_tokens', 'google_business_tokens', 'tumblr_oauth_tokens'];
+  'tiktok_oauth_tokens', 'youtube_oauth_tokens', 'google_business_tokens', 'tumblr_oauth_tokens'];
 
 // Try to find a replacement account when the original account ID no longer exists
 // This happens when a user reconnects their social account (new token row with new UUID)
@@ -502,9 +502,6 @@ Deno.serve(async (req) => {
           case 'gab':
             publishFunctionName = 'publish-to-gab';
             break;
-          case 'pinterest':
-            publishFunctionName = 'publish-to-pinterest';
-            break;
           case 'discord':
             publishFunctionName = 'publish-to-discord';
             break;
@@ -724,9 +721,6 @@ Deno.serve(async (req) => {
               break;
             case 'gab':
               publishFunctionName = 'publish-to-gab';
-              break;
-            case 'pinterest':
-              publishFunctionName = 'publish-to-pinterest';
               break;
             case 'discord':
               publishFunctionName = 'publish-to-discord';
