@@ -163,7 +163,7 @@ export const CampaignSetup = ({
       randomContentTopic: useRandomContent ? randomContentTopic : undefined
     });
   };
-  const canSubmit = (useRandomContent || selectedBooks.length > 0) && !exceedsXLimit;
+  const canSubmit = (useRandomContent || selectedBooks.length > 0);
   return <div className="space-y-6">
       <Card className="p-6 bg-secondary/30">
         <h3 className="text-lg font-semibold mb-4">Parametry kampanii</h3>
