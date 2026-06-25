@@ -59,6 +59,8 @@ export const BookSelector = ({ selectedBooks, onSelectionChange, requireVideo = 
     },
   });
 
+  const hasVideo = (book: Book) => Boolean(book.video_url || book.video_storage_path);
+
   useEffect(() => {
     if (!requireVideo || !books) return;
     const allowedIds = new Set(books.filter(hasVideo).map((book) => book.id));
@@ -88,8 +90,6 @@ export const BookSelector = ({ selectedBooks, onSelectionChange, requireVideo = 
   const handleDeselectAll = () => {
     onSelectionChange([]);
   };
-
-  const hasVideo = (book: Book) => Boolean(book.video_url || book.video_storage_path);
 
   return (
     <Card className="p-6 bg-secondary/30">
