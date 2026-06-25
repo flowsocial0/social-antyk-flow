@@ -551,6 +551,14 @@ export type Database = {
           status: string
           target_accounts: Json | null
           text: string
+          tiktok_account_id: string | null
+          tiktok_allow_comment: boolean | null
+          tiktok_allow_duet: boolean | null
+          tiktok_allow_stitch: boolean | null
+          tiktok_brand_organic: boolean | null
+          tiktok_branded_content: boolean | null
+          tiktok_disclose_content: boolean | null
+          tiktok_privacy_level: string | null
           time: string
           type: string
         }
@@ -572,6 +580,14 @@ export type Database = {
           status?: string
           target_accounts?: Json | null
           text: string
+          tiktok_account_id?: string | null
+          tiktok_allow_comment?: boolean | null
+          tiktok_allow_duet?: boolean | null
+          tiktok_allow_stitch?: boolean | null
+          tiktok_brand_organic?: boolean | null
+          tiktok_branded_content?: boolean | null
+          tiktok_disclose_content?: boolean | null
+          tiktok_privacy_level?: string | null
           time: string
           type: string
         }
@@ -593,6 +609,14 @@ export type Database = {
           status?: string
           target_accounts?: Json | null
           text?: string
+          tiktok_account_id?: string | null
+          tiktok_allow_comment?: boolean | null
+          tiktok_allow_duet?: boolean | null
+          tiktok_allow_stitch?: boolean | null
+          tiktok_brand_organic?: boolean | null
+          tiktok_branded_content?: boolean | null
+          tiktok_disclose_content?: boolean | null
+          tiktok_privacy_level?: string | null
           time?: string
           type?: string
         }
@@ -628,6 +652,14 @@ export type Database = {
           start_date: string
           status: string
           target_platforms: Json | null
+          tiktok_account_id: string | null
+          tiktok_allow_comment: boolean
+          tiktok_allow_duet: boolean
+          tiktok_allow_stitch: boolean
+          tiktok_brand_organic: boolean
+          tiktok_branded_content: boolean
+          tiktok_disclose_content: boolean
+          tiktok_privacy_level: string | null
           updated_at: string
           user_id: string
         }
@@ -645,6 +677,14 @@ export type Database = {
           start_date: string
           status?: string
           target_platforms?: Json | null
+          tiktok_account_id?: string | null
+          tiktok_allow_comment?: boolean
+          tiktok_allow_duet?: boolean
+          tiktok_allow_stitch?: boolean
+          tiktok_brand_organic?: boolean
+          tiktok_branded_content?: boolean
+          tiktok_disclose_content?: boolean
+          tiktok_privacy_level?: string | null
           updated_at?: string
           user_id: string
         }
@@ -662,6 +702,14 @@ export type Database = {
           start_date?: string
           status?: string
           target_platforms?: Json | null
+          tiktok_account_id?: string | null
+          tiktok_allow_comment?: boolean
+          tiktok_allow_duet?: boolean
+          tiktok_allow_stitch?: boolean
+          tiktok_brand_organic?: boolean
+          tiktok_branded_content?: boolean
+          tiktok_disclose_content?: boolean
+          tiktok_privacy_level?: string | null
           updated_at?: string
           user_id?: string
         }
