@@ -353,9 +353,8 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
                   <AlertDialogHeader>
                     <AlertDialogTitle>Rozłączyć wszystkie konta?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Usunie to wszystkie zapisane tokeny autoryzacji dla tej platformy. 
-                      Przy ponownym połączeniu zostaniesz poproszony o udzielenie wszystkich uprawnień od nowa.
-                      Zaplanowane posty na tę platformę nie będą mogły być opublikowane do czasu ponownego połączenia.
+                      Usunie to <strong>wszystkie</strong> zapisane tokeny autoryzacji dla tej platformy.
+                      Aby rozłączyć tylko jedno konto, użyj ikony rozłączenia obok jego nazwy powyżej.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
