@@ -62,7 +62,7 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
       setAccounts([]);
       const ids = idsKey ? idsKey.split(",") : [undefined as any];
       try {
-        const results = await Promise.all(
+        const settled = await Promise.allSettled(
           ids.map(async (id) => {
             const { data, error } = await supabase.functions.invoke("tiktok-creator-info", {
               body: { accountId: id },
@@ -73,12 +73,33 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
           })
         );
         if (cancelled) return;
-        setAccounts(results);
 
-        const options: string[] = results[0]?.info?.privacy_level_options || [];
+        const results: Array<{ accountId: string; info: CreatorInfo }> = [];
+        const errors: string[] = [];
+        settled.forEach((s) => {
+          if (s.status === "fulfilled") results.push(s.value);
+          else errors.push(s.reason?.message || String(s.reason));
+        });
+
+        // Deduplicate by accountId (defensive — same row should never come back twice)
+        const seen = new Set<string>();
+        const unique = results.filter((r) => {
+          if (seen.has(r.accountId)) return false;
+          seen.add(r.accountId);
+          return true;
+        });
+
+        setAccounts(unique);
+        if (unique.length === 0 && errors.length > 0) {
+          setError(errors[0]);
+        } else if (errors.length > 0) {
+          setError(`Niektóre konta nie zostały załadowane: ${errors.join("; ")}`);
+        }
+
+        const options: string[] = unique[0]?.info?.privacy_level_options || [];
         const currentAllowed = options.includes(value.privacyLevel);
         const patch: Partial<TikTokPublishOptionsValue> = {};
-        if (results[0] && value.accountId !== results[0].accountId) patch.accountId = results[0].accountId;
+        if (unique[0] && value.accountId !== unique[0].accountId) patch.accountId = unique[0].accountId;
         if (options.length > 0 && !currentAllowed) {
           patch.privacyLevel = options.includes("SELF_ONLY")
             ? "SELF_ONLY"
