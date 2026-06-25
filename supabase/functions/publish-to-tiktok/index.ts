@@ -308,17 +308,16 @@ serve(async (req) => {
     }
 
     const creatorInfo = await queryCreatorInfo(accessToken);
-    const privacyLevel = pickPrivacyLevel(creatorInfo);
-    console.log('Using TikTok privacy level:', privacyLevel);
+    let privacyLevel = privacyLevelOverride || pickPrivacyLevel(creatorInfo);
+    console.log('Initial TikTok privacy level:', privacyLevel, privacyLevelOverride ? '(override)' : '');
 
     // TikTok Video Upload - FILE_UPLOAD method
-    // Step 1: Initialize video upload
     const initEndpoint = 'https://open.tiktokapis.com/v2/post/publish/video/init/';
-    
-    const initBody = {
+
+    const buildInitBody = (level: string) => ({
       post_info: {
         title: textToPost.substring(0, 150),
-        privacy_level: privacyLevel,
+        privacy_level: level,
         disable_comment: false,
         disable_duet: false,
         disable_stitch: false,
@@ -326,51 +325,74 @@ serve(async (req) => {
       source_info: {
         source: 'FILE_UPLOAD',
         video_size: videoData.size,
-        chunk_size: videoData.size, // Single chunk for smaller videos
+        chunk_size: videoData.size,
         total_chunk_count: 1,
       },
-    };
-
-    console.log('TikTok video init request:', JSON.stringify(initBody, null, 2));
-
-    const initResponse = await fetch(initEndpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json; charset=UTF-8',
-      },
-      body: JSON.stringify(initBody),
     });
 
-    const initData = await initResponse.json();
-    console.log('TikTok video init response:', JSON.stringify(initData, null, 2));
+    const callInit = async (level: string) => {
+      const reqBody = buildInitBody(level);
+      console.log(`TikTok video init request (privacy=${level}):`, JSON.stringify(reqBody));
+      const resp = await fetch(initEndpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: JSON.stringify(reqBody),
+      });
+      const json = await resp.json();
+      console.log(`TikTok video init response (privacy=${level}):`, JSON.stringify(json));
+      return json;
+    };
+
+    let initData = await callInit(privacyLevel);
+    let usedFallback = false;
+
+    // Fallback: if app is unaudited and we tried a public level, retry with SELF_ONLY
+    if (
+      initData?.error?.code === 'unaudited_client_can_only_post_to_private_accounts' &&
+      privacyLevel !== 'SELF_ONLY' &&
+      !privacyLevelOverride
+    ) {
+      console.warn('TikTok rejected public post (unaudited client). Retrying with SELF_ONLY fallback…');
+      privacyLevel = 'SELF_ONLY';
+      usedFallback = true;
+      initData = await callInit(privacyLevel);
+    }
 
     if (initData.error?.code && initData.error.code !== 'ok') {
       const errorCode = initData.error.code;
       const errorMsg = initData.error.message || errorCode;
-      
+      const logId = initData.error.log_id || 'n/a';
+
       if (errorCode === 'spam_risk_too_many_pending_share') {
         throw makeError('Za dużo oczekujących postów. Poczekaj chwilę i spróbuj ponownie.', 'TIKTOK_TOO_MANY_PENDING');
       }
-      
+
       if (errorCode === 'unaudited_client_can_only_post_to_private_accounts') {
-        throw makeError('Aplikacja TikTok nadal działa jak niezatwierdzona dla tego konta. Sprawdź produkcyjne credentiale TikTok i status aplikacji w TikTok Developer Portal.', 'TIKTOK_APP_UNAUDITED');
+        throw makeError(
+          `TikTok odrzuca publikację dla tej aplikacji po stronie API (nawet jako SELF_ONLY). To nie jest błąd harmonogramu ani wideo. Sprawdź w TikTok Developer Portal, czy Production App ma zatwierdzony Content Posting API / Direct Post dla aktualnego Client Key (${clientKeyFingerprint}). log_id=${logId}`,
+          'TIKTOK_APP_UNAUDITED'
+        );
       }
-      
+
       if (errorCode === 'access_token_invalid') {
         throw makeError('Token dostępu wygasł. Połącz konto TikTok ponownie.', 'TOKEN_EXPIRED');
       }
-      
+
       if (errorCode === 'scope_not_authorized') {
         throw makeError('Brak uprawnień do publikacji. Połącz konto TikTok ponownie z wymaganymi uprawnieniami.', 'TIKTOK_SCOPE_NOT_AUTHORIZED');
       }
-      
-      throw makeError(`Błąd TikTok: ${errorMsg}`, errorCode || 'TIKTOK_ERROR');
+
+      throw makeError(`Błąd TikTok: ${errorMsg} (log_id=${logId})`, errorCode || 'TIKTOK_ERROR');
     }
+
+    console.log('TikTok init OK, usedFallback=', usedFallback, 'finalPrivacy=', privacyLevel);
 
     const publishId = initData.data?.publish_id;
     const uploadUrl = initData.data?.upload_url;
-    
+
     if (!publishId || !uploadUrl) {
       console.error('Missing publish_id or upload_url in response:', initData);
       throw new Error('Nie udało się uzyskać URL uploadu z TikTok');
