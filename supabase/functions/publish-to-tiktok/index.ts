@@ -440,8 +440,11 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         publishId,
-        message: 'Wideo wysłane do TikTok! Przetwarzanie może potrwać kilka minut.',
+        message: usedFallback
+          ? 'Wideo wysłane do TikTok jako PRYWATNE (SELF_ONLY) — TikTok nie pozwala tej aplikacji publikować publicznie dla tego konta. Sprawdź zatwierdzenie Content Posting API w TikTok Developer Portal.'
+          : 'Wideo wysłane do TikTok! Przetwarzanie może potrwać kilka minut.',
         privacyLevel,
+        usedFallback,
         note: privacyLevel === 'PUBLIC_TO_EVERYONE'
           ? 'Post został wysłany jako publiczny.'
           : `Post został wysłany z widocznością ${privacyLevel}, zgodnie z ustawieniami dostępnymi dla konta/aplikacji TikTok.`
