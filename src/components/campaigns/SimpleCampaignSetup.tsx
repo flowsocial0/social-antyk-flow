@@ -542,7 +542,12 @@ export const SimpleCampaignSetup = () => {
       />
 
       {targetPlatforms.includes("tiktok") && (
-        <TikTokPublishOptions value={tiktokOptions} onChange={setTiktokOptions} />
+        <TikTokPublishOptions
+          value={tiktokOptions}
+          onChange={setTiktokOptions}
+          selectedAccountId={selectedAccounts.tiktok?.[0]}
+        />
+
       )}
 
       <Card className="p-6 bg-gradient-subtle border-primary/20">
