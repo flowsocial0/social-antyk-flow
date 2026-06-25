@@ -147,22 +147,26 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
   });
 
   const disconnectMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (accountId?: string) => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Musisz być zalogowany');
 
       const tableName = getTableName(platform);
-      const { error } = await (supabase as any)
+      let q = (supabase as any)
         .from(tableName)
         .delete()
         .eq("user_id", session.user.id);
+      if (accountId) q = q.eq("id", accountId);
+      const { error } = await q;
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, accountId) => {
       toast({
         title: "✅ Rozłączono",
-        description: "Konto zostało rozłączone. Przy ponownym połączeniu zostaniesz poproszony o wszystkie uprawnienia.",
+        description: accountId
+          ? "Wybrane konto zostało rozłączone."
+          : "Wszystkie konta zostały rozłączone. Przy ponownym połączeniu zostaniesz poproszony o uprawnienia.",
       });
       refetch();
     },
