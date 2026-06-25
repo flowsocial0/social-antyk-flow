@@ -293,11 +293,17 @@ async function validateAccountToken(
     return { valid: false, reason: `Konto nie istnieje. Połącz ponownie w ustawieniach.` };
   }
   
-  // Check token expiry for platforms that have it
+  // Check token expiry for platforms that have it. TikTok access tokens are
+  // short-lived, but publish-to-tiktok can refresh them with refresh_token.
+  // Do not fail here before the target function gets a chance to refresh.
   if (TABLES_WITH_EXPIRY.includes(tableName) && account.expires_at) {
     const expiresAt = new Date(account.expires_at);
     if (expiresAt < new Date()) {
-      return { valid: false, reason: `Token ${getPlatformNamePL(platform)} wygasł. Połącz konto ponownie.` };
+      if (platform === 'tiktok' && account.refresh_token) {
+        console.log(`TikTok token ${accountId.substring(0, 8)} expired but has refresh_token — publish-to-tiktok will refresh it`);
+      } else {
+        return { valid: false, reason: `Token ${getPlatformNamePL(platform)} wygasł. Połącz konto ponownie.` };
+      }
     }
   }
   
@@ -817,6 +823,13 @@ Deno.serve(async (req) => {
               continue;
             }
             console.log(`Publishing to account ${accountId} on ${platform}`);
+
+            if (platform === 'tiktok' && !resolvedVideoUrl) {
+              const msg = 'TikTok wymaga wideo. Ta książka/post nie ma przypisanego wideo.';
+              console.error(`⛔ ${msg} post=${post.id}`);
+              accountErrors.push(`Konto ${accountId.substring(0, 8)}: ${msg}`);
+              continue;
+            }
             
             // ====== AUTO-REMAP ORPHANED ACCOUNTS ======
             const remap = await tryRemapOrphanedAccount(supabase, platform, accountId, campaignOwnerId);
