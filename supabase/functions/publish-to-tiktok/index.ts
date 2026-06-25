@@ -135,10 +135,18 @@ serve(async (req) => {
       testConnection,
       userId: userIdFromBody,
       videoUrl: videoUrlFromBody,
-      accountId // For multi-account support
+      accountId, // For multi-account support
+      privacyLevelOverride, // Diagnostic: force a specific privacy level
     } = body;
 
-    console.log('Request body:', { contentId, bookId, platform, testConnection, hasVideoUrl: !!videoUrlFromBody, accountId });
+    // Fingerprint client key for diagnostics (no secret leak)
+    const clientKeyEnv = Deno.env.get('TIKTOK_CLIENT_KEY') || '';
+    const clientKeyFingerprint = clientKeyEnv
+      ? `${clientKeyEnv.substring(0, 4)}…${clientKeyEnv.slice(-4)} (len=${clientKeyEnv.length})`
+      : 'MISSING';
+    console.log('TikTok client key fingerprint:', clientKeyFingerprint);
+
+    console.log('Request body:', { contentId, bookId, platform, testConnection, hasVideoUrl: !!videoUrlFromBody, accountId, privacyLevelOverride });
 
     const authHeader = req.headers.get('Authorization');
     if (authHeader) {
