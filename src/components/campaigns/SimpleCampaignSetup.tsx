@@ -154,6 +154,13 @@ export const SimpleCampaignSetup = () => {
       return;
     }
 
+    if (targetPlatforms.includes("tiktok") && posts.some((p) => !p.videoFile)) {
+      toast.error("TikTok wymaga wideo", {
+        description: "Dodaj plik wideo do każdego posta w kampanii TikTok.",
+      });
+      return;
+    }
+
     setIsCreating(true);
 
     try {
@@ -287,7 +294,8 @@ export const SimpleCampaignSetup = () => {
     }
   };
 
-  const canSubmit = posts.every((p) => p.text.trim()) && targetPlatforms.length > 0;
+  const requiresVideo = targetPlatforms.includes("tiktok");
+  const canSubmit = posts.every((p) => p.text.trim()) && targetPlatforms.length > 0 && (!requiresVideo || posts.every((p) => p.videoFile));
 
   // Group posts by day
   const postsByDay: Record<number, SimplePost[]> = {};
@@ -509,6 +517,11 @@ export const SimpleCampaignSetup = () => {
         {posts.some(p => p.imageFile || p.videoFile) && (
           <p className="text-sm text-muted-foreground mt-1">
             📎 {posts.filter(p => p.imageFile).length} grafik, {posts.filter(p => p.videoFile).length} wideo do przesłania
+          </p>
+        )}
+        {requiresVideo && posts.some((p) => !p.videoFile) && (
+          <p className="text-sm text-destructive mt-2">
+            TikTok wymaga wideo — dodaj film do każdego posta przed zaplanowaniem.
           </p>
         )}
       </Card>
