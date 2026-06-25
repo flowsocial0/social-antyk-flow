@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, BookOpen, CheckSquare, Square, Loader2 } from "lucide-react";
+import { Search, BookOpen, CheckSquare, Square, Loader2, Video } from "lucide-react";
 
 interface Book {
   id: string;
@@ -15,14 +15,17 @@ interface Book {
   image_url?: string;
   storage_path?: string;
   description?: string;
+  video_url?: string | null;
+  video_storage_path?: string | null;
 }
 
 interface BookSelectorProps {
   selectedBooks: string[];
   onSelectionChange: (bookIds: string[]) => void;
+  requireVideo?: boolean;
 }
 
-export const BookSelector = ({ selectedBooks, onSelectionChange }: BookSelectorProps) => {
+export const BookSelector = ({ selectedBooks, onSelectionChange, requireVideo = false }: BookSelectorProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -40,7 +43,7 @@ export const BookSelector = ({ selectedBooks, onSelectionChange }: BookSelectorP
     queryFn: async () => {
       let query = supabase
         .from("books")
-        .select("id, code, title, image_url, storage_path, description")
+        .select("id, code, title, image_url, storage_path, description, video_url, video_storage_path")
         .eq("exclude_from_campaigns", false)
         .order("code", { ascending: true });
 
@@ -56,7 +59,12 @@ export const BookSelector = ({ selectedBooks, onSelectionChange }: BookSelectorP
     },
   });
 
+  const hasVideo = (book: Book) => Boolean(book.video_url || book.video_storage_path);
+
   const handleToggle = (bookId: string) => {
+    const book = books?.find((b) => b.id === bookId);
+    if (requireVideo && book && !hasVideo(book)) return;
+
     if (selectedBooks.includes(bookId)) {
       onSelectionChange(selectedBooks.filter(id => id !== bookId));
     } else {
@@ -66,7 +74,7 @@ export const BookSelector = ({ selectedBooks, onSelectionChange }: BookSelectorP
 
   const handleSelectAll = () => {
     if (books) {
-      onSelectionChange(books.map(b => b.id));
+      onSelectionChange(books.filter((book) => !requireVideo || hasVideo(book)).map(b => b.id));
     }
   };
 
@@ -82,8 +90,9 @@ export const BookSelector = ({ selectedBooks, onSelectionChange }: BookSelectorP
       </div>
       
       <p className="text-sm text-muted-foreground mb-4">
-        Zaznacz książki, które mają być promowane w kampanii sprzedażowej. 
-        Posty będą generowane tylko dla wybranych pozycji.
+        {requireVideo
+          ? "TikTok wymaga wideo — możesz zaznaczyć tylko książki z przypisanym filmem."
+          : "Zaznacz książki, które mają być promowane w kampanii sprzedażowej. Posty będą generowane tylko dla wybranych pozycji."}
       </p>
 
       <div className="flex items-center gap-2 mb-4">
@@ -121,10 +130,15 @@ export const BookSelector = ({ selectedBooks, onSelectionChange }: BookSelectorP
           
           <ScrollArea className="h-[300px] border rounded-md">
             <div className="p-2 space-y-1">
-              {books?.map((book) => (
+              {books?.map((book) => {
+                const bookHasVideo = hasVideo(book);
+                const disabled = requireVideo && !bookHasVideo;
+                return (
                 <div
                   key={book.id}
-                  className={`flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors ${
+                  className={`flex items-center gap-3 p-2 rounded-md transition-colors ${
+                    disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                  } ${
                     selectedBooks.includes(book.id) 
                       ? "bg-primary/10 border border-primary/30" 
                       : "hover:bg-muted/50"
@@ -134,6 +148,7 @@ export const BookSelector = ({ selectedBooks, onSelectionChange }: BookSelectorP
                   <Checkbox
                     checked={selectedBooks.includes(book.id)}
                     onCheckedChange={() => handleToggle(book.id)}
+                    disabled={disabled}
                     className="pointer-events-none"
                   />
                   {(() => {
@@ -155,10 +170,19 @@ export const BookSelector = ({ selectedBooks, onSelectionChange }: BookSelectorP
                   })()}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{book.title}</p>
-                    <p className="text-xs text-muted-foreground">{book.code}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{book.code}</span>
+                      {bookHasVideo && (
+                        <span className="inline-flex items-center gap-1 text-primary">
+                          <Video className="h-3 w-3" /> wideo
+                        </span>
+                      )}
+                      {requireVideo && !bookHasVideo && <span>brak wideo</span>}
+                    </div>
                   </div>
                 </div>
-              ))}
+              );
+              })}
               {books?.length === 0 && (
                 <p className="text-center text-muted-foreground py-8">
                   Nie znaleziono książek

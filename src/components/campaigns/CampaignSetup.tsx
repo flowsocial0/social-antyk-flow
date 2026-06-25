@@ -163,6 +163,7 @@ export const CampaignSetup = ({
       randomContentTopic: useRandomContent ? randomContentTopic : undefined
     });
   };
+  const requiresVideo = targetPlatforms.includes('tiktok');
   const canSubmit = (useRandomContent || selectedBooks.length > 0);
   return <div className="space-y-6">
       <Card className="p-6 bg-secondary/30">
@@ -359,7 +360,7 @@ export const CampaignSetup = ({
       <AccountSelector selectedPlatforms={targetPlatforms} selectedAccounts={selectedAccounts} onChange={setSelectedAccounts} />
 
       {/* Book Selection - optional when using random content */}
-      {!useRandomContent && <BookSelector selectedBooks={selectedBooks} onSelectionChange={setSelectedBooks} />}
+      {!useRandomContent && <BookSelector selectedBooks={selectedBooks} onSelectionChange={setSelectedBooks} requireVideo={requiresVideo} />}
 
       {useRandomContent && <Card className="p-4 bg-purple-500/5 border-purple-500/20">
           <p className="text-sm text-muted-foreground">

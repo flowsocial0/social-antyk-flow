@@ -6,7 +6,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function refreshAccessToken(supabase: any, userId: string, refreshToken: string): Promise<string> {
+function makeError(message: string, code: string): Error {
+  const err = new Error(message);
+  (err as any).code = code;
+  return err;
+}
+
+async function refreshAccessToken(supabase: any, tokenId: string, refreshToken: string): Promise<string> {
   const clientKey = Deno.env.get('TIKTOK_CLIENT_KEY')!;
   const clientSecret = Deno.env.get('TIKTOK_CLIENT_SECRET')!;
 
@@ -26,9 +32,10 @@ async function refreshAccessToken(supabase: any, userId: string, refreshToken: s
   });
 
   const data = await response.json();
+  console.log('TikTok refresh response status:', response.status);
   
-  if (data.error) {
-    throw new Error(`Token refresh failed: ${data.error_description || data.error}`);
+  if (!response.ok || data.error) {
+    throw makeError(`Nie udało się odświeżyć tokenu TikTok: ${data.error_description || data.error || response.statusText}`, 'TOKEN_REFRESH_FAILED');
   }
 
   await supabase
@@ -39,10 +46,37 @@ async function refreshAccessToken(supabase: any, userId: string, refreshToken: s
       expires_at: new Date(Date.now() + (data.expires_in || 86400) * 1000).toISOString(),
       updated_at: new Date().toISOString(),
     })
-    .eq('user_id', userId);
+    .eq('id', tokenId);
 
   console.log('Token refreshed successfully');
   return data.access_token;
+}
+
+async function queryCreatorInfo(accessToken: string): Promise<any | null> {
+  const response = await fetch('https://open.tiktokapis.com/v2/post/publish/creator_info/query/', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json; charset=UTF-8',
+    },
+    body: JSON.stringify({}),
+  });
+
+  const data = await response.json();
+  console.log('TikTok creator info response:', JSON.stringify(data, null, 2));
+
+  if (!response.ok || (data.error?.code && data.error.code !== 'ok')) {
+    console.warn('TikTok creator info query failed:', response.status, JSON.stringify(data));
+    return null;
+  }
+
+  return data.data || null;
+}
+
+function pickPrivacyLevel(creatorInfo: any): string {
+  const options = creatorInfo?.privacy_level_options;
+  if (!Array.isArray(options) || options.length === 0) return 'SELF_ONLY';
+  return options.includes('PUBLIC_TO_EVERYONE') ? 'PUBLIC_TO_EVERYONE' : options[0];
 }
 
 // Download video and return as ArrayBuffer with content type
@@ -177,7 +211,7 @@ serve(async (req) => {
       if (!tokenData.refresh_token) {
         throw new Error('Token wygasł i brak refresh tokena. Połącz konto ponownie.');
       }
-      accessToken = await refreshAccessToken(supabase, userId, tokenData.refresh_token);
+      accessToken = await refreshAccessToken(supabase, tokenData.id, tokenData.refresh_token);
     }
 
     let bookData: any = null;
@@ -265,6 +299,10 @@ serve(async (req) => {
       throw new Error('Wideo jest za duże. Maksymalny rozmiar to 128MB.');
     }
 
+    const creatorInfo = await queryCreatorInfo(accessToken);
+    const privacyLevel = pickPrivacyLevel(creatorInfo);
+    console.log('Using TikTok privacy level:', privacyLevel);
+
     // TikTok Video Upload - FILE_UPLOAD method
     // Step 1: Initialize video upload
     const initEndpoint = 'https://open.tiktokapis.com/v2/post/publish/video/init/';
@@ -272,7 +310,7 @@ serve(async (req) => {
     const initBody = {
       post_info: {
         title: textToPost.substring(0, 150),
-        privacy_level: 'SELF_ONLY', // Start with SELF_ONLY (always available)
+        privacy_level: privacyLevel,
         disable_comment: false,
         disable_duet: false,
         disable_stitch: false,
@@ -304,22 +342,22 @@ serve(async (req) => {
       const errorMsg = initData.error.message || errorCode;
       
       if (errorCode === 'spam_risk_too_many_pending_share') {
-        throw new Error('Za dużo oczekujących postów. Poczekaj chwilę i spróbuj ponownie.');
+        throw makeError('Za dużo oczekujących postów. Poczekaj chwilę i spróbuj ponownie.', 'TIKTOK_TOO_MANY_PENDING');
       }
       
       if (errorCode === 'unaudited_client_can_only_post_to_private_accounts') {
-        throw new Error('Aplikacja TikTok wymaga zatwierdzenia przez TikTok. Skontaktuj się z administratorem, aby przejść proces weryfikacji aplikacji TikTok Developer.');
+        throw makeError('Aplikacja TikTok nadal działa jak niezatwierdzona dla tego konta. Sprawdź produkcyjne credentiale TikTok i status aplikacji w TikTok Developer Portal.', 'TIKTOK_APP_UNAUDITED');
       }
       
       if (errorCode === 'access_token_invalid') {
-        throw new Error('Token dostępu wygasł. Połącz konto TikTok ponownie.');
+        throw makeError('Token dostępu wygasł. Połącz konto TikTok ponownie.', 'TOKEN_EXPIRED');
       }
       
       if (errorCode === 'scope_not_authorized') {
-        throw new Error('Brak uprawnień do publikacji. Połącz konto TikTok ponownie z wymaganymi uprawnieniami.');
+        throw makeError('Brak uprawnień do publikacji. Połącz konto TikTok ponownie z wymaganymi uprawnieniami.', 'TIKTOK_SCOPE_NOT_AUTHORIZED');
       }
       
-      throw new Error(`Błąd TikTok: ${errorMsg}`);
+      throw makeError(`Błąd TikTok: ${errorMsg}`, errorCode || 'TIKTOK_ERROR');
     }
 
     const publishId = initData.data?.publish_id;
@@ -373,7 +411,10 @@ serve(async (req) => {
         success: true, 
         publishId,
         message: 'Wideo wysłane do TikTok! Przetwarzanie może potrwać kilka minut.',
-        note: 'Post jest ustawiony jako prywatny (SELF_ONLY). Możesz zmienić widoczność w aplikacji TikTok.'
+        privacyLevel,
+        note: privacyLevel === 'PUBLIC_TO_EVERYONE'
+          ? 'Post został wysłany jako publiczny.'
+          : `Post został wysłany z widocznością ${privacyLevel}, zgodnie z ustawieniami dostępnymi dla konta/aplikacji TikTok.`
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -385,7 +426,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false,
-        error: error.message 
+        error: error.message,
+        errorCode: error.code || null
       }),
       {
         status: 200, // Changed from 500 to 200 for better UX
