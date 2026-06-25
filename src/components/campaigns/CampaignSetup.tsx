@@ -373,7 +373,7 @@ export const CampaignSetup = ({
         <TikTokPublishOptions
           value={tiktokOptions}
           onChange={setTiktokOptions}
-          selectedAccountId={selectedAccounts.tiktok?.[0]}
+          selectedAccountIds={selectedAccounts.tiktok}
         />
 
       )}
