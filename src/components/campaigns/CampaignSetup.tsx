@@ -164,11 +164,16 @@ export const CampaignSetup = ({
       contentRatio: useRandomContent ? 100 : contentRatio,
       selectedAccounts,
       useRandomContent,
-      randomContentTopic: useRandomContent ? randomContentTopic : undefined
+      randomContentTopic: useRandomContent ? randomContentTopic : undefined,
+      tiktokOptions: targetPlatforms.includes('tiktok') ? tiktokOptions : undefined
     });
   };
   const requiresVideo = targetPlatforms.includes('tiktok');
-  const canSubmit = (useRandomContent || selectedBooks.length > 0);
+  const tiktokInvalid =
+    targetPlatforms.includes('tiktok') &&
+    tiktokOptions.brandedContent &&
+    tiktokOptions.privacyLevel === 'SELF_ONLY';
+  const canSubmit = (useRandomContent || selectedBooks.length > 0) && !tiktokInvalid;
   return <div className="space-y-6">
       <Card className="p-6 bg-secondary/30">
         <h3 className="text-lg font-semibold mb-4">Parametry kampanii</h3>
