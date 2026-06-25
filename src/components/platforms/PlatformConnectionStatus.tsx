@@ -147,22 +147,26 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
   });
 
   const disconnectMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (accountId?: string) => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Musisz być zalogowany');
 
       const tableName = getTableName(platform);
-      const { error } = await (supabase as any)
+      let q = (supabase as any)
         .from(tableName)
         .delete()
         .eq("user_id", session.user.id);
+      if (accountId) q = q.eq("id", accountId);
+      const { error } = await q;
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, accountId) => {
       toast({
         title: "✅ Rozłączono",
-        description: "Konto zostało rozłączone. Przy ponownym połączeniu zostaniesz poproszony o wszystkie uprawnienia.",
+        description: accountId
+          ? "Wybrane konto zostało rozłączone."
+          : "Wszystkie konta zostały rozłączone. Przy ponownym połączeniu zostaniesz poproszony o uprawnienia.",
       });
       refetch();
     },
@@ -237,15 +241,48 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
                       </Badge>
                       <span className="text-sm truncate">{account.name}</span>
                     </div>
-                    {account.expires_at && (
-                      <span className={`text-xs shrink-0 ${account.isExpired ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
-                        {account.isExpired 
-                          ? `Wygasł ${new Date(account.expires_at).toLocaleDateString('pl-PL')}` 
-                          : account.expiresInDays !== undefined && account.expiresInDays <= 7 
-                            ? `Wygasa za ${account.expiresInDays} dni` 
-                            : ''}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {account.expires_at && (
+                        <span className={`text-xs ${account.isExpired ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                          {account.isExpired
+                            ? `Wygasł ${new Date(account.expires_at).toLocaleDateString('pl-PL')}`
+                            : account.expiresInDays !== undefined && account.expiresInDays <= 7
+                              ? `Wygasa za ${account.expiresInDays} dni`
+                              : ''}
+                        </span>
+                      )}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            disabled={disconnectMutation.isPending}
+                            title="Rozłącz to konto"
+                          >
+                            <Unplug className="h-3.5 w-3.5" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Rozłączyć konto „{account.name}"?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Usunie to autoryzację tylko dla tego jednego konta. Pozostałe połączone konta pozostaną aktywne.
+                              Zaplanowane posty na to konto nie będą mogły być opublikowane do czasu ponownego połączenia.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Anuluj</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => disconnectMutation.mutate(account.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Tak, rozłącz to konto
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -316,15 +353,14 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
                   <AlertDialogHeader>
                     <AlertDialogTitle>Rozłączyć wszystkie konta?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Usunie to wszystkie zapisane tokeny autoryzacji dla tej platformy. 
-                      Przy ponownym połączeniu zostaniesz poproszony o udzielenie wszystkich uprawnień od nowa.
-                      Zaplanowane posty na tę platformę nie będą mogły być opublikowane do czasu ponownego połączenia.
+                      Usunie to <strong>wszystkie</strong> zapisane tokeny autoryzacji dla tej platformy.
+                      Aby rozłączyć tylko jedno konto, użyj ikony rozłączenia obok jego nazwy powyżej.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Anuluj</AlertDialogCancel>
                     <AlertDialogAction
-                      onClick={() => disconnectMutation.mutate()}
+                      onClick={() => disconnectMutation.mutate(undefined)}
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
                       Tak, rozłącz
