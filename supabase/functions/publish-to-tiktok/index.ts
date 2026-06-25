@@ -372,7 +372,7 @@ serve(async (req) => {
 
       if (errorCode === 'unaudited_client_can_only_post_to_private_accounts') {
         throw makeError(
-          `TikTok odrzuca publikację dla tej aplikacji po stronie API (nawet jako SELF_ONLY). To nie jest błąd harmonogramu ani wideo. Sprawdź w TikTok Developer Portal, czy Production App ma zatwierdzony Content Posting API / Direct Post dla aktualnego Client Key (${clientKeyFingerprint}). log_id=${logId}`,
+          `TikTok odrzuca Direct Post dla tej aplikacji: status Live nie wystarcza — produkt Content Posting API / Direct Post musi być zatwierdzony w App Review. Do czasu zatwierdzenia TikTok pozwala publikować tylko na prywatne konta testowe, więc ustaw konto @glowaccy.solution jako prywatne w aplikacji TikTok albo dokończ review Direct Post w TikTok Developer Portal dla aktualnego Client Key (${clientKeyFingerprint}). To nie jest błąd harmonogramu ani wideo. log_id=${logId}`,
           'TIKTOK_APP_UNAUDITED'
         );
       }
