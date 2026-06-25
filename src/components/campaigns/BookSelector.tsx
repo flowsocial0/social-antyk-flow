@@ -61,15 +61,6 @@ export const BookSelector = ({ selectedBooks, onSelectionChange, requireVideo = 
 
   const hasVideo = (book: Book) => Boolean(book.video_url || book.video_storage_path);
 
-  useEffect(() => {
-    if (!requireVideo || !books) return;
-    const allowedIds = new Set(books.filter(hasVideo).map((book) => book.id));
-    const filtered = selectedBooks.filter((id) => allowedIds.has(id));
-    if (filtered.length !== selectedBooks.length) {
-      onSelectionChange(filtered);
-    }
-  }, [requireVideo, books, selectedBooks, onSelectionChange]);
-
   const handleToggle = (bookId: string) => {
     const book = books?.find((b) => b.id === bookId);
     if (requireVideo && book && !hasVideo(book)) return;
