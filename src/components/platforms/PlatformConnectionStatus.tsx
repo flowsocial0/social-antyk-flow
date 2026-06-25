@@ -361,7 +361,7 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
                   <AlertDialogFooter>
                     <AlertDialogCancel>Anuluj</AlertDialogCancel>
                     <AlertDialogAction
-                      onClick={() => disconnectMutation.mutate()}
+                      onClick={() => disconnectMutation.mutate(undefined)}
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
                       Tak, rozłącz
