@@ -41,38 +41,45 @@ interface Props {
   value: TikTokPublishOptionsValue;
   onChange: (v: TikTokPublishOptionsValue) => void;
   selectedAccountId?: string;
+  selectedAccountIds?: string[];
 }
 
-export const TikTokPublishOptions = ({ value, onChange, selectedAccountId }: Props) => {
+export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selectedAccountIds }: Props) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [creatorInfo, setCreatorInfo] = useState<CreatorInfo | null>(null);
+  const [accounts, setAccounts] = useState<Array<{ accountId: string; info: CreatorInfo }>>([]);
 
-  const effectiveAccountId = selectedAccountId || value.accountId;
+  const idsKey = (selectedAccountIds && selectedAccountIds.length > 0
+    ? selectedAccountIds
+    : [selectedAccountId || value.accountId].filter(Boolean) as string[]
+  ).join(",");
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       setError(null);
-      setCreatorInfo(null);
+      setAccounts([]);
+      const ids = idsKey ? idsKey.split(",") : [undefined as any];
       try {
-        const { data, error } = await supabase.functions.invoke("tiktok-creator-info", {
-          body: { accountId: effectiveAccountId },
-        });
+        const results = await Promise.all(
+          ids.map(async (id) => {
+            const { data, error } = await supabase.functions.invoke("tiktok-creator-info", {
+              body: { accountId: id },
+            });
+            if (error) throw error;
+            if (!data?.success) throw new Error(data?.error || "Nie udało się pobrać danych konta TikTok.");
+            return { accountId: data.accountId as string, info: (data.data || {}) as CreatorInfo };
+          })
+        );
         if (cancelled) return;
-        if (error) throw error;
-        if (!data?.success) {
-          setError(data?.error || "Nie udało się pobrać danych konta TikTok.");
-          return;
-        }
-        setCreatorInfo(data.data || null);
+        setAccounts(results);
 
-        const options: string[] = data.data?.privacy_level_options || [];
+        const options: string[] = results[0]?.info?.privacy_level_options || [];
         const currentAllowed = options.includes(value.privacyLevel);
         const patch: Partial<TikTokPublishOptionsValue> = {};
-        if (value.accountId !== data.accountId) patch.accountId = data.accountId;
-        if (!currentAllowed) {
+        if (results[0] && value.accountId !== results[0].accountId) patch.accountId = results[0].accountId;
+        if (options.length > 0 && !currentAllowed) {
           patch.privacyLevel = options.includes("SELF_ONLY")
             ? "SELF_ONLY"
             : options[0] || "SELF_ONLY";
@@ -88,7 +95,7 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId }: Pro
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveAccountId]);
+  }, [idsKey]);
 
   const update = (patch: Partial<TikTokPublishOptionsValue>) => {
     onChange({ ...value, ...patch });
@@ -98,11 +105,20 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId }: Pro
   const brandedSelfOnlyError =
     value.brandedContent && value.privacyLevel === "SELF_ONLY";
 
-  const privacyOptions = creatorInfo?.privacy_level_options || [
-    "PUBLIC_TO_EVERYONE",
-    "MUTUAL_FOLLOW_FRIENDS",
-    "SELF_ONLY",
-  ];
+  const privacyOptions = accounts.length > 0
+    ? accounts
+        .map((a) => a.info.privacy_level_options || [])
+        .reduce((acc: string[] | null, opts) => {
+          if (acc === null) return [...opts];
+          return acc.filter((o) => opts.includes(o));
+        }, null) || []
+    : ["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "SELF_ONLY"];
+
+  const creatorInfo: CreatorInfo = {
+    comment_disabled: accounts.some((a) => a.info.comment_disabled),
+    duet_disabled: accounts.some((a) => a.info.duet_disabled),
+    stitch_disabled: accounts.some((a) => a.info.stitch_disabled),
+  };
 
   return (
     <Card className="p-6 space-y-5 border-pink-500/30 bg-pink-500/5">
@@ -114,10 +130,11 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId }: Pro
           </h3>
           <p className="text-xs text-muted-foreground mt-1">
             Wymagane przez TikTok Content Posting API — wybierz prywatność i ujawnij rodzaj treści przed publikacją.
+            {accounts.length > 1 && " Ustawienia zostaną zastosowane do wszystkich wybranych kont."}
           </p>
         </div>
         <Badge variant="outline" className="border-pink-500/40 text-pink-600 dark:text-pink-400">
-          TikTok
+          TikTok{accounts.length > 1 ? ` · ${accounts.length} kont` : ""}
         </Badge>
       </div>
 
@@ -137,27 +154,38 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId }: Pro
 
       {!loading && !error && (
         <>
-          {/* Account */}
-          <div className="rounded-md border bg-background p-3">
-            <Label className="text-xs text-muted-foreground">Konto docelowe TikTok</Label>
-            <div className="flex items-center gap-2 mt-1">
-              {creatorInfo?.creator_avatar_url && (
-                <img
-                  src={creatorInfo.creator_avatar_url}
-                  alt="avatar"
-                  className="h-8 w-8 rounded-full object-cover"
-                />
-              )}
-              <div>
-                <p className="text-sm font-medium">
-                  {creatorInfo?.creator_nickname || "—"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  @{creatorInfo?.creator_username || "—"}
-                </p>
-              </div>
+          {/* Accounts */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">
+              {accounts.length > 1 ? `Konta docelowe TikTok (${accounts.length})` : "Konto docelowe TikTok"}
+            </Label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {accounts.map((a) => (
+                <div key={a.accountId} className="rounded-md border bg-background p-3 flex items-center gap-2">
+                  {a.info.creator_avatar_url ? (
+                    <img
+                      src={a.info.creator_avatar_url}
+                      alt="avatar"
+                      className="h-8 w-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-8 w-8 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-600 text-xs font-bold">
+                      {(a.info.creator_nickname || a.info.creator_username || "?").charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {a.info.creator_nickname || "—"}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      @{a.info.creator_username || "—"}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
+
 
           {/* Privacy level */}
           <div className="space-y-2">
