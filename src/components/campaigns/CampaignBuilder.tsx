@@ -32,6 +32,16 @@ export type CampaignConfig = {
   selectedAccounts?: Record<PlatformId, string[]>; // Platform -> Account IDs array (multi-account selection)
   useRandomContent?: boolean; // Generate random content on a specific topic
   randomContentTopic?: string; // Topic for random content generation
+  tiktokOptions?: {
+    accountId?: string;
+    privacyLevel: string;
+    allowComment: boolean;
+    allowDuet: boolean;
+    allowStitch: boolean;
+    discloseContent: boolean;
+    brandOrganic: boolean;
+    brandedContent: boolean;
+  };
 };
 
 interface CampaignBuilderProps {
