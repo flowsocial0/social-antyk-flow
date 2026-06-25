@@ -309,8 +309,63 @@ serve(async (req) => {
     }
 
     const creatorInfo = await queryCreatorInfo(accessToken);
-    let privacyLevel = privacyLevelOverride || pickPrivacyLevel(creatorInfo);
-    console.log('Initial TikTok privacy level:', privacyLevel, privacyLevelOverride ? '(override)' : '');
+
+    // Fetch TikTok publish options from campaign_posts / campaigns when available
+    let userOpts: {
+      privacy_level?: string | null;
+      allow_comment?: boolean | null;
+      allow_duet?: boolean | null;
+      allow_stitch?: boolean | null;
+      disclose_content?: boolean | null;
+      brand_organic?: boolean | null;
+      branded_content?: boolean | null;
+    } = {};
+    if (campaignPostId) {
+      const { data: cp } = await supabase
+        .from('campaign_posts')
+        .select('campaign_id, tiktok_privacy_level, tiktok_allow_comment, tiktok_allow_duet, tiktok_allow_stitch, tiktok_disclose_content, tiktok_brand_organic, tiktok_branded_content')
+        .eq('id', campaignPostId)
+        .maybeSingle();
+      if (cp) {
+        userOpts = {
+          privacy_level: cp.tiktok_privacy_level,
+          allow_comment: cp.tiktok_allow_comment,
+          allow_duet: cp.tiktok_allow_duet,
+          allow_stitch: cp.tiktok_allow_stitch,
+          disclose_content: cp.tiktok_disclose_content,
+          brand_organic: cp.tiktok_brand_organic,
+          branded_content: cp.tiktok_branded_content,
+        };
+        // Fallback to campaign-level if post-level null
+        if (cp.campaign_id && (userOpts.privacy_level == null)) {
+          const { data: camp } = await supabase
+            .from('campaigns')
+            .select('tiktok_privacy_level, tiktok_allow_comment, tiktok_allow_duet, tiktok_allow_stitch, tiktok_disclose_content, tiktok_brand_organic, tiktok_branded_content')
+            .eq('id', cp.campaign_id)
+            .maybeSingle();
+          if (camp) {
+            userOpts = {
+              privacy_level: camp.tiktok_privacy_level,
+              allow_comment: camp.tiktok_allow_comment,
+              allow_duet: camp.tiktok_allow_duet,
+              allow_stitch: camp.tiktok_allow_stitch,
+              disclose_content: camp.tiktok_disclose_content,
+              brand_organic: camp.tiktok_brand_organic,
+              branded_content: camp.tiktok_branded_content,
+            };
+          }
+        }
+      }
+    }
+
+    let privacyLevel = privacyLevelOverride || userOpts.privacy_level || pickPrivacyLevel(creatorInfo);
+    console.log('Initial TikTok privacy level:', privacyLevel, privacyLevelOverride ? '(override)' : userOpts.privacy_level ? '(user)' : '(auto)');
+
+    const disableComment = userOpts.allow_comment === false || !!creatorInfo?.comment_disabled;
+    const disableDuet = userOpts.allow_duet === false || !!creatorInfo?.duet_disabled;
+    const disableStitch = userOpts.allow_stitch === false || !!creatorInfo?.stitch_disabled;
+    const brandOrganic = !!userOpts.brand_organic;
+    const brandedContent = !!userOpts.branded_content;
 
     // TikTok Video Upload - FILE_UPLOAD method
     const initEndpoint = 'https://open.tiktokapis.com/v2/post/publish/video/init/';
@@ -319,9 +374,11 @@ serve(async (req) => {
       post_info: {
         title: textToPost.substring(0, 150),
         privacy_level: level,
-        disable_comment: false,
-        disable_duet: false,
-        disable_stitch: false,
+        disable_comment: disableComment,
+        disable_duet: disableDuet,
+        disable_stitch: disableStitch,
+        brand_content_toggle: brandedContent,
+        brand_organic_toggle: brandOrganic,
       },
       source_info: {
         source: 'FILE_UPLOAD',
