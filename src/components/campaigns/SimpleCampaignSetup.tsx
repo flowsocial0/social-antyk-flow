@@ -36,6 +36,7 @@ export const SimpleCampaignSetup = () => {
   const [targetPlatforms, setTargetPlatforms] = useState<PlatformId[]>(["x"]);
   const [selectedAccounts, setSelectedAccounts] = useState<Record<PlatformId, string[]>>({} as Record<PlatformId, string[]>);
   const [connectedPlatforms, setConnectedPlatforms] = useState<Record<PlatformId, boolean>>({} as Record<PlatformId, boolean>);
+  const [tiktokOptions, setTiktokOptions] = useState<TikTokPublishOptionsValue>(defaultTikTokOptions());
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
