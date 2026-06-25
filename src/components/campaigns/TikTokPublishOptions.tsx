@@ -40,22 +40,25 @@ const PRIVACY_LABELS: Record<string, { label: string; helper: string }> = {
 interface Props {
   value: TikTokPublishOptionsValue;
   onChange: (v: TikTokPublishOptionsValue) => void;
+  selectedAccountId?: string;
 }
 
-export const TikTokPublishOptions = ({ value, onChange }: Props) => {
+export const TikTokPublishOptions = ({ value, onChange, selectedAccountId }: Props) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creatorInfo, setCreatorInfo] = useState<CreatorInfo | null>(null);
-  const [accountId, setAccountId] = useState<string | undefined>(value.accountId);
+
+  const effectiveAccountId = selectedAccountId || value.accountId;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       setError(null);
+      setCreatorInfo(null);
       try {
         const { data, error } = await supabase.functions.invoke("tiktok-creator-info", {
-          body: { accountId: value.accountId },
+          body: { accountId: effectiveAccountId },
         });
         if (cancelled) return;
         if (error) throw error;
@@ -64,19 +67,18 @@ export const TikTokPublishOptions = ({ value, onChange }: Props) => {
           return;
         }
         setCreatorInfo(data.data || null);
-        setAccountId(data.accountId);
 
-        // Initialize privacy level if not set or not allowed
         const options: string[] = data.data?.privacy_level_options || [];
         const currentAllowed = options.includes(value.privacyLevel);
+        const patch: Partial<TikTokPublishOptionsValue> = {};
+        if (value.accountId !== data.accountId) patch.accountId = data.accountId;
         if (!currentAllowed) {
-          // Default to SELF_ONLY for safety (per TikTok unaudited guidance) if available
-          const defaultLevel = options.includes("SELF_ONLY")
+          patch.privacyLevel = options.includes("SELF_ONLY")
             ? "SELF_ONLY"
             : options[0] || "SELF_ONLY";
-          onChange({ ...value, accountId: data.accountId, privacyLevel: defaultLevel });
-        } else if (value.accountId !== data.accountId) {
-          onChange({ ...value, accountId: data.accountId });
+        }
+        if (Object.keys(patch).length > 0) {
+          onChange({ ...value, ...patch });
         }
       } catch (e: any) {
         if (!cancelled) setError(e.message || String(e));
@@ -86,7 +88,7 @@ export const TikTokPublishOptions = ({ value, onChange }: Props) => {
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [effectiveAccountId]);
 
   const update = (patch: Partial<TikTokPublishOptionsValue>) => {
     onChange({ ...value, ...patch });
