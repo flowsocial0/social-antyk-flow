@@ -368,6 +368,11 @@ export const CampaignSetup = ({
       {/* Account Selection (only shows if multiple accounts per platform) */}
       <AccountSelector selectedPlatforms={targetPlatforms} selectedAccounts={selectedAccounts} onChange={setSelectedAccounts} />
 
+      {/* TikTok publishing options (required by TikTok Content Posting API UX) */}
+      {targetPlatforms.includes('tiktok') && (
+        <TikTokPublishOptions value={tiktokOptions} onChange={setTiktokOptions} />
+      )}
+
       {/* Book Selection - optional when using random content */}
       {!useRandomContent && <BookSelector selectedBooks={selectedBooks} onSelectionChange={setSelectedBooks} requireVideo={requiresVideo} />}
 
