@@ -247,7 +247,10 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
                 />
               </label>
               <label className="flex items-center justify-between gap-2 rounded-md border p-3">
-                <span className="text-sm">Duet</span>
+                <div>
+                  <p className="text-sm">Duet</p>
+                  <p className="text-xs text-muted-foreground">Inni mogą nagrać reakcję obok Twojego filmu</p>
+                </div>
                 <Switch
                   checked={!creatorInfo?.duet_disabled && value.allowDuet}
                   disabled={!!creatorInfo?.duet_disabled}
@@ -255,7 +258,10 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
                 />
               </label>
               <label className="flex items-center justify-between gap-2 rounded-md border p-3">
-                <span className="text-sm">Stitch</span>
+                <div>
+                  <p className="text-sm">Stitch</p>
+                  <p className="text-xs text-muted-foreground">Inni mogą dodać fragment Twojego filmu do swojego</p>
+                </div>
                 <Switch
                   checked={!creatorInfo?.stitch_disabled && value.allowStitch}
                   disabled={!!creatorInfo?.stitch_disabled}
