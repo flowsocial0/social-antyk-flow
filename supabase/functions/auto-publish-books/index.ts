@@ -657,8 +657,15 @@ Deno.serve(async (req) => {
         const platformErrors: string[] = [];
         
         // Pre-compute video URL once for this post (same across all platforms/accounts)
-        const bookVideoUrlRaw = post.book?.video_url || 
+        // Priority: post.custom_image_url (if it's a video) > book.video_url / video_storage_path
+        const isVideoUrl = (u: string | null | undefined): boolean =>
+          !!u && /\.(mp4|mov|webm|avi|mkv|m4v)(\?|#|$)/i.test(u);
+
+        const postCustomVideo = isVideoUrl(post.custom_image_url) ? (post.custom_image_url as string) : null;
+        const bookVideoUrlRaw = postCustomVideo ||
+          post.book?.video_url ||
           (post.book?.video_storage_path ? `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${post.book.video_storage_path}` : null);
+        
         
         // Resolve Mega.nz URL once before publishing to any platform
         let resolvedVideoUrl = bookVideoUrlRaw;
