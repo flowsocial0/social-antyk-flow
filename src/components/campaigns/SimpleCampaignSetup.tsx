@@ -169,7 +169,7 @@ export const SimpleCampaignSetup = () => {
       tiktokOptions.privacyLevel === "SELF_ONLY"
     ) {
       toast.error("Branded content nie może być prywatne", {
-        description: "TikTok nie zezwala na publikowanie treści markowych jako „Tylko ja". Zmień prywatność na „Publiczne" lub „Znajomi".",
+        description: 'TikTok nie zezwala na publikowanie treści markowych jako "Tylko ja". Zmień prywatność na "Publiczne" lub "Znajomi".',
       });
       return;
     }
