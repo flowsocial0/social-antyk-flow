@@ -151,6 +151,19 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Musisz być zalogowany');
 
+      // For TikTok, call revoke edge function so the app is also removed from
+      // the user's "Connected Apps" list on TikTok — this forces TikTok to show
+      // the full consent screen on the next authorization.
+      if (platform === 'tiktok') {
+        const { data, error } = await supabase.functions.invoke('tiktok-oauth-revoke', {
+          body: accountId ? { accountId } : {},
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (error) throw error;
+        if (data && data.success === false) throw new Error(data.error || 'Nie udało się odwołać tokenu');
+        return;
+      }
+
       const tableName = getTableName(platform);
       let q = (supabase as any)
         .from(tableName)
@@ -165,7 +178,9 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
       toast({
         title: "✅ Rozłączono",
         description: accountId
-          ? "Wybrane konto zostało rozłączone."
+          ? (platform === 'tiktok'
+              ? "Konto rozłączone. Aplikacja została też odwołana po stronie TikTok — przy ponownym łączeniu zobaczysz ekran zgody."
+              : "Wybrane konto zostało rozłączone.")
           : "Wszystkie konta zostały rozłączone. Przy ponownym połączeniu zostaniesz poproszony o uprawnienia.",
       });
       refetch();
@@ -178,6 +193,7 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
       });
     },
   });
+
 
   const handleConnect = async () => {
     if (onConnect) {
