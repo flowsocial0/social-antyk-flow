@@ -13,6 +13,7 @@ import { AccountSelector } from "./AccountSelector";
 import { PlatformId, getAllPlatforms } from "@/config/platforms";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { TikTokPublishOptions, defaultTikTokOptions, type TikTokPublishOptionsValue } from "./TikTokPublishOptions";
 
 interface SimplePost {
   id: string;
