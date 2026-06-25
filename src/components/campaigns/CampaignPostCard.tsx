@@ -417,6 +417,11 @@ export const CampaignPostCard = ({ post, userId, onSave, onRegenerate, onDelete,
                         💡 Wskazówka: Spróbuj rozłączyć i ponownie połączyć konto na stronie danej platformy. Uprawnienia mogły wygasnąć lub nie zostały w pełni zaakceptowane.
                       </p>
                     )}
+                    {post.error_code === 'TIKTOK_APP_UNAUDITED' && (
+                      <p className="text-xs font-medium text-orange-600 mt-2 p-2 bg-orange-500/10 rounded">
+                        💡 TikTok: status Live aplikacji nie oznacza jeszcze zatwierdzenia Direct Post. Do czasu App Review konto docelowe musi być prywatne w aplikacji TikTok albo trzeba zatwierdzić produkt Content Posting API / Direct Post w TikTok Developer Portal.
+                      </p>
+                    )}
                     {post.error_code && (
                       <p className="text-xs text-muted-foreground mt-1">
                         Kod błędu: {post.error_code}

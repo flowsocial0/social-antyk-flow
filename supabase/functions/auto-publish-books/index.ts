@@ -1097,6 +1097,7 @@ Deno.serve(async (req) => {
             
             // Check if the error is rate-limit related → use rate_limited instead of failed
             const isRateError = isRateLimitErrorMessage(errorMessage);
+            const isTikTokUnaudited = platformErrors.some(error => /TIKTOK_APP_UNAUDITED|Content Posting API|Direct Post|prywatne konta testowe|unaudited_client/i.test(error));
             const newStatus = isRateError ? 'rate_limited' : 'failed';
             const retryAt = isRateError ? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() : null;
             
@@ -1105,7 +1106,7 @@ Deno.serve(async (req) => {
               .update({
                 status: newStatus,
                 error_message: errorMessage,
-                error_code: isRateError ? 'RATE_LIMITED' : 'PUBLISH_FAILED',
+                error_code: isRateError ? 'RATE_LIMITED' : isTikTokUnaudited ? 'TIKTOK_APP_UNAUDITED' : 'PUBLISH_FAILED',
                 next_retry_at: retryAt
               })
               .eq('id', post.id);
