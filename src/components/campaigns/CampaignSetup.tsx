@@ -16,6 +16,7 @@ import { AccountSelector } from "./AccountSelector";
 import { useSearchParams } from "react-router-dom";
 import { PlatformId, getAllPlatforms } from "@/config/platforms";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { TikTokPublishOptions, defaultTikTokOptions, type TikTokPublishOptionsValue } from "./TikTokPublishOptions";
 interface CampaignSetupProps {
   onComplete: (config: CampaignConfig) => void;
   initialConfig?: Partial<CampaignConfig>;
