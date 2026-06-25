@@ -59,6 +59,15 @@ export const BookSelector = ({ selectedBooks, onSelectionChange, requireVideo = 
     },
   });
 
+  useEffect(() => {
+    if (!requireVideo || !books) return;
+    const allowedIds = new Set(books.filter(hasVideo).map((book) => book.id));
+    const filtered = selectedBooks.filter((id) => allowedIds.has(id));
+    if (filtered.length !== selectedBooks.length) {
+      onSelectionChange(filtered);
+    }
+  }, [requireVideo, books, selectedBooks, onSelectionChange]);
+
   const handleToggle = (bookId: string) => {
     const book = books?.find((b) => b.id === bookId);
     if (requireVideo && book && !hasVideo(book)) return;
