@@ -302,6 +302,16 @@ export const SimpleCampaignSetup = () => {
           platforms: targetPlatforms,
           target_accounts: selectedAccounts,
           custom_image_url: post.imageUrl || post.videoUrl || null,
+          ...(targetPlatforms.includes("tiktok") && {
+            tiktok_account_id: tiktokOptions.accountId ?? null,
+            tiktok_privacy_level: tiktokOptions.privacyLevel,
+            tiktok_allow_comment: tiktokOptions.allowComment,
+            tiktok_allow_duet: tiktokOptions.allowDuet,
+            tiktok_allow_stitch: tiktokOptions.allowStitch,
+            tiktok_disclose_content: tiktokOptions.discloseContent,
+            tiktok_brand_organic: tiktokOptions.brandOrganic,
+            tiktok_branded_content: tiktokOptions.brandedContent,
+          }),
         };
       });
 
