@@ -137,6 +137,7 @@ serve(async (req) => {
       videoUrl: videoUrlFromBody,
       accountId, // For multi-account support
       privacyLevelOverride, // Diagnostic: force a specific privacy level
+      campaignPostId, // Optional: fetch tiktok options from campaign_posts/campaigns
     } = body;
 
     // Fingerprint client key for diagnostics (no secret leak)
@@ -146,7 +147,7 @@ serve(async (req) => {
       : 'MISSING';
     console.log('TikTok client key fingerprint:', clientKeyFingerprint);
 
-    console.log('Request body:', { contentId, bookId, platform, testConnection, hasVideoUrl: !!videoUrlFromBody, accountId, privacyLevelOverride });
+    console.log('Request body:', { contentId, bookId, platform, testConnection, hasVideoUrl: !!videoUrlFromBody, accountId, privacyLevelOverride, campaignPostId });
 
     const authHeader = req.headers.get('Authorization');
     if (authHeader) {
