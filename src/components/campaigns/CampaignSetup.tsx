@@ -41,6 +41,9 @@ export const CampaignSetup = ({
   const [connectedPlatforms, setConnectedPlatforms] = useState<Record<PlatformId, boolean>>({} as Record<PlatformId, boolean>);
   const [useRandomContent, setUseRandomContent] = useState(initialConfig?.useRandomContent ?? false);
   const [randomContentTopic, setRandomContentTopic] = useState(initialConfig?.randomContentTopic || "");
+  const [tiktokOptions, setTiktokOptions] = useState<TikTokPublishOptionsValue>(
+    initialConfig?.tiktokOptions ?? defaultTikTokOptions()
+  );
   useEffect(() => {
     checkConnectedPlatforms();
   }, []);
