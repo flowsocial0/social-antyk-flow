@@ -370,7 +370,12 @@ export const CampaignSetup = ({
 
       {/* TikTok publishing options (required by TikTok Content Posting API UX) */}
       {targetPlatforms.includes('tiktok') && (
-        <TikTokPublishOptions value={tiktokOptions} onChange={setTiktokOptions} />
+        <TikTokPublishOptions
+          value={tiktokOptions}
+          onChange={setTiktokOptions}
+          selectedAccountId={selectedAccounts.tiktok?.[0]}
+        />
+
       )}
 
       {/* Book Selection - optional when using random content */}
