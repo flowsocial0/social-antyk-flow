@@ -13,6 +13,7 @@ import { AccountSelector } from "./AccountSelector";
 import { PlatformId, getAllPlatforms } from "@/config/platforms";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { TikTokPublishOptions, defaultTikTokOptions, type TikTokPublishOptionsValue } from "./TikTokPublishOptions";
 
 interface SimplePost {
   id: string;
@@ -35,6 +36,7 @@ export const SimpleCampaignSetup = () => {
   const [targetPlatforms, setTargetPlatforms] = useState<PlatformId[]>(["x"]);
   const [selectedAccounts, setSelectedAccounts] = useState<Record<PlatformId, string[]>>({} as Record<PlatformId, string[]>);
   const [connectedPlatforms, setConnectedPlatforms] = useState<Record<PlatformId, boolean>>({} as Record<PlatformId, boolean>);
+  const [tiktokOptions, setTiktokOptions] = useState<TikTokPublishOptionsValue>(defaultTikTokOptions());
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
@@ -161,6 +163,18 @@ export const SimpleCampaignSetup = () => {
       return;
     }
 
+    if (
+      targetPlatforms.includes("tiktok") &&
+      tiktokOptions.brandedContent &&
+      tiktokOptions.privacyLevel === "SELF_ONLY"
+    ) {
+      toast.error("Branded content nie może być prywatne", {
+        description: 'TikTok nie zezwala na publikowanie treści markowych jako "Tylko ja". Zmień prywatność na "Publiczne" lub "Znajomi".',
+      });
+      return;
+    }
+
+
     setIsCreating(true);
 
     try {
@@ -254,6 +268,16 @@ export const SimpleCampaignSetup = () => {
           content_posts_count: 0,
           sales_posts_count: posts.length,
           status: "active",
+          ...(targetPlatforms.includes("tiktok") && {
+            tiktok_account_id: tiktokOptions.accountId ?? null,
+            tiktok_privacy_level: tiktokOptions.privacyLevel,
+            tiktok_allow_comment: tiktokOptions.allowComment,
+            tiktok_allow_duet: tiktokOptions.allowDuet,
+            tiktok_allow_stitch: tiktokOptions.allowStitch,
+            tiktok_disclose_content: tiktokOptions.discloseContent,
+            tiktok_brand_organic: tiktokOptions.brandOrganic,
+            tiktok_branded_content: tiktokOptions.brandedContent,
+          }),
         })
         .select()
         .single();
@@ -278,6 +302,16 @@ export const SimpleCampaignSetup = () => {
           platforms: targetPlatforms,
           target_accounts: selectedAccounts,
           custom_image_url: post.imageUrl || post.videoUrl || null,
+          ...(targetPlatforms.includes("tiktok") && {
+            tiktok_account_id: tiktokOptions.accountId ?? null,
+            tiktok_privacy_level: tiktokOptions.privacyLevel,
+            tiktok_allow_comment: tiktokOptions.allowComment,
+            tiktok_allow_duet: tiktokOptions.allowDuet,
+            tiktok_allow_stitch: tiktokOptions.allowStitch,
+            tiktok_disclose_content: tiktokOptions.discloseContent,
+            tiktok_brand_organic: tiktokOptions.brandOrganic,
+            tiktok_branded_content: tiktokOptions.brandedContent,
+          }),
         };
       });
 
@@ -506,6 +540,10 @@ export const SimpleCampaignSetup = () => {
         selectedAccounts={selectedAccounts}
         onChange={setSelectedAccounts}
       />
+
+      {targetPlatforms.includes("tiktok") && (
+        <TikTokPublishOptions value={tiktokOptions} onChange={setTiktokOptions} />
+      )}
 
       <Card className="p-6 bg-gradient-subtle border-primary/20">
         <h3 className="text-lg font-semibold mb-2">Podsumowanie</h3>

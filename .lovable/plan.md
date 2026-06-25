@@ -1,151 +1,76 @@
-## Diagnoza po ultra-dokładnym sprawdzeniu
+## Stan obecny — czego brakuje
 
-**Do I know what the issue is?** Tak.
+Sprawdziłem `CampaignSetup.tsx`, `SimpleCampaignSetup.tsx` i `PlatformTikTok.tsx`. Mamy tylko walidację „TikTok wymaga wideo". **Brakuje wszystkich elementów UX wymaganych przez audyt TikToka:**
 
-Problem nie jest już po stronie wideo, harmonogramu ani crona. Aktualny błąd jest zwracany bezpośrednio przez API TikToka przy wywołaniu:
+| Wymóg TikToka | Status u nas |
+|---|---|
+| Widoczna nazwa konta TikTok przy publikacji | ❌ brak (publikujemy do pierwszego znalezionego konta) |
+| Wybór Privacy level (Public / Friends / Only me) z `creator_info/query` | ❌ brak w UI (kod EF używa hardcoded `PUBLIC_TO_EVERYONE` z fallbackiem na `SELF_ONLY`) |
+| Disclosure: Disclose video content / Your brand / Branded content | ❌ brak |
+| Link do TikTok Music Usage Confirmation | ❌ brak |
+| Link do Branded Content Policy | ❌ brak |
 
-```text
-/v2/post/publish/video/init/
-```
+Bez tego TikTok **odrzuci audyt** — to twarde wymagania ich review checklisty.
 
-TikTok zwraca:
+## Plan dorobienia
 
-```text
-unaudited_client_can_only_post_to_private_accounts
-```
+### 1. Nowa edge function `tiktok-creator-info`
+- Wywołuje `POST /v2/post/publish/creator_info/query/` per `tiktok_oauth_tokens` rekord usera.
+- Zwraca: `creator_username`, `creator_nickname`, `privacy_level_options[]`, `comment_disabled`, `duet_disabled`, `stitch_disabled`, `max_video_post_duration_sec`.
+- Wywoływana z frontu przy wejściu w setup kampanii TikTok, aby pokazać realne opcje konta.
 
-To oznacza, że dla użytego `TIKTOK_CLIENT_KEY` TikTok nadal traktuje aplikację jako nieaudytowaną / nieuprawnioną do publicznego Direct Postingu na tym koncie. W takim stanie TikTok pozwala co najwyżej na publikację prywatną (`SELF_ONLY`), mimo że token ma scope `video.publish`.
+### 2. Nowy komponent `TikTokPublishOptions.tsx`
+Pojawia się w `CampaignSetup` i `SimpleCampaignSetup`, gdy `targetPlatforms` zawiera `tiktok`. Zawiera:
 
-## Co potwierdziłem
+- **Konto docelowe** — pole tekstowe / read-only badge z `@creator_username` + `display_name` (z `tiktok-creator-info`). Jeśli user ma kilka kont TikTok, dropdown wyboru.
+- **Privacy level** — `<RadioGroup>` z opcjami zwróconymi przez `privacy_level_options` (typowo: `PUBLIC_TO_EVERYONE` / `MUTUAL_FOLLOW_FRIENDS` / `SELF_ONLY`). Etykiety PL: Publiczny / Znajomi / Tylko ja. Domyślnie `SELF_ONLY` zanim user wybierze (zgodnie z wytycznymi TikToka dla unaudited).
+- **Interaction toggles** — 3 `<Switch>`: Zezwól na komentarze / Duet / Stitch. Wyszarzone, jeśli `comment_disabled`/`duet_disabled`/`stitch_disabled` z creator_info.
+- **Disclosure section** (wymóg UX TikToka — musi być zawsze widoczna, nawet jeśli wyłączona):
+  - `<Switch>` „Ujawnij treść wideo" (Disclose video content) — master toggle.
+  - Po włączeniu pokazują się 2 checkboxy:
+    - „Twoja marka" (Your brand) — promujesz własną markę/produkt.
+    - „Treść markowa" (Branded content) — partnerstwo płatne z marką trzecią.
+  - Walidacja: jeśli `Branded content = true`, to `privacy_level` nie może być `SELF_ONLY` (wymóg TikToka — pokażemy inline error).
+- **Stopka z linkami** (zawsze widoczna pod sekcją):
+  - „Publikując akceptujesz [Music Usage Confirmation](https://www.tiktok.com/legal/page/global/music-usage-confirmation/en) oraz [Branded Content Policy](https://www.tiktok.com/legal/page/global/bc-policy/en) TikToka."
+  - Linki `target="_blank" rel="noopener noreferrer"`.
 
-- Cron działa co minutę i podnosi posty.
-- Post TikTok został znaleziony i przekazany do publikacji.
-- Wideo jest obecne i pobierane poprawnie z Supabase Storage.
-- Token TikToka istnieje, ma scope:
+### 3. Zapis wyborów do bazy
+- Rozszerzyć tabelę `campaigns` (lub `campaign_posts` jeśli per-post) o kolumny:
+  - `tiktok_privacy_level text`
+  - `tiktok_allow_comment bool default true`
+  - `tiktok_allow_duet bool default true`
+  - `tiktok_allow_stitch bool default true`
+  - `tiktok_disclose_content bool default false`
+  - `tiktok_brand_organic bool default false` (Your brand)
+  - `tiktok_branded_content bool default false`
+  - `tiktok_account_id uuid` (FK do `tiktok_oauth_tokens.id`, gdy user wybrał konkretne konto)
 
-```text
-user.info.basic,video.publish
-```
+### 4. `publish-to-tiktok` — użyć wyborów usera
+Zamiast hardcoded `PUBLIC_TO_EVERYONE` → `SELF_ONLY` fallback:
+- Czytać `tiktok_privacy_level` i pozostałe flagi z rekordu posta/kampanii.
+- W payloadzie `post/publish/video/init/` ustawiać `privacy_level`, `disable_comment`, `disable_duet`, `disable_stitch`, `brand_content_toggle`, `brand_organic_toggle`.
+- Fallback `SELF_ONLY` zostaje tylko dla błędu `unaudited_client_can_only_post_to_private_accounts` (do czasu zatwierdzenia audytu).
 
-- Token odświeża się poprawnie.
-- `creator_info/query` działa i zwraca konto `Glowaccy Solutions`.
-- Publikacja dochodzi aż do TikTok `video/init`, czyli backend aplikacji działa.
-- Błąd pojawia się dopiero jako decyzja TikToka po stronie ich API.
+### 5. `PlatformTikTok.tsx` — wzmocnić panel konta
+Dodać pod `PlatformConnectionStatus`:
+- Karta „Wymagania publikacji TikTok" z linkami do Music Usage Confirmation + Branded Content Policy + krótki opis Privacy/Disclosure (żeby było widać też poza ekranem kampanii — TikTok recenzenci często sprawdzają i tutaj).
 
-## Podejrzane miejsca w kodzie
+### 6. Treści PL do skopiowania
+Przygotuję dokładne mikroteksty (etykiety, helper textów, walidacje) zgodne z brzmieniem wymaganym przez TikTok policy.
 
-### `supabase/functions/publish-to-tiktok/index.ts`
+## Kolejność implementacji (po akceptacji)
 
-Obecnie kod wybiera publiczną widoczność, jeśli TikTok pokazuje taką opcję:
+1. Migracja DB (kolumny na campaigns + opcjonalnie campaign_posts).
+2. Edge function `tiktok-creator-info` + deploy.
+3. Komponent `TikTokPublishOptions.tsx`.
+4. Wpięcie do `CampaignSetup.tsx` i `SimpleCampaignSetup.tsx` (pojawia się, gdy TikTok w `targetPlatforms`).
+5. Aktualizacja `publish-to-tiktok` na nowe pola.
+6. Wzbogacenie `PlatformTikTok.tsx` o sekcję policy/links.
+7. Smoke test: połącz konto → utwórz kampanię → sprawdź czy widać wszystkie elementy (do nagrania).
 
-```ts
-return options.includes('PUBLIC_TO_EVERYONE') ? 'PUBLIC_TO_EVERYONE' : options[0];
-```
+## Co po Twojej stronie
 
-Następnie wysyła:
+Po wdrożeniu zostaje tylko nagrać 3 sekwencje (autoryzacja → ekran publikacji z widocznymi nowymi elementami → potwierdzenie + post na koncie TikTok) i wysłać audyt. Kod fallbacku `SELF_ONLY` zostawiamy, więc nadal możesz testować na koncie prywatnym do czasu zatwierdzenia.
 
-```json
-"privacy_level": "PUBLIC_TO_EVERYONE"
-```
-
-Dla aplikacji uznanej przez TikToka za nieaudytowaną kończy się to błędem:
-
-```text
-unaudited_client_can_only_post_to_private_accounts
-```
-
-### `supabase/functions/auto-publish-books/index.ts`
-
-Tu błąd jest poprawnie przechwytywany i zapisany jako `failed`, dlatego użytkownik widzi go w kampanii.
-
-## Plan naprawy
-
-### 1. Dodać bezpieczny fallback dla TikToka
-
-W `publish-to-tiktok` zmienić logikę tak, aby gdy TikTok zwróci:
-
-```text
-unaudited_client_can_only_post_to_private_accounts
-```
-
-funkcja automatycznie ponowiła `video/init` z:
-
-```text
-SELF_ONLY
-```
-
-Dzięki temu:
-
-- kampania nie będzie kończyć się błędem, jeśli TikTok pozwala tylko na prywatne posty,
-- zobaczymy, czy problem dotyczy wyłącznie publiczności posta,
-- użytkownik dostanie realny wynik zamiast martwego błędu.
-
-### 2. Zapisać w odpowiedzi, że post poszedł prywatnie
-
-Jeśli fallback zadziała, funkcja ma zwrócić sukces z informacją:
-
-```text
-Post wysłany jako prywatny, ponieważ TikTok nadal nie pozwala tej aplikacji publikować publicznie dla tego konta.
-```
-
-W UI kampanii ma być widoczna informacja, że publikacja przeszła, ale z widocznością `SELF_ONLY`.
-
-### 3. Poprawić komunikat błędu, jeśli nawet SELF_ONLY nie przejdzie
-
-Jeśli TikTok odrzuci także `SELF_ONLY`, wtedy komunikat powinien jasno mówić:
-
-```text
-TikTok odrzuca publikację dla tej aplikacji po stronie API. To nie jest błąd harmonogramu ani wideo. Sprawdź w TikTok Developer Portal, czy Production App ma zatwierdzony Content Posting API / Direct Post dla aktualnego Client Key.
-```
-
-### 4. Dodać diagnostyczne logi bez ujawniania sekretów
-
-W `publish-to-tiktok` dodać logi:
-
-- czy `TIKTOK_CLIENT_KEY` jest obecny,
-- skrócony fingerprint client key, np. pierwsze 4 i ostatnie 4 znaki,
-- użyty `privacy_level`,
-- czy publikacja była próbą publiczną czy fallbackiem prywatnym,
-- dokładny `error.code` i `log_id` TikToka.
-
-Bez logowania pełnych tokenów ani sekretów.
-
-### 5. Dodać opcjonalne wymuszenie prywatnego testu
-
-Dodać obsługę parametru technicznego w body funkcji:
-
-```ts
-privacyLevelOverride: 'SELF_ONLY' | 'PUBLIC_TO_EVERYONE'
-```
-
-Tylko dla diagnostyki z backendu. Pozwoli szybko sprawdzić, czy konto/aplikacja przepuszcza prywatny upload.
-
-### 6. Zresetować obecny nieudany post do ponownej próby
-
-Po wdrożeniu zresetować post:
-
-```text
-00591a5a-7daf-4e50-923c-752d11ff852b
-```
-
-z `failed` na `scheduled`, wyczyścić `error_message` i `error_code`, żeby cron podjął go ponownie.
-
-### 7. Po wdrożeniu sprawdzić wynik w logach
-
-Po kolejnej próbie sprawdzić:
-
-- czy pierwsza próba publiczna nadal dostała `unaudited_client_can_only_post_to_private_accounts`,
-- czy fallback `SELF_ONLY` przeszedł,
-- czy post zmienił status na `published`,
-- czy TikTok zwrócił `publish_id`.
-
-## Ważna konkluzja
-
-Jeżeli fallback `SELF_ONLY` przejdzie, to aplikacja technicznie działa, ale TikTok nadal nie pozwala publikować publicznie dla użytego production clienta. Wtedy problem jest w statusie zatwierdzenia TikTok Developer Portal / produkcyjnego Client Key, nie w cronach ani uploadzie.
-
-Jeżeli fallback `SELF_ONLY` też nie przejdzie, trzeba będzie sprawdzić konfigurację aplikacji TikTok: zatwierdzony produkt Content Posting API, właściwy Production Client Key, redirect URI, scopes oraz czy aktualnie połączone konto było autoryzowane już po przejściu aplikacji na production.
-
-<presentation-actions>
-<presentation-open-history>View History</presentation-open-history>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+Czy akceptujesz plan?
