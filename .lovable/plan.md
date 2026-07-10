@@ -1,36 +1,92 @@
-## Reset tokenów TikTok (wymuszenie ponownej autoryzacji)
+## TikTok — poprawki UX pod ponowną aplikację (Content Sharing Guidelines pkt 3 i 4)
 
-Aby ponownie zobaczyć ekran zgody TikToka (zamiast cichego logowania), trzeba:
+### Diagnoza — co TikTok odrzucił
 
-### 1. Usunąć tokeny z bazy
+Recenzent wskazał **punkt 3/4 „Required UX Implementation in Your App"** i konkretnie **„Please showcase full interactions on Content Disclosure Setting."** Obecny `TikTokPublishOptions.tsx` ma zalążek tej sekcji, ale nie spełnia wszystkich wymogów. Sprawdziłem plik i porównałem z checklistą TikToka.
 
-Wyczyścić rekordy w tabeli `tiktok_oauth_tokens` dla Twojego użytkownika (wszystkie konta lub konkretne wybrane). Można:
+### Konkretne braki (co reviewer nie zobaczył na demo)
 
-- **Wariant A** (wszystkie konta TikTok): `DELETE FROM tiktok_oauth_tokens WHERE user_id = '<twoj_uuid>'`
-- **Wariant B** (jedno konkretne konto): `DELETE FROM tiktok_oauth_tokens WHERE id = '<token_id>'`
+| # | Wymóg TikToka (pkt 3–4) | Stan obecny | Problem |
+|---|---|---|---|
+| 1 | Poziom prywatności nie może mieć wartości domyślnej — użytkownik musi świadomie wybrać | `defaultTikTokOptions()` ustawia `privacyLevel: "SELF_ONLY"` | Reviewer widzi już wybraną opcję → automatyczny fail |
+| 2 | Gdy „Disclose video content" = ON, musi być widoczna **etykieta zgodności** informująca co pojawi się na filmie | Brak | Brak komunikatu „Your video will be labeled as **Promotional content** / **Paid partnership**" |
+| 3 | Consent statement musi pojawić się **warunkowo** po włączeniu disclosure/branded, z odnośnikami do polityk **w treści zdania** | Linki są na dole karty zawsze | Reviewer musi zobaczyć, że tekst zgody pojawia się dokładnie po włączeniu toggle |
+| 4 | Nie można pozwolić włączyć „Branded content" bez wybrania jednej z opcji (Your brand LUB Branded content) — muszą być dostępne obie i widoczne po włączeniu Disclosure | Ma toggle Disclosure + 2 pod-toggle | OK strukturalnie, ale brakuje twardej walidacji: „musisz zaznaczyć co najmniej jedno" |
+| 5 | Branded content = SELF_ONLY musi być zablokowane hard (nie da się publikować) | Pokazywany alert, ale przycisk „Publikuj" nie jest blokowany na poziomie kampanii | Trzeba zwrócić błąd walidacji z komponentu |
+| 6 | Music Usage Confirmation pokazywany **zawsze** przy włączonym Disclosure; Branded Content Policy pokazywany tylko dla Branded | Oba linki zawsze na dole | Trzeba warunkowo w consent statement |
+| 7 | Interakcje (comment/duet/stitch) — TikTok chce zobaczyć że użytkownik może je przełączyć — jest OK | OK | – |
 
-### 2. Wymusić ekran zgody w OAuth start
+### Zakres zmian
 
-W `supabase/functions/tiktok-oauth-start/index.ts` dodać do URL autoryzacyjnego parametr `prompt=consent` (lub odpowiednik `force_authentication=1` używany przez TikTok), żeby nawet po reset tokenów TikTok pokazał pełny ekran wyboru uprawnień zamiast cichej zgody, jeśli przeglądarka pamięta sesję.
+**Pliki dotknięte (tylko frontend UX — bez zmian w edge functions / API):**
 
-### 3. Wyczyścić sesję TikToka w przeglądarce (po Twojej stronie — instrukcja)
+1. `src/components/campaigns/TikTokPublishOptions.tsx` — główna przebudowa sekcji Disclosure
+2. `src/components/campaigns/CampaignSetup.tsx` (albo miejsce gdzie wywoływane) — walidacja przycisku „Publikuj" gdy `privacyLevel === ""`
 
-Po usunięciu tokenów po naszej stronie, jeśli TikTok nadal automatycznie potwierdza autoryzację:
+**Nowy default `defaultTikTokOptions()`:**
+```ts
+privacyLevel: ""   // NIE ustawiamy domyślnej — user musi wybrać
+```
 
-- Wyloguj się z tiktok.com w przeglądarce, na której łączysz konto, **albo**
-- Użyj trybu incognito do ponownej autoryzacji w Social Auto Flow.
+**Nowa struktura karty Disclosure w `TikTokPublishOptions.tsx`:**
 
-### Pytania przed wykonaniem
+```
+┌── Ustawienia ujawnienia treści ─────────────────────┐
+│ [ ] Ujawnij treść wideo                              │
+│     Włącz jeśli film promuje markę, produkt, usługę │
+│                                                      │
+│  ↓ Gdy ON, pojawia się:                              │
+│                                                      │
+│  Wybierz przynajmniej jedną opcję: *                 │
+│  [ ] Twoja marka                                     │
+│      Promujesz własną markę/produkt/usługę           │
+│      → etykieta „Promotional content"                │
+│                                                      │
+│  [ ] Treść markowa (Branded content)                 │
+│      Płatne partnerstwo z marką trzecią              │
+│      → etykieta „Paid partnership"                   │
+│      ⚠ Nie może być „Tylko ja"                       │
+│                                                      │
+│  ┌── Compliance label preview ──────────────────┐   │
+│  │ ✓ Twój film zostanie oznaczony jako:         │   │
+│  │   "Promotional content" (i/lub)              │   │
+│  │   "Paid partnership"                          │   │
+│  └───────────────────────────────────────────────┘   │
+│                                                      │
+│  ┌── Consent statement (warunkowy) ─────────────┐   │
+│  │ Publikując akceptujesz:                       │   │
+│  │  • Music Usage Confirmation ↗ (zawsze)        │   │
+│  │  • Branded Content Policy ↗ (tylko branded)   │   │
+│  └───────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────┘
+```
 
-Potrzebuję wiedzieć:
+**Nowe błędy walidacji zwracane z komponentu (blokują „Publikuj"):**
 
-1. Czy zresetować **wszystkie** Twoje konta TikTok, czy konkretne (np. tylko `socialflow5` / `Glowaccy Solutions`)?
-2. Czy dodać `prompt=consent` na stałe do flow OAuth (przyda się też w przyszłości przy podobnych sytuacjach)?
+- `privacyLevel === ""` → „Wybierz poziom prywatności."
+- `discloseContent && !brandOrganic && !brandedContent` → „Zaznacz co najmniej jedną opcję: Twoja marka lub Treść markowa."
+- `brandedContent && privacyLevel === "SELF_ONLY"` → „Treści markowej nie można publikować jako Tylko ja."
 
-Po Twojej odpowiedzi wykonam DELETE w bazie i (opcjonalnie) zaktualizuję `tiktok-oauth-start`.
+Komponent otrzyma nowy prop `onValidChange(isValid: boolean)`, żeby nadrzędny formularz mógł disable'ować „Publikuj".
 
-&nbsp;
+### Co nagrać w demo video (pod pkt 3–4)
 
-Odpowiedź użytkownika:
+Nagranie musi krok po kroku pokazać:
 
-Dodaj opcje, która na żądanie usunie tokeny z wybranego konta w dowolnym socialu
+1. Wybór wideo → wchodzę w opcje TikTok
+2. „Privacy level" jest **pusty** — klikam „Publiczne"
+3. Klikam Disclosure toggle → pojawia się sekcja z dwoma opcjami (obie odznaczone), pole „Publikuj" jest zablokowane
+4. Zaznaczam „Twoja marka" → pojawia się etykieta „Promotional content" + consent statement z linkiem „Music Usage Confirmation"
+5. Zaznaczam też „Branded content" → dochodzi „Paid partnership" + link „Branded Content Policy"
+6. Zmieniam prywatność na „Tylko ja" → pojawia się czerwony alert, „Publikuj" zablokowany
+7. Wracam na „Publiczne" → alert znika, klikam „Publikuj"
+
+### Poza zakresem (nie ruszam)
+
+- Edge functions (`publish-to-tiktok`, `tiktok-creator-info`) — logika już poprawnie przekazuje wszystkie flagi
+- OAuth flow, revoke, callback
+- Baza danych — kolumny `tiktok_*` już istnieją
+
+### Podsumowanie techniczne
+
+3 zmiany kluczowe: (a) `privacyLevel` domyślnie pusty + walidacja, (b) warunkowy compliance-label + consent statement w miejscu Disclosure zamiast na dole, (c) blokada „Publikuj" gdy warunki UX niespełnione. Reszta karty (poziomy prywatności, interakcje, dwa pod-toggle disclosure) już jest.

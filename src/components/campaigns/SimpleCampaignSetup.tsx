@@ -37,6 +37,7 @@ export const SimpleCampaignSetup = () => {
   const [selectedAccounts, setSelectedAccounts] = useState<Record<PlatformId, string[]>>({} as Record<PlatformId, string[]>);
   const [connectedPlatforms, setConnectedPlatforms] = useState<Record<PlatformId, boolean>>({} as Record<PlatformId, boolean>);
   const [tiktokOptions, setTiktokOptions] = useState<TikTokPublishOptionsValue>(defaultTikTokOptions());
+  const [tiktokValid, setTiktokValid] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
@@ -545,6 +546,7 @@ export const SimpleCampaignSetup = () => {
         <TikTokPublishOptions
           value={tiktokOptions}
           onChange={setTiktokOptions}
+          onValidChange={setTiktokValid}
           selectedAccountIds={selectedAccounts.tiktok}
         />
 
@@ -573,7 +575,7 @@ export const SimpleCampaignSetup = () => {
         onClick={handleCreateCampaign}
         className="w-full"
         size="lg"
-        disabled={!canSubmit || isCreating}
+        disabled={!canSubmit || isCreating || (targetPlatforms.includes("tiktok") && !tiktokValid)}
       >
         {isCreating ? (
           <>
