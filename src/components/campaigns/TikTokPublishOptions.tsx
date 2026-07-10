@@ -1,16 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Music, ShieldAlert, ExternalLink, Video } from "lucide-react";
+import { Loader2, Music, ShieldAlert, ExternalLink, Video, Tag, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export type TikTokPublishOptionsValue = {
   accountId?: string;
-  privacyLevel: string;
+  privacyLevel: string; // pusty string = użytkownik jeszcze nie wybrał (wymagane przez TikTok UX)
   allowComment: boolean;
   allowDuet: boolean;
   allowStitch: boolean;
@@ -42,9 +42,11 @@ interface Props {
   onChange: (v: TikTokPublishOptionsValue) => void;
   selectedAccountId?: string;
   selectedAccountIds?: string[];
+  /** Zgłasza rodzicowi, czy formularz TikTok spełnia wszystkie wymogi UX TikToka (pkt 3–4). */
+  onValidChange?: (isValid: boolean) => void;
 }
 
-export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selectedAccountIds }: Props) => {
+export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selectedAccountIds, onValidChange }: Props) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<Array<{ accountId: string; info: CreatorInfo }>>([]);
@@ -81,7 +83,6 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
           else errors.push(s.reason?.message || String(s.reason));
         });
 
-        // Deduplicate by accountId (defensive — same row should never come back twice)
         const seen = new Set<string>();
         const unique = results.filter((r) => {
           if (seen.has(r.accountId)) return false;
@@ -96,17 +97,10 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
           setError(`Niektóre konta nie zostały załadowane: ${errors.join("; ")}`);
         }
 
-        const options: string[] = unique[0]?.info?.privacy_level_options || [];
-        const currentAllowed = options.includes(value.privacyLevel);
-        const patch: Partial<TikTokPublishOptionsValue> = {};
-        if (unique[0] && value.accountId !== unique[0].accountId) patch.accountId = unique[0].accountId;
-        if (options.length > 0 && !currentAllowed) {
-          patch.privacyLevel = options.includes("SELF_ONLY")
-            ? "SELF_ONLY"
-            : options[0] || "SELF_ONLY";
-        }
-        if (Object.keys(patch).length > 0) {
-          onChange({ ...value, ...patch });
+        // WAŻNE: nie ustawiamy automatycznie privacy_level — TikTok wymaga świadomego wyboru użytkownika.
+        // Ustawiamy tylko accountId (pierwsze konto z listy).
+        if (unique[0] && value.accountId !== unique[0].accountId) {
+          onChange({ ...value, accountId: unique[0].accountId });
         }
       } catch (e: any) {
         if (!cancelled) setError(e.message || String(e));
@@ -122,10 +116,7 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
     onChange({ ...value, ...patch });
   };
 
-  // Validation: branded content cannot be SELF_ONLY
-  const brandedSelfOnlyError =
-    value.brandedContent && value.privacyLevel === "SELF_ONLY";
-
+  // Dostępne poziomy prywatności = przecięcie opcji ze wszystkich wybranych kont
   const privacyOptions = accounts.length > 0
     ? accounts
         .map((a) => a.info.privacy_level_options || [])
@@ -140,6 +131,33 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
     duet_disabled: accounts.some((a) => a.info.duet_disabled),
     stitch_disabled: accounts.some((a) => a.info.stitch_disabled),
   };
+
+  // ===== WALIDACJA UX WYMAGANA PRZEZ TIKTOK (pkt 3–4 Content Sharing Guidelines) =====
+  const errors: string[] = [];
+  if (!value.privacyLevel) {
+    errors.push("Wybierz poziom prywatności filmu.");
+  }
+  if (value.discloseContent && !value.brandOrganic && !value.brandedContent) {
+    errors.push("Zaznacz co najmniej jedną opcję ujawnienia: „Twoja marka" lub „Treść markowa".");
+  }
+  if (value.brandedContent && value.privacyLevel === "SELF_ONLY") {
+    errors.push("Treści markowych (branded content) nie można publikować jako „Tylko ja".");
+  }
+  const isValid = errors.length === 0;
+
+  useEffect(() => {
+    onValidChange?.(isValid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isValid]);
+
+  // Etykiety zgodności, które TikTok pokaże na filmie
+  const complianceLabels = useMemo(() => {
+    if (!value.discloseContent) return [];
+    const labels: string[] = [];
+    if (value.brandOrganic) labels.push("Promotional content");
+    if (value.brandedContent) labels.push("Paid partnership");
+    return labels;
+  }, [value.discloseContent, value.brandOrganic, value.brandedContent]);
 
   return (
     <Card className="p-6 space-y-5 border-pink-500/30 bg-pink-500/5">
@@ -207,10 +225,17 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
             </div>
           </div>
 
-
-          {/* Privacy level */}
+          {/* Privacy level — bez domyślnie zaznaczonego */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Poziom prywatności *</Label>
+            <Label className="text-sm font-medium">
+              Poziom prywatności <span className="text-destructive">*</span>
+            </Label>
+            {!value.privacyLevel && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <Info className="h-3 w-3" />
+                Wybierz kto zobaczy Twój film — TikTok wymaga świadomego wyboru.
+              </p>
+            )}
             <RadioGroup
               value={value.privacyLevel}
               onValueChange={(v) => update({ privacyLevel: v })}
@@ -271,7 +296,7 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
             </div>
           </div>
 
-          {/* Disclosure */}
+          {/* Content Disclosure Setting — kluczowa sekcja pkt 3–4 */}
           <div className="space-y-3 rounded-md border p-4 bg-background">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -285,7 +310,6 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
                 onCheckedChange={(c) =>
                   update({
                     discloseContent: c,
-                    // Reset sub-flags when turning off
                     brandOrganic: c ? value.brandOrganic : false,
                     brandedContent: c ? value.brandedContent : false,
                   })
@@ -294,7 +318,11 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
             </div>
 
             {value.discloseContent && (
-              <div className="space-y-2 pl-1">
+              <div className="space-y-3 pl-1">
+                <p className="text-xs font-medium text-foreground">
+                  Zaznacz co najmniej jedną opcję: <span className="text-destructive">*</span>
+                </p>
+
                 <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer hover:bg-secondary/40">
                   <Switch
                     checked={value.brandOrganic}
@@ -303,10 +331,11 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
                   <div>
                     <p className="text-sm font-medium">Twoja marka</p>
                     <p className="text-xs text-muted-foreground">
-                      Promujesz własną markę, produkt lub usługę.
+                      Promujesz własną markę, produkt lub usługę. Film zostanie oznaczony jako <strong>„Promotional content"</strong>.
                     </p>
                   </div>
                 </label>
+
                 <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer hover:bg-secondary/40">
                   <Switch
                     checked={value.brandedContent}
@@ -315,50 +344,83 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
                   <div>
                     <p className="text-sm font-medium">Treść markowa (Branded content)</p>
                     <p className="text-xs text-muted-foreground">
-                      Płatne partnerstwo z marką trzecią. TikTok nie zezwala na ustawienie „Tylko ja" dla tej opcji.
+                      Płatne partnerstwo z marką trzecią. Film zostanie oznaczony jako <strong>„Paid partnership"</strong>. Nie można ustawić „Tylko ja".
                     </p>
                   </div>
                 </label>
 
-                {brandedSelfOnlyError && (
-                  <Alert variant="destructive">
-                    <ShieldAlert className="h-4 w-4" />
-                    <AlertDescription>
-                      Treści markowych (branded content) nie można publikować jako „Tylko ja". Zmień prywatność na „Publiczne" lub „Znajomi".
+                {/* Compliance label preview — dokładnie to zobaczy widz na filmie */}
+                {complianceLabels.length > 0 && (
+                  <Alert className="border-pink-500/40 bg-pink-500/10">
+                    <Tag className="h-4 w-4 text-pink-500" />
+                    <AlertDescription className="text-sm">
+                      <strong>Twój film zostanie oznaczony jako:</strong>{" "}
+                      {complianceLabels.map((l, i) => (
+                        <span key={l}>
+                          <span className="inline-block px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-700 dark:text-pink-300 font-mono text-xs">
+                            {l}
+                          </span>
+                          {i < complianceLabels.length - 1 ? " oraz " : ""}
+                        </span>
+                      ))}
                     </AlertDescription>
                   </Alert>
+                )}
+
+                {/* Consent statement — warunkowy, dokładnie w miejscu Disclosure */}
+                {(value.brandOrganic || value.brandedContent) && (
+                  <div className="text-xs text-muted-foreground border rounded-md p-3 bg-secondary/30">
+                    <p className="mb-2 flex items-center gap-1">
+                      <Music className="h-3 w-3" />
+                      Publikując ten film akceptujesz:
+                    </p>
+                    <ul className="space-y-1 pl-4 list-disc">
+                      <li>
+                        TikTok{" "}
+                        <a
+                          href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-pink-600 dark:text-pink-400 hover:underline"
+                        >
+                          Music Usage Confirmation
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </li>
+                      {value.brandedContent && (
+                        <li>
+                          TikTok{" "}
+                          <a
+                            href="https://www.tiktok.com/legal/page/global/bc-policy/en"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-pink-600 dark:text-pink-400 hover:underline"
+                          >
+                            Branded Content Policy
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </li>
+                      )}
+                    </ul>
+                  </div>
                 )}
               </div>
             )}
           </div>
 
-          {/* Policy links — mandatory UX */}
-          <div className="text-xs text-muted-foreground border-t pt-3 space-y-1">
-            <p className="flex items-center gap-1">
-              <Music className="h-3 w-3" />
-              Publikując akceptujesz politykę TikToka:
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <a
-                href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-pink-600 dark:text-pink-400 hover:underline"
-              >
-                Music Usage Confirmation
-                <ExternalLink className="h-3 w-3" />
-              </a>
-              <a
-                href="https://www.tiktok.com/legal/page/global/bc-policy/en"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-pink-600 dark:text-pink-400 hover:underline"
-              >
-                Branded Content Policy
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            </div>
-          </div>
+          {/* Zbiorczy blok błędów walidacji — blokuje przycisk „Publikuj/Zaplanuj" u rodzica */}
+          {errors.length > 0 && (
+            <Alert variant="destructive">
+              <ShieldAlert className="h-4 w-4" />
+              <AlertDescription>
+                <ul className="list-disc pl-4 space-y-1">
+                  {errors.map((e) => (
+                    <li key={e}>{e}</li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
         </>
       )}
     </Card>
@@ -366,7 +428,8 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
 };
 
 export const defaultTikTokOptions = (): TikTokPublishOptionsValue => ({
-  privacyLevel: "SELF_ONLY",
+  // Pusty poziom prywatności = użytkownik musi świadomie wybrać (wymóg TikTok UX pkt 4).
+  privacyLevel: "",
   allowComment: true,
   allowDuet: true,
   allowStitch: true,
