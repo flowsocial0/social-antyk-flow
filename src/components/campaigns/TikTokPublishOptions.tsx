@@ -138,10 +138,10 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
     errors.push("Wybierz poziom prywatności filmu.");
   }
   if (value.discloseContent && !value.brandOrganic && !value.brandedContent) {
-    errors.push("Zaznacz co najmniej jedną opcję ujawnienia: „Twoja marka" lub „Treść markowa".");
+    errors.push('Zaznacz co najmniej jedną opcję ujawnienia: „Twoja marka" lub „Treść markowa".');
   }
   if (value.brandedContent && value.privacyLevel === "SELF_ONLY") {
-    errors.push("Treści markowych (branded content) nie można publikować jako „Tylko ja".");
+    errors.push('Treści markowych (branded content) nie można publikować jako „Tylko ja".');
   }
   const isValid = errors.length === 0;
 
