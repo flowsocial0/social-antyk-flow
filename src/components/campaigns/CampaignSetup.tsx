@@ -44,6 +44,7 @@ export const CampaignSetup = ({
   const [tiktokOptions, setTiktokOptions] = useState<TikTokPublishOptionsValue>(
     initialConfig?.tiktokOptions ?? defaultTikTokOptions()
   );
+  const [tiktokValid, setTiktokValid] = useState(true);
   useEffect(() => {
     checkConnectedPlatforms();
   }, []);
@@ -373,6 +374,7 @@ export const CampaignSetup = ({
         <TikTokPublishOptions
           value={tiktokOptions}
           onChange={setTiktokOptions}
+          onValidChange={setTiktokValid}
           selectedAccountIds={selectedAccounts.tiktok}
         />
 
@@ -429,7 +431,7 @@ export const CampaignSetup = ({
         </div>
       </Card>
 
-      <Button onClick={handleSubmit} className="w-full" size="lg" disabled={!canSubmit}>
+      <Button onClick={handleSubmit} className="w-full" size="lg" disabled={!canSubmit || (targetPlatforms.includes('tiktok') && !tiktokValid)}>
         Przejdź do generowania planu
         <ArrowRight className="ml-2 h-4 w-4" />
       </Button>
