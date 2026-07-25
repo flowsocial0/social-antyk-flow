@@ -139,7 +139,8 @@ export const CampaignSetup = ({
       randomContentTopic: useRandomContent ? randomContentTopic : undefined,
       libraryVideoUrl,
       libraryVideoTitle,
-      tiktokOptions: targetPlatforms.includes('tiktok') ? tiktokOptions : undefined
+      tiktokOptions: targetPlatforms.includes('tiktok') ? tiktokOptions : undefined,
+      youtubeOptions: targetPlatforms.includes('youtube') ? youtubeOptions : undefined
     });
   };
   const requiresVideo = targetPlatforms.includes('tiktok');
