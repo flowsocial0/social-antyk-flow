@@ -359,6 +359,12 @@ export const CampaignSetup = ({
 
       )}
 
+      {/* YouTube publishing options: title, description, tags, privacy, thumbnail */}
+      {targetPlatforms.includes('youtube') && (
+        <YouTubePublishOptions value={youtubeOptions} onChange={setYoutubeOptions} />
+      )}
+
+
       {/* Video from the reusable library, applied to every post of this campaign */}
       <Card className="p-6 bg-secondary/30">
         <div className="flex flex-wrap items-start justify-between gap-4">
