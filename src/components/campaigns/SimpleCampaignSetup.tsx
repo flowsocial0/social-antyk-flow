@@ -14,6 +14,7 @@ import { PlatformId, getAllPlatforms } from "@/config/platforms";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { TikTokPublishOptions, defaultTikTokOptions, type TikTokPublishOptionsValue } from "./TikTokPublishOptions";
+import { YouTubePublishOptions, defaultYouTubeOptions, type YouTubePublishOptionsValue } from "./YouTubePublishOptions";
 import { VideoPickerDialog } from "@/components/videos/VideoPickerDialog";
 import { useConnectedAccounts } from "@/hooks/useConnectedAccounts";
 import { Badge } from "@/components/ui/badge";
