@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,6 +50,7 @@ export const SimpleCampaignSetup = () => {
   const [youtubeOptions, setYoutubeOptions] = useState<YouTubePublishOptionsValue>(defaultYouTubeOptions());
   const [isCreating, setIsCreating] = useState(false);
   const [pickerPostId, setPickerPostId] = useState<string | null>(null);
+  const lastPickerPostId = useRef<string | null>(null);
 
 
   const addPost = (day: number) => {
@@ -654,7 +655,14 @@ export const SimpleCampaignSetup = () => {
 
       <VideoPickerDialog
         open={pickerPostId !== null}
-        onOpenChange={(open) => !open && setPickerPostId(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            lastPickerPostId.current = pickerPostId;
+            setPickerPostId(null);
+          } else if (lastPickerPostId.current) {
+            setPickerPostId(lastPickerPostId.current);
+          }
+        }}
         onSelect={(url, video) => {
           if (pickerPostId) handleLibraryVideoSelected(pickerPostId, url, video.title);
           setPickerPostId(null);

@@ -42,6 +42,18 @@ export function VideoPickerDialog({ open, onOpenChange, onSelect }: VideoPickerD
   const [selected, setSelected] = useState<LibraryVideo | null>(null);
   const [addOpen, setAddOpen] = useState(false);
 
+  // Nested dialogs conflict (focus trap + scroll lock), so we hide the picker while adding
+  const openAdd = () => {
+    onOpenChange(false);
+    setTimeout(() => setAddOpen(true), 80);
+  };
+
+  const handleAddOpenChange = (next: boolean) => {
+    setAddOpen(next);
+    if (!next) setTimeout(() => onOpenChange(true), 80);
+  };
+
+
   const visible = filterAndSortVideos(videos, search, "all", tagFilter, sort);
 
   const handleConfirm = () => {
@@ -104,7 +116,7 @@ export function VideoPickerDialog({ open, onOpenChange, onSelect }: VideoPickerD
                 </SelectContent>
               </Select>
             )}
-            <Button variant="outline" onClick={() => setAddOpen(true)} className="w-full">
+            <Button variant="outline" onClick={openAdd} className="w-full">
               <Plus className="h-4 w-4 mr-2" />
               Dodaj wideo
             </Button>
@@ -124,7 +136,7 @@ export function VideoPickerDialog({ open, onOpenChange, onSelect }: VideoPickerD
                     ? "Biblioteka jest pusta — dodaj pierwszy film."
                     : "Brak wyników dla tych filtrów."}
                 </p>
-                <Button variant="outline" onClick={() => setAddOpen(true)}>
+                <Button variant="outline" onClick={openAdd}>
                   <Plus className="h-4 w-4 mr-2" />
                   Dodaj wideo
                 </Button>
@@ -163,7 +175,7 @@ export function VideoPickerDialog({ open, onOpenChange, onSelect }: VideoPickerD
         </DialogContent>
       </Dialog>
 
-      <AddVideoDialog open={addOpen} onOpenChange={setAddOpen} onAdded={reload} />
+      <AddVideoDialog open={addOpen} onOpenChange={handleAddOpenChange} onAdded={reload} />
     </>
   );
 }
