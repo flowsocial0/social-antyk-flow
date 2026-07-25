@@ -50,6 +50,9 @@ export const CampaignSetup = ({
     initialConfig?.tiktokOptions ?? defaultTikTokOptions()
   );
   const [tiktokValid, setTiktokValid] = useState(true);
+  const [youtubeOptions, setYoutubeOptions] = useState<YouTubePublishOptionsValue>(
+    (initialConfig?.youtubeOptions as YouTubePublishOptionsValue) ?? defaultYouTubeOptions()
+  );
   const [libraryVideoUrl, setLibraryVideoUrl] = useState<string | undefined>(initialConfig?.libraryVideoUrl);
   const [libraryVideoTitle, setLibraryVideoTitle] = useState<string | undefined>(initialConfig?.libraryVideoTitle);
   const [videoPickerOpen, setVideoPickerOpen] = useState(false);
