@@ -17,6 +17,10 @@ import { useSearchParams } from "react-router-dom";
 import { PlatformId, getAllPlatforms } from "@/config/platforms";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TikTokPublishOptions, defaultTikTokOptions, type TikTokPublishOptionsValue } from "./TikTokPublishOptions";
+import { VideoPickerDialog } from "@/components/videos/VideoPickerDialog";
+import { Badge } from "@/components/ui/badge";
+import { Library, Video } from "lucide-react";
+
 interface CampaignSetupProps {
   onComplete: (config: CampaignConfig) => void;
   initialConfig?: Partial<CampaignConfig>;
@@ -45,6 +49,10 @@ export const CampaignSetup = ({
     initialConfig?.tiktokOptions ?? defaultTikTokOptions()
   );
   const [tiktokValid, setTiktokValid] = useState(true);
+  const [libraryVideoUrl, setLibraryVideoUrl] = useState<string | undefined>(initialConfig?.libraryVideoUrl);
+  const [libraryVideoTitle, setLibraryVideoTitle] = useState<string | undefined>(initialConfig?.libraryVideoTitle);
+  const [videoPickerOpen, setVideoPickerOpen] = useState(false);
+
   useEffect(() => {
     checkConnectedPlatforms();
   }, []);
