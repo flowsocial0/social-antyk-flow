@@ -659,9 +659,10 @@ Deno.serve(async (req) => {
         // Pre-compute video URL once for this post (same across all platforms/accounts)
         // Priority: post.custom_image_url (if it's a video) > book.video_url / video_storage_path
         const isVideoUrl = (u: string | null | undefined): boolean =>
-          !!u && /\.(mp4|mov|webm|avi|mkv|m4v)(\?|#|$)/i.test(u);
+          !!u && (/\.(mp4|mov|webm|avi|mkv|m4v)(\?|#|$)/i.test(u) || MEGA_REGEX.test(u));
 
         const postCustomVideo = isVideoUrl(post.custom_image_url) ? (post.custom_image_url as string) : null;
+
         const bookVideoUrlRaw = postCustomVideo ||
           post.book?.video_url ||
           (post.book?.video_storage_path ? `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${post.book.video_storage_path}` : null);
@@ -872,16 +873,18 @@ Deno.serve(async (req) => {
             
             const accountOwnerId = accountData?.user_id || campaignOwnerId;
             
-            // Priority: custom_image_url > Supabase Storage > external image_url
-            // Supabase Storage URLs are publicly accessible and work with Instagram/Facebook servers
+            // Priority: custom_image_url (only when it is an image) > Supabase Storage > external image_url
+            // A video/Mega link in custom_image_url must never be treated as an image.
             const storageUrl = post.book?.storage_path 
               ? `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${post.book.storage_path}` 
               : null;
-            const mediaUrl = post.custom_image_url || storageUrl || post.book?.image_url || null;
+            const customImageOnly = isVideoUrl(post.custom_image_url) ? null : (post.custom_image_url || null);
+            const mediaUrl = customImageOnly || storageUrl || post.book?.image_url || null;
             
             // For video: use pre-resolved video URL (Mega already handled above)
             // Detect if mediaUrl is a video based on extension
             const isMediaVideo = mediaUrl ? /\.(mp4|mov|webm|avi|mkv|m4v)$/i.test(mediaUrl) : false;
+
             
             // Final video URL: if mediaUrl is video use it, otherwise use the pre-resolved book video
             const videoUrl = isMediaVideo ? mediaUrl : resolvedVideoUrl;
