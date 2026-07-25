@@ -318,6 +318,15 @@ export const SimpleCampaignSetup = () => {
             tiktok_brand_organic: tiktokOptions.brandOrganic,
             tiktok_branded_content: tiktokOptions.brandedContent,
           }),
+          ...(targetPlatforms.includes("youtube") && {
+            youtube_title: youtubeOptions.title || null,
+            youtube_description: youtubeOptions.description || null,
+            youtube_thumbnail_url: youtubeOptions.thumbnailUrl || null,
+            youtube_privacy_status: youtubeOptions.privacyStatus,
+            youtube_tags: youtubeOptions.tags
+              ? youtubeOptions.tags.split(",").map((t) => t.trim()).filter(Boolean)
+              : null,
+          }),
         };
       });
 
