@@ -391,6 +391,59 @@ export const CampaignSetup = ({
 
       )}
 
+      {/* Video from the reusable library, applied to every post of this campaign */}
+      <Card className="p-6 bg-secondary/30">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Video className="h-5 w-5 text-primary" />
+              Wideo dla kampanii
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-xl">
+              Wybierz jeden film z Biblioteki wideo, a użyjemy go we wszystkich postach tej kampanii.
+              Filmy z Mega.nz pobieramy dopiero w chwili publikacji.
+              {requiresVideo && " TikTok wymaga wideo."}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {libraryVideoUrl && (
+              <>
+                <Badge variant="secondary" className="gap-1">
+                  <Video className="h-3 w-3" />
+                  {libraryVideoTitle || "Wideo z biblioteki"}
+                </Badge>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Usuń wideo z kampanii"
+                  onClick={() => {
+                    setLibraryVideoUrl(undefined);
+                    setLibraryVideoTitle(undefined);
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+            <Button type="button" variant="outline" onClick={() => setVideoPickerOpen(true)}>
+              <Library className="h-4 w-4 mr-2" />
+              {libraryVideoUrl ? "Zmień wideo" : "Wybierz z biblioteki"}
+            </Button>
+          </div>
+        </div>
+        {requiresVideo && !libraryVideoUrl && (
+          <Alert className="mt-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-sm">
+              Bez wideo z biblioteki TikTok użyje filmu przypisanego do wybranych produktów. Jeśli
+              produkt go nie ma, publikacja się nie powiedzie.
+            </AlertDescription>
+          </Alert>
+        )}
+      </Card>
+
+
       {/* Book Selection - optional when using random content */}
       {!useRandomContent && <BookSelector selectedBooks={selectedBooks} onSelectionChange={setSelectedBooks} requireVideo={requiresVideo} />}
 
