@@ -674,6 +674,16 @@ export const SimpleCampaignSetup = () => {
           </>
         )}
       </Button>
+
+      <VideoPickerDialog
+        open={pickerPostId !== null}
+        onOpenChange={(open) => !open && setPickerPostId(null)}
+        onSelect={(url, video) => {
+          if (pickerPostId) handleLibraryVideoSelected(pickerPostId, url, video.title);
+          setPickerPostId(null);
+        }}
+      />
     </div>
+
   );
 };
