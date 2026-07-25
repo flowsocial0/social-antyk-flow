@@ -17,6 +17,7 @@ import { useSearchParams } from "react-router-dom";
 import { PlatformId, getAllPlatforms } from "@/config/platforms";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TikTokPublishOptions, defaultTikTokOptions, type TikTokPublishOptionsValue } from "./TikTokPublishOptions";
+import { YouTubePublishOptions, defaultYouTubeOptions, type YouTubePublishOptionsValue } from "./YouTubePublishOptions";
 import { VideoPickerDialog } from "@/components/videos/VideoPickerDialog";
 import { useConnectedAccounts } from "@/hooks/useConnectedAccounts";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +51,9 @@ export const CampaignSetup = ({
     initialConfig?.tiktokOptions ?? defaultTikTokOptions()
   );
   const [tiktokValid, setTiktokValid] = useState(true);
+  const [youtubeOptions, setYoutubeOptions] = useState<YouTubePublishOptionsValue>(
+    (initialConfig?.youtubeOptions as YouTubePublishOptionsValue) ?? defaultYouTubeOptions()
+  );
   const [libraryVideoUrl, setLibraryVideoUrl] = useState<string | undefined>(initialConfig?.libraryVideoUrl);
   const [libraryVideoTitle, setLibraryVideoTitle] = useState<string | undefined>(initialConfig?.libraryVideoTitle);
   const [videoPickerOpen, setVideoPickerOpen] = useState(false);
@@ -139,7 +143,8 @@ export const CampaignSetup = ({
       randomContentTopic: useRandomContent ? randomContentTopic : undefined,
       libraryVideoUrl,
       libraryVideoTitle,
-      tiktokOptions: targetPlatforms.includes('tiktok') ? tiktokOptions : undefined
+      tiktokOptions: targetPlatforms.includes('tiktok') ? tiktokOptions : undefined,
+      youtubeOptions: targetPlatforms.includes('youtube') ? youtubeOptions : undefined
     });
   };
   const requiresVideo = targetPlatforms.includes('tiktok');
@@ -353,6 +358,12 @@ export const CampaignSetup = ({
         />
 
       )}
+
+      {/* YouTube publishing options: title, description, tags, privacy, thumbnail */}
+      {targetPlatforms.includes('youtube') && (
+        <YouTubePublishOptions value={youtubeOptions} onChange={setYoutubeOptions} />
+      )}
+
 
       {/* Video from the reusable library, applied to every post of this campaign */}
       <Card className="p-6 bg-secondary/30">

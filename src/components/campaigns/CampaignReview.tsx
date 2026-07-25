@@ -109,6 +109,17 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
           target_accounts: config.selectedAccounts || {},
           // A library video overrides whatever media the book itself carries.
           custom_image_url: config.libraryVideoUrl || null,
+          ...(config.targetPlatforms?.includes("youtube") && config.youtubeOptions
+            ? {
+                youtube_title: config.youtubeOptions.title || null,
+                youtube_description: config.youtubeOptions.description || null,
+                youtube_thumbnail_url: config.youtubeOptions.thumbnailUrl || null,
+                youtube_privacy_status: config.youtubeOptions.privacyStatus,
+                youtube_tags: config.youtubeOptions.tags
+                  ? config.youtubeOptions.tags.split(",").map((t) => t.trim()).filter(Boolean)
+                  : null,
+              }
+            : {}),
         } as any);
 
 

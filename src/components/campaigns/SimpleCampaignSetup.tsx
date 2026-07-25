@@ -14,6 +14,7 @@ import { PlatformId, getAllPlatforms } from "@/config/platforms";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { TikTokPublishOptions, defaultTikTokOptions, type TikTokPublishOptionsValue } from "./TikTokPublishOptions";
+import { YouTubePublishOptions, defaultYouTubeOptions, type YouTubePublishOptionsValue } from "./YouTubePublishOptions";
 import { VideoPickerDialog } from "@/components/videos/VideoPickerDialog";
 import { useConnectedAccounts } from "@/hooks/useConnectedAccounts";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +47,7 @@ export const SimpleCampaignSetup = () => {
   const { connectedPlatforms, accountCounts } = useConnectedAccounts();
   const [tiktokOptions, setTiktokOptions] = useState<TikTokPublishOptionsValue>(defaultTikTokOptions());
   const [tiktokValid, setTiktokValid] = useState(true);
+  const [youtubeOptions, setYoutubeOptions] = useState<YouTubePublishOptionsValue>(defaultYouTubeOptions());
   const [isCreating, setIsCreating] = useState(false);
   const [pickerPostId, setPickerPostId] = useState<string | null>(null);
 
@@ -315,6 +317,15 @@ export const SimpleCampaignSetup = () => {
             tiktok_disclose_content: tiktokOptions.discloseContent,
             tiktok_brand_organic: tiktokOptions.brandOrganic,
             tiktok_branded_content: tiktokOptions.brandedContent,
+          }),
+          ...(targetPlatforms.includes("youtube") && {
+            youtube_title: youtubeOptions.title || null,
+            youtube_description: youtubeOptions.description || null,
+            youtube_thumbnail_url: youtubeOptions.thumbnailUrl || null,
+            youtube_privacy_status: youtubeOptions.privacyStatus,
+            youtube_tags: youtubeOptions.tags
+              ? youtubeOptions.tags.split(",").map((t) => t.trim()).filter(Boolean)
+              : null,
           }),
         };
       });
@@ -591,6 +602,11 @@ export const SimpleCampaignSetup = () => {
         />
 
       )}
+
+      {targetPlatforms.includes("youtube") && (
+        <YouTubePublishOptions value={youtubeOptions} onChange={setYoutubeOptions} />
+      )}
+
 
       <Card className="p-6 bg-gradient-subtle border-primary/20">
         <h3 className="text-lg font-semibold mb-2">Podsumowanie</h3>

@@ -561,6 +561,11 @@ export type Database = {
           tiktok_privacy_level: string | null
           time: string
           type: string
+          youtube_description: string | null
+          youtube_privacy_status: string | null
+          youtube_tags: string[] | null
+          youtube_thumbnail_url: string | null
+          youtube_title: string | null
         }
         Insert: {
           book_id?: string | null
@@ -590,6 +595,11 @@ export type Database = {
           tiktok_privacy_level?: string | null
           time: string
           type: string
+          youtube_description?: string | null
+          youtube_privacy_status?: string | null
+          youtube_tags?: string[] | null
+          youtube_thumbnail_url?: string | null
+          youtube_title?: string | null
         }
         Update: {
           book_id?: string | null
@@ -619,6 +629,11 @@ export type Database = {
           tiktok_privacy_level?: string | null
           time?: string
           type?: string
+          youtube_description?: string | null
+          youtube_privacy_status?: string | null
+          youtube_tags?: string[] | null
+          youtube_thumbnail_url?: string | null
+          youtube_title?: string | null
         }
         Relationships: [
           {
@@ -662,6 +677,11 @@ export type Database = {
           tiktok_privacy_level: string | null
           updated_at: string
           user_id: string
+          youtube_description: string | null
+          youtube_privacy_status: string | null
+          youtube_tags: string[] | null
+          youtube_thumbnail_url: string | null
+          youtube_title: string | null
         }
         Insert: {
           content_posts_count: number
@@ -687,6 +707,11 @@ export type Database = {
           tiktok_privacy_level?: string | null
           updated_at?: string
           user_id: string
+          youtube_description?: string | null
+          youtube_privacy_status?: string | null
+          youtube_tags?: string[] | null
+          youtube_thumbnail_url?: string | null
+          youtube_title?: string | null
         }
         Update: {
           content_posts_count?: number
@@ -712,6 +737,11 @@ export type Database = {
           tiktok_privacy_level?: string | null
           updated_at?: string
           user_id?: string
+          youtube_description?: string | null
+          youtube_privacy_status?: string | null
+          youtube_tags?: string[] | null
+          youtube_thumbnail_url?: string | null
+          youtube_title?: string | null
         }
         Relationships: []
       }

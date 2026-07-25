@@ -35,6 +35,15 @@ export type CampaignConfig = {
   libraryVideoUrl?: string; // Video from the library applied to every post in this campaign
   libraryVideoTitle?: string;
 
+  youtubeOptions?: {
+    title: string;
+    description: string;
+    thumbnailUrl?: string;
+    privacyStatus: "public" | "unlisted" | "private";
+    tags: string;
+  };
+
+
   tiktokOptions?: {
     accountId?: string;
     privacyLevel: string;
