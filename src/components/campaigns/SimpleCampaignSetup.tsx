@@ -46,6 +46,8 @@ export const SimpleCampaignSetup = () => {
   const [tiktokOptions, setTiktokOptions] = useState<TikTokPublishOptionsValue>(defaultTikTokOptions());
   const [tiktokValid, setTiktokValid] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [pickerPostId, setPickerPostId] = useState<string | null>(null);
+
 
   useEffect(() => {
     checkConnectedPlatforms();
