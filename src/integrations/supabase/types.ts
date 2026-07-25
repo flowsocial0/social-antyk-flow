@@ -1576,6 +1576,72 @@ export type Database = {
         }
         Relationships: []
       }
+      video_library: {
+        Row: {
+          created_at: string
+          description: string | null
+          duration_sec: number | null
+          file_size_mb: number | null
+          height: number | null
+          id: string
+          mega_url: string | null
+          mime_type: string | null
+          public_url: string | null
+          source_type: string
+          storage_path: string | null
+          tags: string[]
+          thumbnail_path: string | null
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+          usage_count: number
+          user_id: string
+          width: number | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          duration_sec?: number | null
+          file_size_mb?: number | null
+          height?: number | null
+          id?: string
+          mega_url?: string | null
+          mime_type?: string | null
+          public_url?: string | null
+          source_type: string
+          storage_path?: string | null
+          tags?: string[]
+          thumbnail_path?: string | null
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+          width?: number | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          duration_sec?: number | null
+          file_size_mb?: number | null
+          height?: number | null
+          id?: string
+          mega_url?: string | null
+          mime_type?: string | null
+          public_url?: string | null
+          source_type?: string
+          storage_path?: string | null
+          tags?: string[]
+          thumbnail_path?: string | null
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+          width?: number | null
+        }
+        Relationships: []
+      }
       x_daily_publications: {
         Row: {
           account_id: string
