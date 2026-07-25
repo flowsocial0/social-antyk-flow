@@ -14,6 +14,9 @@ import { PlatformId, getAllPlatforms } from "@/config/platforms";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { TikTokPublishOptions, defaultTikTokOptions, type TikTokPublishOptionsValue } from "./TikTokPublishOptions";
+import { VideoPickerDialog } from "@/components/videos/VideoPickerDialog";
+import { Badge } from "@/components/ui/badge";
+import { Library } from "lucide-react";
 
 interface SimplePost {
   id: string;
@@ -24,7 +27,11 @@ interface SimplePost {
   imageFile?: File;
   videoUrl?: string;
   videoFile?: File;
+  /** Publishable URL taken straight from the video library (direct file or Mega link). */
+  libraryVideoUrl?: string;
+  libraryVideoTitle?: string;
 }
+
 
 export const SimpleCampaignSetup = () => {
   const navigate = useNavigate();
@@ -106,22 +113,55 @@ export const SimpleCampaignSetup = () => {
 
   const handleImageUpload = async (postId: string, file: File) => {
     const previewUrl = URL.createObjectURL(file);
-    updatePost(postId, { imageUrl: previewUrl, imageFile: file, videoUrl: undefined, videoFile: undefined });
+    updatePost(postId, {
+      imageUrl: previewUrl,
+      imageFile: file,
+      videoUrl: undefined,
+      videoFile: undefined,
+      libraryVideoUrl: undefined,
+      libraryVideoTitle: undefined,
+    });
   };
 
   const handleVideoUpload = async (postId: string, file: File) => {
     // Validate file size (128MB max)
     if (file.size > 128 * 1024 * 1024) {
-      toast.error("Plik wideo jest za duży (max 128MB)");
+      toast.error("Plik wideo jest za duży (max 128MB). Dodaj go do Biblioteki wideo jako link Mega.nz.");
       return;
     }
     const previewUrl = URL.createObjectURL(file);
-    updatePost(postId, { videoUrl: previewUrl, videoFile: file, imageUrl: undefined, imageFile: undefined });
+    updatePost(postId, {
+      videoUrl: previewUrl,
+      videoFile: file,
+      imageUrl: undefined,
+      imageFile: undefined,
+      libraryVideoUrl: undefined,
+      libraryVideoTitle: undefined,
+    });
+  };
+
+  const handleLibraryVideoSelected = (postId: string, url: string, title: string) => {
+    updatePost(postId, {
+      libraryVideoUrl: url,
+      libraryVideoTitle: title,
+      videoUrl: undefined,
+      videoFile: undefined,
+      imageUrl: undefined,
+      imageFile: undefined,
+    });
   };
 
   const clearMedia = (postId: string) => {
-    updatePost(postId, { imageUrl: undefined, imageFile: undefined, videoUrl: undefined, videoFile: undefined });
+    updatePost(postId, {
+      imageUrl: undefined,
+      imageFile: undefined,
+      videoUrl: undefined,
+      videoFile: undefined,
+      libraryVideoUrl: undefined,
+      libraryVideoTitle: undefined,
+    });
   };
+
 
   const addDay = () => {
     const newDay = durationDays + 1;
