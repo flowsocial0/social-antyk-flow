@@ -89,7 +89,7 @@ export function VideoPickerDialog({ open, onOpenChange, onSelect }: VideoPickerD
                 <SelectItem value="most_used">Najczęściej używane</SelectItem>
               </SelectContent>
             </Select>
-            {allTags.length > 0 ? (
+            {allTags.length > 0 && (
               <Select value={tagFilter} onValueChange={setTagFilter}>
                 <SelectTrigger aria-label="Filtruj po tagu">
                   <SelectValue />
@@ -103,13 +103,13 @@ export function VideoPickerDialog({ open, onOpenChange, onSelect }: VideoPickerD
                   ))}
                 </SelectContent>
               </Select>
-            ) : (
-              <Button variant="outline" onClick={() => setAddOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Dodaj wideo
-              </Button>
             )}
+            <Button variant="outline" onClick={() => setAddOpen(true)} className="w-full">
+              <Plus className="h-4 w-4 mr-2" />
+              Dodaj wideo
+            </Button>
           </div>
+
 
           <div className="flex-1 overflow-y-auto -mx-1 px-1 py-2">
             {loading ? (
