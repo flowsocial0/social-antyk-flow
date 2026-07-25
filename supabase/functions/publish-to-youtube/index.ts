@@ -136,9 +136,35 @@ Deno.serve(async (req) => {
     let title: string | undefined = requestData.title;
     let description: string | undefined = requestData.description;
     let userId: string | undefined = requestData.userId;
-    const privacyStatus = requestData.privacyStatus || 'public';
-    const tags = requestData.tags || [];
+    let privacyStatus = requestData.privacyStatus || 'public';
+    let tags = requestData.tags || [];
     const categoryId = requestData.categoryId || '22';
+    let thumbnailUrl: string | undefined = undefined;
+
+    // Campaign post overrides (title / description / tags / privacy / thumbnail set in the campaign wizard)
+    if (requestData.campaignPostId) {
+      const { data: cpost } = await supabase
+        .from('campaign_posts')
+        .select('text, youtube_title, youtube_description, youtube_thumbnail_url, youtube_privacy_status, youtube_tags')
+        .eq('id', requestData.campaignPostId)
+        .maybeSingle();
+
+      if (cpost) {
+        if (cpost.youtube_title) title = cpost.youtube_title;
+        if (cpost.youtube_description) description = cpost.youtube_description;
+        else if (!description && cpost.text) description = cpost.text;
+        if (cpost.youtube_thumbnail_url) thumbnailUrl = cpost.youtube_thumbnail_url;
+        if (cpost.youtube_privacy_status) privacyStatus = cpost.youtube_privacy_status as typeof privacyStatus;
+        if (Array.isArray(cpost.youtube_tags) && cpost.youtube_tags.length > 0) tags = cpost.youtube_tags;
+        console.log('[YouTube] Applied campaign post overrides:', {
+          hasTitle: !!cpost.youtube_title,
+          hasDescription: !!cpost.youtube_description,
+          hasThumbnail: !!cpost.youtube_thumbnail_url,
+          privacyStatus,
+        });
+      }
+    }
+
 
     // If bookId is provided, fetch book data from database
     if (requestData.bookId) {
