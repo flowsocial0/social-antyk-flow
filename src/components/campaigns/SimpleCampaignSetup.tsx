@@ -603,6 +603,11 @@ export const SimpleCampaignSetup = () => {
 
       )}
 
+      {targetPlatforms.includes("youtube") && (
+        <YouTubePublishOptions value={youtubeOptions} onChange={setYoutubeOptions} />
+      )}
+
+
       <Card className="p-6 bg-gradient-subtle border-primary/20">
         <h3 className="text-lg font-semibold mb-2">Podsumowanie</h3>
         <p className="text-muted-foreground">
