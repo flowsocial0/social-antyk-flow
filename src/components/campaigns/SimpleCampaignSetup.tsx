@@ -197,7 +197,7 @@ export const SimpleCampaignSetup = () => {
       return;
     }
 
-    if (targetPlatforms.includes("tiktok") && posts.some((p) => !p.videoFile)) {
+    if (targetPlatforms.includes("tiktok") && posts.some((p) => !p.videoFile && !p.libraryVideoUrl)) {
       toast.error("TikTok wymaga wideo", {
         description: "Dodaj plik wideo do każdego posta w kampanii TikTok.",
       });
@@ -227,7 +227,9 @@ export const SimpleCampaignSetup = () => {
       for (const post of posts) {
         // Initialize as undefined - only set to public URL after successful upload
         let uploadedImageUrl: string | undefined = undefined;
-        let uploadedVideoUrl: string | undefined = undefined;
+        // A library video already has a publishable URL, so it needs no upload at all.
+        let uploadedVideoUrl: string | undefined = post.libraryVideoUrl;
+
         
         // Upload image if present
         if (post.imageFile) {
@@ -370,7 +372,9 @@ export const SimpleCampaignSetup = () => {
   };
 
   const requiresVideo = targetPlatforms.includes("tiktok");
-  const canSubmit = posts.every((p) => p.text.trim()) && targetPlatforms.length > 0 && (!requiresVideo || posts.every((p) => p.videoFile));
+  const hasVideo = (p: SimplePost) => !!p.videoFile || !!p.libraryVideoUrl;
+  const canSubmit = posts.every((p) => p.text.trim()) && targetPlatforms.length > 0 && (!requiresVideo || posts.every(hasVideo));
+
 
   // Group posts by day
   const postsByDay: Record<number, SimplePost[]> = {};
@@ -604,7 +608,13 @@ export const SimpleCampaignSetup = () => {
             📎 {posts.filter(p => p.imageFile).length} grafik, {posts.filter(p => p.videoFile).length} wideo do przesłania
           </p>
         )}
-        {requiresVideo && posts.some((p) => !p.videoFile) && (
+        {posts.some(p => p.libraryVideoUrl) && (
+          <p className="text-sm text-muted-foreground mt-1">
+            🎬 {posts.filter(p => p.libraryVideoUrl).length} wideo z biblioteki (bez ponownego przesyłania)
+          </p>
+        )}
+        {requiresVideo && posts.some((p) => !hasVideo(p)) && (
+
           <p className="text-sm text-destructive mt-2">
             TikTok wymaga wideo — dodaj film do każdego posta przed zaplanowaniem.
           </p>
