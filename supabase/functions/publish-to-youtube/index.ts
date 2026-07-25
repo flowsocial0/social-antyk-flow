@@ -441,6 +441,34 @@ Deno.serve(async (req) => {
     const youtubeVideoId = uploadResult.id;
     const youtubeVideoUrl = `https://www.youtube.com/watch?v=${youtubeVideoId}`;
 
+    // Optional custom thumbnail (requires a verified YouTube channel — failure must not break publishing)
+    if (thumbnailUrl && youtubeVideoId) {
+      try {
+        console.log('[YouTube] Uploading custom thumbnail...');
+        const thumbResp = await fetch(thumbnailUrl);
+        if (!thumbResp.ok) throw new Error(`Thumbnail fetch failed: ${thumbResp.status}`);
+        const thumbBlob = await thumbResp.blob();
+        const setThumb = await fetch(
+          `https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=${youtubeVideoId}&uploadType=media`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': thumbBlob.type || 'image/jpeg',
+            },
+            body: thumbBlob,
+          }
+        );
+        if (!setThumb.ok) {
+          console.error('[YouTube] Thumbnail set failed:', await setThumb.text());
+        } else {
+          console.log('[YouTube] Thumbnail set successfully');
+        }
+      } catch (thumbErr) {
+        console.error('[YouTube] Thumbnail error (ignored):', thumbErr);
+      }
+    }
+
     // Update book_platform_content if contentId was provided
     if (requestData.contentId) {
       console.log('[YouTube] Updating content record...');
