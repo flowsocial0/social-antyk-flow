@@ -14,6 +14,9 @@ import { PlatformId, getAllPlatforms } from "@/config/platforms";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { TikTokPublishOptions, defaultTikTokOptions, type TikTokPublishOptionsValue } from "./TikTokPublishOptions";
+import { VideoPickerDialog } from "@/components/videos/VideoPickerDialog";
+import { Badge } from "@/components/ui/badge";
+import { Library } from "lucide-react";
 
 interface SimplePost {
   id: string;
@@ -24,7 +27,11 @@ interface SimplePost {
   imageFile?: File;
   videoUrl?: string;
   videoFile?: File;
+  /** Publishable URL taken straight from the video library (direct file or Mega link). */
+  libraryVideoUrl?: string;
+  libraryVideoTitle?: string;
 }
+
 
 export const SimpleCampaignSetup = () => {
   const navigate = useNavigate();
@@ -39,6 +46,8 @@ export const SimpleCampaignSetup = () => {
   const [tiktokOptions, setTiktokOptions] = useState<TikTokPublishOptionsValue>(defaultTikTokOptions());
   const [tiktokValid, setTiktokValid] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [pickerPostId, setPickerPostId] = useState<string | null>(null);
+
 
   useEffect(() => {
     checkConnectedPlatforms();
@@ -106,22 +115,55 @@ export const SimpleCampaignSetup = () => {
 
   const handleImageUpload = async (postId: string, file: File) => {
     const previewUrl = URL.createObjectURL(file);
-    updatePost(postId, { imageUrl: previewUrl, imageFile: file, videoUrl: undefined, videoFile: undefined });
+    updatePost(postId, {
+      imageUrl: previewUrl,
+      imageFile: file,
+      videoUrl: undefined,
+      videoFile: undefined,
+      libraryVideoUrl: undefined,
+      libraryVideoTitle: undefined,
+    });
   };
 
   const handleVideoUpload = async (postId: string, file: File) => {
     // Validate file size (128MB max)
     if (file.size > 128 * 1024 * 1024) {
-      toast.error("Plik wideo jest za duży (max 128MB)");
+      toast.error("Plik wideo jest za duży (max 128MB). Dodaj go do Biblioteki wideo jako link Mega.nz.");
       return;
     }
     const previewUrl = URL.createObjectURL(file);
-    updatePost(postId, { videoUrl: previewUrl, videoFile: file, imageUrl: undefined, imageFile: undefined });
+    updatePost(postId, {
+      videoUrl: previewUrl,
+      videoFile: file,
+      imageUrl: undefined,
+      imageFile: undefined,
+      libraryVideoUrl: undefined,
+      libraryVideoTitle: undefined,
+    });
+  };
+
+  const handleLibraryVideoSelected = (postId: string, url: string, title: string) => {
+    updatePost(postId, {
+      libraryVideoUrl: url,
+      libraryVideoTitle: title,
+      videoUrl: undefined,
+      videoFile: undefined,
+      imageUrl: undefined,
+      imageFile: undefined,
+    });
   };
 
   const clearMedia = (postId: string) => {
-    updatePost(postId, { imageUrl: undefined, imageFile: undefined, videoUrl: undefined, videoFile: undefined });
+    updatePost(postId, {
+      imageUrl: undefined,
+      imageFile: undefined,
+      videoUrl: undefined,
+      videoFile: undefined,
+      libraryVideoUrl: undefined,
+      libraryVideoTitle: undefined,
+    });
   };
+
 
   const addDay = () => {
     const newDay = durationDays + 1;
@@ -157,7 +199,7 @@ export const SimpleCampaignSetup = () => {
       return;
     }
 
-    if (targetPlatforms.includes("tiktok") && posts.some((p) => !p.videoFile)) {
+    if (targetPlatforms.includes("tiktok") && posts.some((p) => !p.videoFile && !p.libraryVideoUrl)) {
       toast.error("TikTok wymaga wideo", {
         description: "Dodaj plik wideo do każdego posta w kampanii TikTok.",
       });
@@ -187,7 +229,9 @@ export const SimpleCampaignSetup = () => {
       for (const post of posts) {
         // Initialize as undefined - only set to public URL after successful upload
         let uploadedImageUrl: string | undefined = undefined;
-        let uploadedVideoUrl: string | undefined = undefined;
+        // A library video already has a publishable URL, so it needs no upload at all.
+        let uploadedVideoUrl: string | undefined = post.libraryVideoUrl;
+
         
         // Upload image if present
         if (post.imageFile) {
@@ -330,7 +374,9 @@ export const SimpleCampaignSetup = () => {
   };
 
   const requiresVideo = targetPlatforms.includes("tiktok");
-  const canSubmit = posts.every((p) => p.text.trim()) && targetPlatforms.length > 0 && (!requiresVideo || posts.every((p) => p.videoFile));
+  const hasVideo = (p: SimplePost) => !!p.videoFile || !!p.libraryVideoUrl;
+  const canSubmit = posts.every((p) => p.text.trim()) && targetPlatforms.length > 0 && (!requiresVideo || posts.every(hasVideo));
+
 
   // Group posts by day
   const postsByDay: Record<number, SimplePost[]> = {};
@@ -484,6 +530,39 @@ export const SimpleCampaignSetup = () => {
                         />
                       </Label>
 
+                      {/* Pick from the reusable video library */}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-auto py-2"
+                        onClick={() => setPickerPostId(post.id)}
+                      >
+                        <Library className="h-4 w-4 mr-2" />
+                        {post.libraryVideoUrl ? "Zmień z biblioteki" : "Wybierz z biblioteki"}
+                      </Button>
+
+                      {/* Library video preview */}
+                      {post.libraryVideoUrl && (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="gap-1">
+                            <Video className="h-3 w-3" />
+                            {post.libraryVideoTitle || "Wideo z biblioteki"}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => clearMedia(post.id)}
+                            className="h-6 w-6 p-0 text-muted-foreground"
+                            aria-label="Usuń wideo z posta"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+
+
+
                       {/* Image preview */}
                       {post.imageUrl && (
                         <div className="flex items-center gap-2">
@@ -564,7 +643,13 @@ export const SimpleCampaignSetup = () => {
             📎 {posts.filter(p => p.imageFile).length} grafik, {posts.filter(p => p.videoFile).length} wideo do przesłania
           </p>
         )}
-        {requiresVideo && posts.some((p) => !p.videoFile) && (
+        {posts.some(p => p.libraryVideoUrl) && (
+          <p className="text-sm text-muted-foreground mt-1">
+            🎬 {posts.filter(p => p.libraryVideoUrl).length} wideo z biblioteki (bez ponownego przesyłania)
+          </p>
+        )}
+        {requiresVideo && posts.some((p) => !hasVideo(p)) && (
+
           <p className="text-sm text-destructive mt-2">
             TikTok wymaga wideo — dodaj film do każdego posta przed zaplanowaniem.
           </p>
@@ -589,6 +674,16 @@ export const SimpleCampaignSetup = () => {
           </>
         )}
       </Button>
+
+      <VideoPickerDialog
+        open={pickerPostId !== null}
+        onOpenChange={(open) => !open && setPickerPostId(null)}
+        onSelect={(url, video) => {
+          if (pickerPostId) handleLibraryVideoSelected(pickerPostId, url, video.title);
+          setPickerPostId(null);
+        }}
+      />
     </div>
+
   );
 };

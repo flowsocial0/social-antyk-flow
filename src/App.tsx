@@ -14,6 +14,8 @@ import HomePage from "./pages/HomePage";
 import Schedule from "./pages/Schedule";
 import Campaigns from "./pages/Campaigns";
 import CampaignsNew from "./pages/CampaignsNew";
+import VideoLibrary from "./pages/VideoLibrary";
+
 import CampaignDetails from "./pages/CampaignDetails";
 import SocialAccounts from "./pages/SocialAccounts";
 import TwitterCallback from "./pages/TwitterCallback";
@@ -135,7 +137,9 @@ const App = () => (
           <Route path="/settings/social-accounts" element={<ProtectedRoute><SocialAccounts /></ProtectedRoute>} />
           <Route path="/book/:id" element={<ProtectedRoute><BookPreview /></ProtectedRoute>} />
           <Route path="/book/:id/redirect" element={<ProtectedRoute><BookRedirect /></ProtectedRoute>} />
+          <Route path="/videos" element={<ProtectedRoute><VideoLibrary /></ProtectedRoute>} />
           <Route path="/platforms" element={<ProtectedRoute><Platforms /></ProtectedRoute>} />
+
           <Route path="/platforms/x" element={<ProtectedRoute><PlatformX /></ProtectedRoute>} />
           <Route path="/platforms/facebook" element={<ProtectedRoute><PlatformFacebook /></ProtectedRoute>} />
           <Route path="/platforms/facebook/select-page/*" element={<ProtectedRoute><FacebookSelectPage /></ProtectedRoute>} />

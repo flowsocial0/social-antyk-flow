@@ -107,7 +107,10 @@ export const CampaignReview = ({ posts, config, onBack }: CampaignReviewProps) =
           status: "scheduled",
           platforms: config.targetPlatforms || ["x"],
           target_accounts: config.selectedAccounts || {},
+          // A library video overrides whatever media the book itself carries.
+          custom_image_url: config.libraryVideoUrl || null,
         } as any);
+
 
         if (postError) throw postError;
 

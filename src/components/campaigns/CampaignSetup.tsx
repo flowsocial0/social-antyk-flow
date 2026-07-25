@@ -17,6 +17,10 @@ import { useSearchParams } from "react-router-dom";
 import { PlatformId, getAllPlatforms } from "@/config/platforms";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TikTokPublishOptions, defaultTikTokOptions, type TikTokPublishOptionsValue } from "./TikTokPublishOptions";
+import { VideoPickerDialog } from "@/components/videos/VideoPickerDialog";
+import { Badge } from "@/components/ui/badge";
+import { Library, Video } from "lucide-react";
+
 interface CampaignSetupProps {
   onComplete: (config: CampaignConfig) => void;
   initialConfig?: Partial<CampaignConfig>;
@@ -45,6 +49,10 @@ export const CampaignSetup = ({
     initialConfig?.tiktokOptions ?? defaultTikTokOptions()
   );
   const [tiktokValid, setTiktokValid] = useState(true);
+  const [libraryVideoUrl, setLibraryVideoUrl] = useState<string | undefined>(initialConfig?.libraryVideoUrl);
+  const [libraryVideoTitle, setLibraryVideoTitle] = useState<string | undefined>(initialConfig?.libraryVideoTitle);
+  const [videoPickerOpen, setVideoPickerOpen] = useState(false);
+
   useEffect(() => {
     checkConnectedPlatforms();
   }, []);
@@ -166,6 +174,8 @@ export const CampaignSetup = ({
       selectedAccounts,
       useRandomContent,
       randomContentTopic: useRandomContent ? randomContentTopic : undefined,
+      libraryVideoUrl,
+      libraryVideoTitle,
       tiktokOptions: targetPlatforms.includes('tiktok') ? tiktokOptions : undefined
     });
   };
@@ -174,6 +184,7 @@ export const CampaignSetup = ({
     targetPlatforms.includes('tiktok') &&
     tiktokOptions.brandedContent &&
     tiktokOptions.privacyLevel === 'SELF_ONLY';
+
   const canSubmit = (useRandomContent || selectedBooks.length > 0) && !tiktokInvalid;
   return <div className="space-y-6">
       <Card className="p-6 bg-secondary/30">
@@ -380,6 +391,59 @@ export const CampaignSetup = ({
 
       )}
 
+      {/* Video from the reusable library, applied to every post of this campaign */}
+      <Card className="p-6 bg-secondary/30">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Video className="h-5 w-5 text-primary" />
+              Wideo dla kampanii
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-xl">
+              Wybierz jeden film z Biblioteki wideo, a użyjemy go we wszystkich postach tej kampanii.
+              Filmy z Mega.nz pobieramy dopiero w chwili publikacji.
+              {requiresVideo && " TikTok wymaga wideo."}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {libraryVideoUrl && (
+              <>
+                <Badge variant="secondary" className="gap-1">
+                  <Video className="h-3 w-3" />
+                  {libraryVideoTitle || "Wideo z biblioteki"}
+                </Badge>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Usuń wideo z kampanii"
+                  onClick={() => {
+                    setLibraryVideoUrl(undefined);
+                    setLibraryVideoTitle(undefined);
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+            <Button type="button" variant="outline" onClick={() => setVideoPickerOpen(true)}>
+              <Library className="h-4 w-4 mr-2" />
+              {libraryVideoUrl ? "Zmień wideo" : "Wybierz z biblioteki"}
+            </Button>
+          </div>
+        </div>
+        {requiresVideo && !libraryVideoUrl && (
+          <Alert className="mt-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-sm">
+              Bez wideo z biblioteki TikTok użyje filmu przypisanego do wybranych produktów. Jeśli
+              produkt go nie ma, publikacja się nie powiedzie.
+            </AlertDescription>
+          </Alert>
+        )}
+      </Card>
+
+
       {/* Book Selection - optional when using random content */}
       {!useRandomContent && <BookSelector selectedBooks={selectedBooks} onSelectionChange={setSelectedBooks} requireVideo={requiresVideo} />}
 
@@ -435,5 +499,16 @@ export const CampaignSetup = ({
         Przejdź do generowania planu
         <ArrowRight className="ml-2 h-4 w-4" />
       </Button>
+
+      <VideoPickerDialog
+        open={videoPickerOpen}
+        onOpenChange={setVideoPickerOpen}
+        onSelect={(url, video) => {
+          setLibraryVideoUrl(url);
+          setLibraryVideoTitle(video.title);
+          setVideoPickerOpen(false);
+        }}
+      />
     </div>;
+
 };
