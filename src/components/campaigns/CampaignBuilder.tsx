@@ -32,6 +32,9 @@ export type CampaignConfig = {
   selectedAccounts?: Record<PlatformId, string[]>; // Platform -> Account IDs array (multi-account selection)
   useRandomContent?: boolean; // Generate random content on a specific topic
   randomContentTopic?: string; // Topic for random content generation
+  libraryVideoUrl?: string; // Video from the library applied to every post in this campaign
+  libraryVideoTitle?: string;
+
   tiktokOptions?: {
     accountId?: string;
     privacyLevel: string;
