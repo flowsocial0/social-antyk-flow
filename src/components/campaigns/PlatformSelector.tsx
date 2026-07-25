@@ -10,9 +10,11 @@ interface PlatformSelectorProps {
   selected: PlatformId[];
   onChange: (platforms: PlatformId[]) => void;
   connectedPlatforms: Record<PlatformId, boolean>;
+  /** Number of the signed-in user's own accounts per platform. */
+  accountCounts?: Record<PlatformId, number>;
 }
 
-export const PlatformSelector = ({ selected, onChange, connectedPlatforms }: PlatformSelectorProps) => {
+export const PlatformSelector = ({ selected, onChange, connectedPlatforms, accountCounts }: PlatformSelectorProps) => {
   const platforms = getAllPlatforms();
   
   const handleToggle = (platform: PlatformId) => {
@@ -29,12 +31,24 @@ export const PlatformSelector = ({ selected, onChange, connectedPlatforms }: Pla
     return !connectedPlatforms[platform];
   };
 
+  const accountLabel = (count: number) => {
+    if (count === 1) return "1 konto";
+    if (count >= 2 && count <= 4) return `${count} konta`;
+    return `${count} kont`;
+  };
+
   const getStatusBadge = (platformId: PlatformId) => {
     const platform = platforms.find(p => p.id === platformId);
     if (!platform) return null;
-    
+
+    const count = accountCounts?.[platformId];
+
     if (connectedPlatforms[platformId]) {
-      return <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/20">Połączono</Badge>;
+      return (
+        <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/20">
+          {count !== undefined ? `Połączono · ${accountLabel(count)}` : "Połączono"}
+        </Badge>
+      );
     }
     
     if (platform.status === 'active') {
@@ -45,6 +59,7 @@ export const PlatformSelector = ({ selected, onChange, connectedPlatforms }: Pla
       {platform.status === 'coming-soon' ? 'Wkrótce' : 'Planowana'}
     </Badge>;
   };
+
 
   return (
     <Card className="p-4 space-y-4">

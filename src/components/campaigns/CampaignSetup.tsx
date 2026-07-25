@@ -18,6 +18,7 @@ import { PlatformId, getAllPlatforms } from "@/config/platforms";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TikTokPublishOptions, defaultTikTokOptions, type TikTokPublishOptionsValue } from "./TikTokPublishOptions";
 import { VideoPickerDialog } from "@/components/videos/VideoPickerDialog";
+import { useConnectedAccounts } from "@/hooks/useConnectedAccounts";
 import { Badge } from "@/components/ui/badge";
 import { Library, Video } from "lucide-react";
 
@@ -42,7 +43,7 @@ export const CampaignSetup = ({
   const [regenerateTexts, setRegenerateTexts] = useState(initialConfig?.regenerateTexts ?? false);
   const [contentRatio, setContentRatio] = useState(initialConfig?.contentRatio ?? 20);
   const [selectedAccounts, setSelectedAccounts] = useState<Record<PlatformId, string[]>>(initialConfig?.selectedAccounts || {} as Record<PlatformId, string[]>);
-  const [connectedPlatforms, setConnectedPlatforms] = useState<Record<PlatformId, boolean>>({} as Record<PlatformId, boolean>);
+  const { connectedPlatforms, accountCounts } = useConnectedAccounts();
   const [useRandomContent, setUseRandomContent] = useState(initialConfig?.useRandomContent ?? false);
   const [randomContentTopic, setRandomContentTopic] = useState(initialConfig?.randomContentTopic || "");
   const [tiktokOptions, setTiktokOptions] = useState<TikTokPublishOptionsValue>(
@@ -53,44 +54,6 @@ export const CampaignSetup = ({
   const [libraryVideoTitle, setLibraryVideoTitle] = useState<string | undefined>(initialConfig?.libraryVideoTitle);
   const [videoPickerOpen, setVideoPickerOpen] = useState(false);
 
-  useEffect(() => {
-    checkConnectedPlatforms();
-  }, []);
-  const checkConnectedPlatforms = async () => {
-    const platforms = getAllPlatforms();
-    const connectionStatus: Record<string, boolean> = {};
-
-    // Check all platform connections in parallel
-    const [xResult, fbResult, tiktokResult, ytResult, igResult, linkedinResult] = await Promise.all([
-      (supabase as any).from('twitter_oauth1_tokens').select('id').limit(1).maybeSingle(),
-      (supabase as any).from('facebook_oauth_tokens').select('id').limit(1).maybeSingle(),
-      (supabase as any).from('tiktok_oauth_tokens').select('id').limit(1).maybeSingle(),
-      (supabase as any).from('youtube_oauth_tokens').select('id').limit(1).maybeSingle(),
-      (supabase as any).from('instagram_oauth_tokens').select('id').limit(1).maybeSingle(),
-      (supabase as any).from('linkedin_oauth_tokens').select('id').limit(1).maybeSingle(),
-    ]);
-
-    // Set connection status for all platforms
-    platforms.forEach(platform => {
-      if (platform.id === 'x') {
-        connectionStatus[platform.id] = !!xResult.data;
-      } else if (platform.id === 'facebook') {
-        connectionStatus[platform.id] = !!fbResult.data;
-      } else if (platform.id === 'tiktok') {
-        connectionStatus[platform.id] = !!tiktokResult.data;
-      } else if (platform.id === 'youtube') {
-        connectionStatus[platform.id] = !!ytResult.data;
-      } else if (platform.id === 'instagram') {
-        connectionStatus[platform.id] = !!igResult.data;
-      } else if (platform.id === 'linkedin') {
-        connectionStatus[platform.id] = !!linkedinResult.data;
-      } else {
-        // For other platforms, mark as not connected
-        connectionStatus[platform.id] = false;
-      }
-    });
-    setConnectedPlatforms(connectionStatus as Record<PlatformId, boolean>);
-  };
   const handlePostsPerDayChange = (value: number) => {
     // Allow up to 50 posts per day (no platform limit restriction)
     const limitedValue = Math.min(value, 50);
@@ -375,7 +338,7 @@ export const CampaignSetup = ({
       </Card>
 
       {/* Platform Selection */}
-      <PlatformSelector selected={targetPlatforms} onChange={setTargetPlatforms} connectedPlatforms={connectedPlatforms} />
+      <PlatformSelector selected={targetPlatforms} onChange={setTargetPlatforms} connectedPlatforms={connectedPlatforms} accountCounts={accountCounts} />
 
       {/* Account Selection (only shows if multiple accounts per platform) */}
       <AccountSelector selectedPlatforms={targetPlatforms} selectedAccounts={selectedAccounts} onChange={setSelectedAccounts} />

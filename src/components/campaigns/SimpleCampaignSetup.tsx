@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { TikTokPublishOptions, defaultTikTokOptions, type TikTokPublishOptionsValue } from "./TikTokPublishOptions";
 import { VideoPickerDialog } from "@/components/videos/VideoPickerDialog";
+import { useConnectedAccounts } from "@/hooks/useConnectedAccounts";
 import { Badge } from "@/components/ui/badge";
 import { Library } from "lucide-react";
 
@@ -42,54 +43,12 @@ export const SimpleCampaignSetup = () => {
   const [startDate, setStartDate] = useState(format(addDays(new Date(), 1), "yyyy-MM-dd"));
   const [targetPlatforms, setTargetPlatforms] = useState<PlatformId[]>(["x"]);
   const [selectedAccounts, setSelectedAccounts] = useState<Record<PlatformId, string[]>>({} as Record<PlatformId, string[]>);
-  const [connectedPlatforms, setConnectedPlatforms] = useState<Record<PlatformId, boolean>>({} as Record<PlatformId, boolean>);
+  const { connectedPlatforms, accountCounts } = useConnectedAccounts();
   const [tiktokOptions, setTiktokOptions] = useState<TikTokPublishOptionsValue>(defaultTikTokOptions());
   const [tiktokValid, setTiktokValid] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [pickerPostId, setPickerPostId] = useState<string | null>(null);
 
-
-  useEffect(() => {
-    checkConnectedPlatforms();
-  }, []);
-
-  const checkConnectedPlatforms = async () => {
-    const platforms = getAllPlatforms();
-    const connectionStatus: Record<string, boolean> = {};
-
-    // Map platform IDs to their token table names
-    const platformTableMap: Record<string, string> = {
-      x: "twitter_oauth1_tokens",
-      facebook: "facebook_oauth_tokens",
-      tiktok: "tiktok_oauth_tokens",
-      youtube: "youtube_oauth_tokens",
-      instagram: "instagram_oauth_tokens",
-      linkedin: "linkedin_oauth_tokens",
-      telegram: "telegram_tokens",
-      bluesky: "bluesky_tokens",
-      discord: "discord_tokens",
-      
-      mastodon: "mastodon_tokens",
-      tumblr: "tumblr_oauth_tokens",
-      google_business: "google_business_tokens",
-    };
-
-    // Check all platform connections in parallel
-    const results = await Promise.all(
-      platforms.map(async (platform) => {
-        const table = platformTableMap[platform.id];
-        if (!table) return { id: platform.id, connected: false };
-        const { data } = await (supabase as any).from(table).select("id").limit(1).maybeSingle();
-        return { id: platform.id, connected: !!data };
-      })
-    );
-
-    results.forEach((r) => {
-      connectionStatus[r.id] = r.connected;
-    });
-
-    setConnectedPlatforms(connectionStatus as Record<PlatformId, boolean>);
-  };
 
   const addPost = (day: number) => {
     const postsForDay = posts.filter(p => p.day === day);
@@ -613,6 +572,8 @@ export const SimpleCampaignSetup = () => {
         selected={targetPlatforms}
         onChange={setTargetPlatforms}
         connectedPlatforms={connectedPlatforms}
+        accountCounts={accountCounts}
+
       />
 
       <AccountSelector
