@@ -67,7 +67,7 @@ export function VideoPickerDialog({ open, onOpenChange, onSelect }: VideoPickerD
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-4">
             <div className="relative sm:col-span-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
