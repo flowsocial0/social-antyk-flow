@@ -528,6 +528,39 @@ export const SimpleCampaignSetup = () => {
                         />
                       </Label>
 
+                      {/* Pick from the reusable video library */}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-auto py-2"
+                        onClick={() => setPickerPostId(post.id)}
+                      >
+                        <Library className="h-4 w-4 mr-2" />
+                        {post.libraryVideoUrl ? "Zmień z biblioteki" : "Wybierz z biblioteki"}
+                      </Button>
+
+                      {/* Library video preview */}
+                      {post.libraryVideoUrl && (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="gap-1">
+                            <Video className="h-3 w-3" />
+                            {post.libraryVideoTitle || "Wideo z biblioteki"}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => clearMedia(post.id)}
+                            className="h-6 w-6 p-0 text-muted-foreground"
+                            aria-label="Usuń wideo z posta"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+
+
+
                       {/* Image preview */}
                       {post.imageUrl && (
                         <div className="flex items-center gap-2">
