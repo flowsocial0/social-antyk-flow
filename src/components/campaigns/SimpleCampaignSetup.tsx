@@ -50,6 +50,7 @@ export const SimpleCampaignSetup = () => {
   const [youtubeOptions, setYoutubeOptions] = useState<YouTubePublishOptionsValue>(defaultYouTubeOptions());
   const [isCreating, setIsCreating] = useState(false);
   const [pickerPostId, setPickerPostId] = useState<string | null>(null);
+  const lastPickerPostId = useRef<string | null>(null);
 
 
   const addPost = (day: number) => {
