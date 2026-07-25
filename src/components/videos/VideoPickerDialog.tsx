@@ -42,6 +42,18 @@ export function VideoPickerDialog({ open, onOpenChange, onSelect }: VideoPickerD
   const [selected, setSelected] = useState<LibraryVideo | null>(null);
   const [addOpen, setAddOpen] = useState(false);
 
+  // Nested dialogs conflict (focus trap + scroll lock), so we hide the picker while adding
+  const openAdd = () => {
+    onOpenChange(false);
+    setTimeout(() => setAddOpen(true), 80);
+  };
+
+  const handleAddOpenChange = (next: boolean) => {
+    setAddOpen(next);
+    if (!next) setTimeout(() => onOpenChange(true), 80);
+  };
+
+
   const visible = filterAndSortVideos(videos, search, "all", tagFilter, sort);
 
   const handleConfirm = () => {
