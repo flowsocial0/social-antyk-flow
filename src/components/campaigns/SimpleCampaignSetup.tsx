@@ -572,6 +572,8 @@ export const SimpleCampaignSetup = () => {
         selected={targetPlatforms}
         onChange={setTargetPlatforms}
         connectedPlatforms={connectedPlatforms}
+        accountCounts={accountCounts}
+
       />
 
       <AccountSelector
