@@ -47,6 +47,7 @@ export const SimpleCampaignSetup = () => {
   const { connectedPlatforms, accountCounts } = useConnectedAccounts();
   const [tiktokOptions, setTiktokOptions] = useState<TikTokPublishOptionsValue>(defaultTikTokOptions());
   const [tiktokValid, setTiktokValid] = useState(true);
+  const [youtubeOptions, setYoutubeOptions] = useState<YouTubePublishOptionsValue>(defaultYouTubeOptions());
   const [isCreating, setIsCreating] = useState(false);
   const [pickerPostId, setPickerPostId] = useState<string | null>(null);
 
