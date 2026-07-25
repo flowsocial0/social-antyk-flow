@@ -499,5 +499,16 @@ export const CampaignSetup = ({
         Przejdź do generowania planu
         <ArrowRight className="ml-2 h-4 w-4" />
       </Button>
+
+      <VideoPickerDialog
+        open={videoPickerOpen}
+        onOpenChange={setVideoPickerOpen}
+        onSelect={(url, video) => {
+          setLibraryVideoUrl(url);
+          setLibraryVideoTitle(video.title);
+          setVideoPickerOpen(false);
+        }}
+      />
     </div>;
+
 };
