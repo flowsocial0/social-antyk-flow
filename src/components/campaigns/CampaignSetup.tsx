@@ -174,6 +174,8 @@ export const CampaignSetup = ({
       selectedAccounts,
       useRandomContent,
       randomContentTopic: useRandomContent ? randomContentTopic : undefined,
+      libraryVideoUrl,
+      libraryVideoTitle,
       tiktokOptions: targetPlatforms.includes('tiktok') ? tiktokOptions : undefined
     });
   };
@@ -182,6 +184,7 @@ export const CampaignSetup = ({
     targetPlatforms.includes('tiktok') &&
     tiktokOptions.brandedContent &&
     tiktokOptions.privacyLevel === 'SELF_ONLY';
+
   const canSubmit = (useRandomContent || selectedBooks.length > 0) && !tiktokInvalid;
   return <div className="space-y-6">
       <Card className="p-6 bg-secondary/30">
