@@ -17,6 +17,7 @@ import { useSearchParams } from "react-router-dom";
 import { PlatformId, getAllPlatforms } from "@/config/platforms";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TikTokPublishOptions, defaultTikTokOptions, type TikTokPublishOptionsValue } from "./TikTokPublishOptions";
+import { YouTubePublishOptions, defaultYouTubeOptions, type YouTubePublishOptionsValue } from "./YouTubePublishOptions";
 import { VideoPickerDialog } from "@/components/videos/VideoPickerDialog";
 import { useConnectedAccounts } from "@/hooks/useConnectedAccounts";
 import { Badge } from "@/components/ui/badge";
