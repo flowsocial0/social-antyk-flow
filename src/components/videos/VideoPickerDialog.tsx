@@ -116,7 +116,7 @@ export function VideoPickerDialog({ open, onOpenChange, onSelect }: VideoPickerD
                 </SelectContent>
               </Select>
             )}
-            <Button variant="outline" onClick={() => setAddOpen(true)} className="w-full">
+            <Button variant="outline" onClick={openAdd} className="w-full">
               <Plus className="h-4 w-4 mr-2" />
               Dodaj wideo
             </Button>
@@ -136,7 +136,7 @@ export function VideoPickerDialog({ open, onOpenChange, onSelect }: VideoPickerD
                     ? "Biblioteka jest pusta — dodaj pierwszy film."
                     : "Brak wyników dla tych filtrów."}
                 </p>
-                <Button variant="outline" onClick={() => setAddOpen(true)}>
+                <Button variant="outline" onClick={openAdd}>
                   <Plus className="h-4 w-4 mr-2" />
                   Dodaj wideo
                 </Button>
@@ -175,7 +175,7 @@ export function VideoPickerDialog({ open, onOpenChange, onSelect }: VideoPickerD
         </DialogContent>
       </Dialog>
 
-      <AddVideoDialog open={addOpen} onOpenChange={setAddOpen} onAdded={reload} />
+      <AddVideoDialog open={addOpen} onOpenChange={handleAddOpenChange} onAdded={reload} />
     </>
   );
 }
