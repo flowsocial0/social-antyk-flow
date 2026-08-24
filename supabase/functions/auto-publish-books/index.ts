@@ -79,7 +79,9 @@ interface CampaignPost {
   scheduled_at: string;
   platforms?: string[];
   target_accounts?: Record<string, string[]>; // Platform -> Account IDs array
-  custom_image_url?: string; // Custom image/video URL from simple campaign
+  custom_image_url?: string; // Custom image URL from simple campaign
+  custom_video_url?: string; // Dedicated video URL (file or Mega link) for this post
+
   campaign?: {
     id: string;
     user_id: string;
