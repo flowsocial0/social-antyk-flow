@@ -1134,7 +1134,44 @@ Deno.serve(async (req) => {
               error: errorMessage
             });
           }
+        } else if (platformSuccessCount === 0) {
+          // Wszystkie konta zwróciły limit platformy (np. Facebook code 368), więc żadna
+          // gałąź powyżej nie zmieniła statusu — post zostawał w 'publishing' i wracał
+          // w każdym cyklu, generując powtarzalne pobrania mediów i obciążenie bazy.
+          const { data: currentPostState } = await supabase
+            .from('campaign_posts')
+            .select('status, next_retry_at')
+            .eq('id', post.id)
+            .single();
+
+          if (currentPostState?.status === 'rate_limited' && currentPostState?.next_retry_at) {
+            console.log(`⏳ Post ${post.id} already rate_limited with retry at ${currentPostState.next_retry_at}`);
+          } else {
+            const retryAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+            await supabase
+              .from('campaign_posts')
+              .update({
+                status: 'rate_limited',
+                error_message: platformErrors.length > 0
+                  ? platformErrors.join(' | ')
+                  : 'Limit platformy — automatyczna ponowna próba za 2 godziny.',
+                error_code: 'RATE_LIMITED',
+                next_retry_at: retryAt
+              })
+              .eq('id', post.id);
+            console.log(`⏳ Post ${post.id} set to rate_limited, retry at ${retryAt}`);
+          }
+
+          results.push({
+            id: post.id,
+            type: 'campaign_post',
+            platforms: platforms,
+            success: false,
+            error: 'rate_limited',
+            is_rate_limit: true
+          });
         }
+
 
       } catch (error: any) {
         console.error(`Error publishing campaign post ${post.id}:`, error);
