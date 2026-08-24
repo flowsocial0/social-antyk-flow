@@ -47,13 +47,21 @@ export function AddVideoDialog({ open, onOpenChange, onAdded }: AddVideoDialogPr
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const oversized = !!file && file.size / (1024 * 1024) > MAX_UPLOAD_MB;
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0] || null;
     setFile(selected);
+    if (selected && selected.size / (1024 * 1024) > MAX_UPLOAD_MB) {
+      toast.error(`Plik jest za duży (${(selected.size / 1024 / 1024).toFixed(0)} MB)`, {
+        description: `Bezpośrednio możesz wgrać maksymalnie ${MAX_UPLOAD_MB} MB. Wrzuć ten film na Mega.nz i dodaj go tutaj jako link — nie zajmie miejsca w aplikacji.`,
+      });
+    }
     if (selected && !title.trim()) {
       setTitle(selected.name.replace(/\.[^.]+$/, ""));
     }
   };
+
 
   const parsedTags = tags
     .split(",")
