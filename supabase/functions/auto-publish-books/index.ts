@@ -428,7 +428,8 @@ Deno.serve(async (req) => {
       .or(`status.eq.scheduled,and(status.eq.rate_limited,next_retry_at.lte.${now})`)
       .not('status', 'eq', 'publishing')
       .order('scheduled_at', { ascending: false })
-      .limit(1000);
+      .limit(150);
+
 
     if (recentFetchError) {
       console.error('Error fetching recent campaign posts:', recentFetchError);
@@ -448,7 +449,8 @@ Deno.serve(async (req) => {
       .or(`status.eq.scheduled,and(status.eq.rate_limited,next_retry_at.lte.${now})`)
       .not('status', 'eq', 'publishing')
       .order('scheduled_at', { ascending: true })
-      .limit(1000);
+      .limit(150);
+
 
     if (olderFetchError) {
       console.error('Error fetching older campaign posts:', olderFetchError);
