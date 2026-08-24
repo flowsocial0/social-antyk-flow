@@ -835,7 +835,7 @@ Deno.serve(async (req) => {
             }
             console.log(`Publishing to account ${accountId} on ${platform}`);
 
-            if (platform === 'tiktok' && !resolvedVideoUrl) {
+            if (platform === 'tiktok' && !bookVideoUrlRaw) {
               const msg = 'TikTok wymaga wideo. Ta książka/post nie ma przypisanego wideo.';
               console.error(`⛔ ${msg} post=${post.id}`);
               accountErrors.push(`Konto ${accountId.substring(0, 8)}: ${msg}`);
