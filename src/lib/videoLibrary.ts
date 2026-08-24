@@ -2,7 +2,13 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const VIDEO_BUCKET = "ObrazkiKsiazek";
 export const VIDEO_PREFIX = "video-library";
-export const MAX_UPLOAD_MB = 500;
+/**
+ * Realny limit pojedynczego obiektu w Supabase Storage na tym projekcie.
+ * Większe pliki są odrzucane przez API ("The object exceeded the maximum allowed size"),
+ * dlatego blokujemy je już w formularzu i kierujemy użytkownika na Mega.nz.
+ */
+export const MAX_UPLOAD_MB = 50;
+
 
 export const MEGA_URL_REGEX = /^https?:\/\/mega\.nz\/(file|folder)\//;
 
