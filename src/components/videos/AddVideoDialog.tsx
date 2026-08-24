@@ -70,8 +70,9 @@ export function AddVideoDialog({ open, onOpenChange, onAdded }: AddVideoDialogPr
 
   const canSave =
     title.trim().length > 0 &&
-    (tab === "upload" ? !!file : isMegaUrl(megaUrl)) &&
+    (tab === "upload" ? !!file && !oversized : isMegaUrl(megaUrl)) &&
     !saving;
+
 
   const handleSave = async () => {
     setSaving(true);
