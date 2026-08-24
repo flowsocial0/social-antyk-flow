@@ -884,16 +884,20 @@ Deno.serve(async (req) => {
             const customImageOnly = isVideoUrl(post.custom_image_url) ? null : (post.custom_image_url || null);
             const mediaUrl = customImageOnly || storageUrl || post.book?.image_url || null;
             
-            // For video: use pre-resolved video URL (Mega already handled above)
             // Detect if mediaUrl is a video based on extension
             const isMediaVideo = mediaUrl ? /\.(mp4|mov|webm|avi|mkv|m4v)$/i.test(mediaUrl) : false;
 
-            
-            // Final video URL: if mediaUrl is video use it, otherwise use the pre-resolved book video
-            const videoUrl = isMediaVideo ? mediaUrl : resolvedVideoUrl;
+            // Final video URL — Mega jest pobierana dopiero teraz (po przejściu limitów).
+            const videoUrl = isMediaVideo ? mediaUrl : await ensureVideoUrl();
             const imageUrl = isMediaVideo ? null : mediaUrl;
-            
+
+            if (!videoUrl && megaError) {
+              accountErrors.push(`Konto ${accountId.substring(0, 8)}: ${megaError}`);
+              continue;
+            }
+
             console.log(`Media for post ${post.id}: image=${imageUrl ? 'present' : 'none'}, video=${videoUrl ? 'present' : 'none'}`);
+
             
             const { data, error: publishError } = await supabase.functions.invoke(publishFunctionName, {
               body: { 
