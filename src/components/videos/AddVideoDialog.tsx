@@ -165,12 +165,23 @@ export function AddVideoDialog({ open, onOpenChange, onAdded }: AddVideoDialogPr
                 disabled={saving}
               />
               {file && (
-                <p className="text-xs text-muted-foreground">
+                <p className={`text-xs ${oversized ? "text-destructive" : "text-muted-foreground"}`}>
                   {file.name} — {(file.size / 1024 / 1024).toFixed(1)} MB
                 </p>
               )}
+              {oversized && (
+                <Alert variant="destructive">
+                  <Info className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Ten plik przekracza limit {MAX_UPLOAD_MB} MB dla bezpośredniego uploadu. Wrzuć
+                    go na Mega.nz i dodaj w zakładce „Link Mega.nz” — film zostanie pobrany
+                    automatycznie dopiero w chwili publikacji.
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
           </TabsContent>
+
 
           <TabsContent value="mega" className="space-y-3 pt-4">
             <div className="space-y-2">
