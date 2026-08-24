@@ -659,40 +659,41 @@ Deno.serve(async (req) => {
         const platformErrors: string[] = [];
         
         // Pre-compute video URL once for this post (same across all platforms/accounts)
-        // Priority: post.custom_image_url (if it's a video) > book.video_url / video_storage_path
+        // Priority: post.custom_video_url > post.custom_image_url (if it's a video) > book video
         const isVideoUrl = (u: string | null | undefined): boolean =>
           !!u && (/\.(mp4|mov|webm|avi|mkv|m4v)(\?|#|$)/i.test(u) || MEGA_REGEX.test(u));
 
-        const postCustomVideo = isVideoUrl(post.custom_image_url) ? (post.custom_image_url as string) : null;
+        const postCustomVideo = post.custom_video_url ||
+          (isVideoUrl(post.custom_image_url) ? (post.custom_image_url as string) : null);
 
         const bookVideoUrlRaw = postCustomVideo ||
           post.book?.video_url ||
           (post.book?.video_storage_path ? `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${post.book.video_storage_path}` : null);
-        
-        
-        // Resolve Mega.nz URL once before publishing to any platform
-        let resolvedVideoUrl = bookVideoUrlRaw;
+
+        // LAZY Mega.nz resolution: pobieramy plik dopiero, gdy naprawdę publikujemy.
+        // Wcześniej pobieranie działo się przed sprawdzeniem limitów platformy, więc
+        // każdy odrzucony post marnował kilkanaście MB transferu i Disk IO co cykl.
         let tempMegaPath: string | null = null;
-        if (resolvedVideoUrl && MEGA_REGEX.test(resolvedVideoUrl)) {
+        let megaResolvedUrl: string | null = null;
+        let megaError: string | null = null;
+
+        const ensureVideoUrl = async (): Promise<string | null> => {
+          if (!bookVideoUrlRaw) return null;
+          if (!MEGA_REGEX.test(bookVideoUrlRaw)) return bookVideoUrlRaw;
+          if (megaResolvedUrl) return megaResolvedUrl;
+          if (megaError) return null;
           try {
-            const resolved = await resolveMegaUrl(resolvedVideoUrl, post.id, supabase, supabaseUrl);
-            resolvedVideoUrl = resolved.resolvedUrl;
+            const resolved = await resolveMegaUrl(bookVideoUrlRaw, post.id, supabase, supabaseUrl);
+            megaResolvedUrl = resolved.resolvedUrl;
             tempMegaPath = resolved.tempPath;
+            return megaResolvedUrl;
           } catch (megaErr: any) {
+            megaError = `Nie udało się pobrać wideo z Mega.nz: ${megaErr.message}. Użyj mniejszego pliku lub bezpośredniego linku .mp4.`;
             console.error(`Mega.nz resolution failed for post ${post.id}:`, megaErr.message);
-            await supabase
-              .from('campaign_posts')
-              .update({
-                status: 'failed',
-                error_message: `Nie udało się pobrać wideo z Mega.nz: ${megaErr.message}. Użyj mniejszego pliku lub bezpośredniego linku .mp4.`,
-                error_code: 'MEGA_DOWNLOAD_FAILED'
-              })
-              .eq('id', post.id);
-            failCount++;
-            results.push({ id: post.id, type: 'campaign_post', success: false, error: megaErr.message });
-            continue; // skip this entire post
+            return null;
           }
-        }
+        };
+
         
         for (const platform of platforms) {
           // ====== PRE-PLATFORM RATE LIMIT CHECK (before account loop) ======
