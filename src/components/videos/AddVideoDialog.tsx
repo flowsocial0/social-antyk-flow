@@ -47,13 +47,21 @@ export function AddVideoDialog({ open, onOpenChange, onAdded }: AddVideoDialogPr
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const oversized = !!file && file.size / (1024 * 1024) > MAX_UPLOAD_MB;
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0] || null;
     setFile(selected);
+    if (selected && selected.size / (1024 * 1024) > MAX_UPLOAD_MB) {
+      toast.error(`Plik jest za duży (${(selected.size / 1024 / 1024).toFixed(0)} MB)`, {
+        description: `Bezpośrednio możesz wgrać maksymalnie ${MAX_UPLOAD_MB} MB. Wrzuć ten film na Mega.nz i dodaj go tutaj jako link — nie zajmie miejsca w aplikacji.`,
+      });
+    }
     if (selected && !title.trim()) {
       setTitle(selected.name.replace(/\.[^.]+$/, ""));
     }
   };
+
 
   const parsedTags = tags
     .split(",")
@@ -62,8 +70,9 @@ export function AddVideoDialog({ open, onOpenChange, onAdded }: AddVideoDialogPr
 
   const canSave =
     title.trim().length > 0 &&
-    (tab === "upload" ? !!file : isMegaUrl(megaUrl)) &&
+    (tab === "upload" ? !!file && !oversized : isMegaUrl(megaUrl)) &&
     !saving;
+
 
   const handleSave = async () => {
     setSaving(true);
@@ -156,12 +165,23 @@ export function AddVideoDialog({ open, onOpenChange, onAdded }: AddVideoDialogPr
                 disabled={saving}
               />
               {file && (
-                <p className="text-xs text-muted-foreground">
+                <p className={`text-xs ${oversized ? "text-destructive" : "text-muted-foreground"}`}>
                   {file.name} — {(file.size / 1024 / 1024).toFixed(1)} MB
                 </p>
               )}
+              {oversized && (
+                <Alert variant="destructive">
+                  <Info className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Ten plik przekracza limit {MAX_UPLOAD_MB} MB dla bezpośredniego uploadu. Wrzuć
+                    go na Mega.nz i dodaj w zakładce „Link Mega.nz” — film zostanie pobrany
+                    automatycznie dopiero w chwili publikacji.
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
           </TabsContent>
+
 
           <TabsContent value="mega" className="space-y-3 pt-4">
             <div className="space-y-2">
