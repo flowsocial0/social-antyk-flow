@@ -79,7 +79,9 @@ interface CampaignPost {
   scheduled_at: string;
   platforms?: string[];
   target_accounts?: Record<string, string[]>; // Platform -> Account IDs array
-  custom_image_url?: string; // Custom image/video URL from simple campaign
+  custom_image_url?: string; // Custom image URL from simple campaign
+  custom_video_url?: string; // Dedicated video URL (file or Mega link) for this post
+
   campaign?: {
     id: string;
     user_id: string;
@@ -428,7 +430,8 @@ Deno.serve(async (req) => {
       .or(`status.eq.scheduled,and(status.eq.rate_limited,next_retry_at.lte.${now})`)
       .not('status', 'eq', 'publishing')
       .order('scheduled_at', { ascending: false })
-      .limit(1000);
+      .limit(150);
+
 
     if (recentFetchError) {
       console.error('Error fetching recent campaign posts:', recentFetchError);
@@ -448,7 +451,8 @@ Deno.serve(async (req) => {
       .or(`status.eq.scheduled,and(status.eq.rate_limited,next_retry_at.lte.${now})`)
       .not('status', 'eq', 'publishing')
       .order('scheduled_at', { ascending: true })
-      .limit(1000);
+      .limit(150);
+
 
     if (olderFetchError) {
       console.error('Error fetching older campaign posts:', olderFetchError);
@@ -657,40 +661,41 @@ Deno.serve(async (req) => {
         const platformErrors: string[] = [];
         
         // Pre-compute video URL once for this post (same across all platforms/accounts)
-        // Priority: post.custom_image_url (if it's a video) > book.video_url / video_storage_path
+        // Priority: post.custom_video_url > post.custom_image_url (if it's a video) > book video
         const isVideoUrl = (u: string | null | undefined): boolean =>
           !!u && (/\.(mp4|mov|webm|avi|mkv|m4v)(\?|#|$)/i.test(u) || MEGA_REGEX.test(u));
 
-        const postCustomVideo = isVideoUrl(post.custom_image_url) ? (post.custom_image_url as string) : null;
+        const postCustomVideo = post.custom_video_url ||
+          (isVideoUrl(post.custom_image_url) ? (post.custom_image_url as string) : null);
 
         const bookVideoUrlRaw = postCustomVideo ||
           post.book?.video_url ||
           (post.book?.video_storage_path ? `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${post.book.video_storage_path}` : null);
-        
-        
-        // Resolve Mega.nz URL once before publishing to any platform
-        let resolvedVideoUrl = bookVideoUrlRaw;
+
+        // LAZY Mega.nz resolution: pobieramy plik dopiero, gdy naprawdę publikujemy.
+        // Wcześniej pobieranie działo się przed sprawdzeniem limitów platformy, więc
+        // każdy odrzucony post marnował kilkanaście MB transferu i Disk IO co cykl.
         let tempMegaPath: string | null = null;
-        if (resolvedVideoUrl && MEGA_REGEX.test(resolvedVideoUrl)) {
+        let megaResolvedUrl: string | null = null;
+        let megaError: string | null = null;
+
+        const ensureVideoUrl = async (): Promise<string | null> => {
+          if (!bookVideoUrlRaw) return null;
+          if (!MEGA_REGEX.test(bookVideoUrlRaw)) return bookVideoUrlRaw;
+          if (megaResolvedUrl) return megaResolvedUrl;
+          if (megaError) return null;
           try {
-            const resolved = await resolveMegaUrl(resolvedVideoUrl, post.id, supabase, supabaseUrl);
-            resolvedVideoUrl = resolved.resolvedUrl;
+            const resolved = await resolveMegaUrl(bookVideoUrlRaw, post.id, supabase, supabaseUrl);
+            megaResolvedUrl = resolved.resolvedUrl;
             tempMegaPath = resolved.tempPath;
+            return megaResolvedUrl;
           } catch (megaErr: any) {
+            megaError = `Nie udało się pobrać wideo z Mega.nz: ${megaErr.message}. Użyj mniejszego pliku lub bezpośredniego linku .mp4.`;
             console.error(`Mega.nz resolution failed for post ${post.id}:`, megaErr.message);
-            await supabase
-              .from('campaign_posts')
-              .update({
-                status: 'failed',
-                error_message: `Nie udało się pobrać wideo z Mega.nz: ${megaErr.message}. Użyj mniejszego pliku lub bezpośredniego linku .mp4.`,
-                error_code: 'MEGA_DOWNLOAD_FAILED'
-              })
-              .eq('id', post.id);
-            failCount++;
-            results.push({ id: post.id, type: 'campaign_post', success: false, error: megaErr.message });
-            continue; // skip this entire post
+            return null;
           }
-        }
+        };
+
         
         for (const platform of platforms) {
           // ====== PRE-PLATFORM RATE LIMIT CHECK (before account loop) ======
@@ -832,7 +837,7 @@ Deno.serve(async (req) => {
             }
             console.log(`Publishing to account ${accountId} on ${platform}`);
 
-            if (platform === 'tiktok' && !resolvedVideoUrl) {
+            if (platform === 'tiktok' && !bookVideoUrlRaw) {
               const msg = 'TikTok wymaga wideo. Ta książka/post nie ma przypisanego wideo.';
               console.error(`⛔ ${msg} post=${post.id}`);
               accountErrors.push(`Konto ${accountId.substring(0, 8)}: ${msg}`);
@@ -881,16 +886,20 @@ Deno.serve(async (req) => {
             const customImageOnly = isVideoUrl(post.custom_image_url) ? null : (post.custom_image_url || null);
             const mediaUrl = customImageOnly || storageUrl || post.book?.image_url || null;
             
-            // For video: use pre-resolved video URL (Mega already handled above)
             // Detect if mediaUrl is a video based on extension
             const isMediaVideo = mediaUrl ? /\.(mp4|mov|webm|avi|mkv|m4v)$/i.test(mediaUrl) : false;
 
-            
-            // Final video URL: if mediaUrl is video use it, otherwise use the pre-resolved book video
-            const videoUrl = isMediaVideo ? mediaUrl : resolvedVideoUrl;
+            // Final video URL — Mega jest pobierana dopiero teraz (po przejściu limitów).
+            const videoUrl = isMediaVideo ? mediaUrl : await ensureVideoUrl();
             const imageUrl = isMediaVideo ? null : mediaUrl;
-            
+
+            if (!videoUrl && megaError) {
+              accountErrors.push(`Konto ${accountId.substring(0, 8)}: ${megaError}`);
+              continue;
+            }
+
             console.log(`Media for post ${post.id}: image=${imageUrl ? 'present' : 'none'}, video=${videoUrl ? 'present' : 'none'}`);
+
             
             const { data, error: publishError } = await supabase.functions.invoke(publishFunctionName, {
               body: { 
@@ -1127,7 +1136,44 @@ Deno.serve(async (req) => {
               error: errorMessage
             });
           }
+        } else if (platformSuccessCount === 0) {
+          // Wszystkie konta zwróciły limit platformy (np. Facebook code 368), więc żadna
+          // gałąź powyżej nie zmieniła statusu — post zostawał w 'publishing' i wracał
+          // w każdym cyklu, generując powtarzalne pobrania mediów i obciążenie bazy.
+          const { data: currentPostState } = await supabase
+            .from('campaign_posts')
+            .select('status, next_retry_at')
+            .eq('id', post.id)
+            .single();
+
+          if (currentPostState?.status === 'rate_limited' && currentPostState?.next_retry_at) {
+            console.log(`⏳ Post ${post.id} already rate_limited with retry at ${currentPostState.next_retry_at}`);
+          } else {
+            const retryAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+            await supabase
+              .from('campaign_posts')
+              .update({
+                status: 'rate_limited',
+                error_message: platformErrors.length > 0
+                  ? platformErrors.join(' | ')
+                  : 'Limit platformy — automatyczna ponowna próba za 2 godziny.',
+                error_code: 'RATE_LIMITED',
+                next_retry_at: retryAt
+              })
+              .eq('id', post.id);
+            console.log(`⏳ Post ${post.id} set to rate_limited, retry at ${retryAt}`);
+          }
+
+          results.push({
+            id: post.id,
+            type: 'campaign_post',
+            platforms: platforms,
+            success: false,
+            error: 'rate_limited',
+            is_rate_limit: true
+          });
         }
+
 
       } catch (error: any) {
         console.error(`Error publishing campaign post ${post.id}:`, error);
