@@ -539,6 +539,7 @@ export type Database = {
           category: string
           created_at: string
           custom_image_url: string | null
+          custom_video_url: string | null
           day: number
           error_code: string | null
           error_message: string | null
@@ -573,6 +574,7 @@ export type Database = {
           category: string
           created_at?: string
           custom_image_url?: string | null
+          custom_video_url?: string | null
           day: number
           error_code?: string | null
           error_message?: string | null
@@ -607,6 +609,7 @@ export type Database = {
           category?: string
           created_at?: string
           custom_image_url?: string | null
+          custom_video_url?: string | null
           day?: number
           error_code?: string | null
           error_message?: string | null
