@@ -44,4 +44,8 @@
 
 ## Czego oczekiwać
 
-Po A+B transfer powinien spaść z ~20-25 GB/dobę do rzędu pojedynczych GB — czyli poniżej progu 250 GB w miesiącu i bez nadwyżki na fakturze.
+Po A+B transfer powinien spaść z ~20-25 GB/dobę do rzędu pojedynczych GB — czyli poniżej progu 250 GB w miesiącu i bez nadwyżki na fakturze.  
+  
+  
+Komentarz od użytkownika:   
+z literki A punkt "2. Wykładniczy backoff zamiast stałych 5 minut: 15 min → 1 h → 4 h." nie realizuje. od razu podejmij 3 próby max i napisz, że błąd z czytelną wiadomością co sie zesrało. Użytkownik musi od razu wiedzie czy idzie i czemu nie idzie. Już przy pierwszej nieudanej próbie wyraźnie napisz, że jest problem z pobieraniem i że ponawiasz próby.
