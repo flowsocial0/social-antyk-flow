@@ -310,8 +310,11 @@ export const SimpleCampaignSetup = () => {
           status: "scheduled",
           platforms: targetPlatforms,
           target_accounts: selectedAccounts,
-          custom_image_url: post.imageUrl || null,
+          // custom_image_url zostaje wspólnym polem mediów (czytają je funkcje publikujące),
+          // a custom_video_url trzyma film osobno, żeby grafika go nie nadpisywała.
+          custom_image_url: post.videoUrl || post.imageUrl || null,
           custom_video_url: post.videoUrl || null,
+
 
           ...(targetPlatforms.includes("tiktok") && {
             tiktok_account_id: tiktokOptions.accountId ?? null,
