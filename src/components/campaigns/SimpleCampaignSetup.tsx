@@ -16,6 +16,8 @@ import { useNavigate } from "react-router-dom";
 import { TikTokPublishOptions, defaultTikTokOptions, type TikTokPublishOptionsValue } from "./TikTokPublishOptions";
 import { YouTubePublishOptions, defaultYouTubeOptions, type YouTubePublishOptionsValue } from "./YouTubePublishOptions";
 import { VideoPickerDialog } from "@/components/videos/VideoPickerDialog";
+import { sanitizeFileName } from "@/lib/videoLibrary";
+
 import { useConnectedAccounts } from "@/hooks/useConnectedAccounts";
 import { Badge } from "@/components/ui/badge";
 import { Library } from "lucide-react";
@@ -187,6 +189,11 @@ export const SimpleCampaignSetup = () => {
       if (!user) throw new Error("Nie zalogowany");
 
       // Upload images and videos
+      // Ten sam plik przypisany do wielu dni wgrywamy tylko RAZ (deduplikacja),
+      // wcześniej 7-dniowa kampania z tym samym filmem oznaczała 7 uploadów.
+      const uploadCache = new Map<string, string>();
+      const fileKey = (f: File) => `${f.name}|${f.size}|${f.lastModified}`;
+
       const postsWithUploadedMedia: SimplePost[] = [];
       for (const post of posts) {
         // Initialize as undefined - only set to public URL after successful upload
@@ -197,56 +204,50 @@ export const SimpleCampaignSetup = () => {
         
         // Upload image if present
         if (post.imageFile) {
-          const fileName = `${user.id}/${Date.now()}_${post.imageFile.name}`;
-          const { error: uploadError } = await supabase.storage
-            .from("ObrazkiKsiazek")
-            .upload(fileName, post.imageFile);
-
-          if (uploadError) {
-            console.error("Image upload error:", uploadError);
-            toast.error(`Błąd uploadu grafiki dla posta: ${uploadError.message}`);
-            // uploadedImageUrl remains undefined - never store blob URL
+          const key = fileKey(post.imageFile);
+          if (uploadCache.has(key)) {
+            uploadedImageUrl = uploadCache.get(key);
           } else {
+            const fileName = `${user.id}/${Date.now()}_${sanitizeFileName(post.imageFile.name)}`;
+            const { error: uploadError } = await supabase.storage
+              .from("ObrazkiKsiazek")
+              .upload(fileName, post.imageFile);
+
+            if (uploadError) {
+              console.error("Image upload error:", uploadError);
+              throw new Error(`Nie udało się przesłać grafiki: ${uploadError.message}`);
+            }
             const { data: { publicUrl } } = supabase.storage
               .from("ObrazkiKsiazek")
               .getPublicUrl(fileName);
             uploadedImageUrl = publicUrl;
+            uploadCache.set(key, publicUrl);
           }
         }
         
         // Upload video if present - sanitize filename
         if (post.videoFile) {
-          // Sanitize filename: remove Polish chars, spaces, and special chars
-          const sanitizeFileName = (name: string): string => {
-            return name
-              .normalize('NFD')
-              .replace(/[\u0300-\u036f]/g, '')
-              .replace(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g, (c: string) => {
-                const map: Record<string, string> = {
-                  'ą':'a','ć':'c','ę':'e','ł':'l','ń':'n','ó':'o','ś':'s','ź':'z','ż':'z',
-                  'Ą':'A','Ć':'C','Ę':'E','Ł':'L','Ń':'N','Ó':'O','Ś':'S','Ź':'Z','Ż':'Z'
-                };
-                return map[c] || c;
-              })
-              .replace(/\s+/g, '_')
-              .replace(/[^a-zA-Z0-9._-]/g, '');
-          };
-          
-          const sanitizedName = sanitizeFileName(post.videoFile.name);
-          const fileName = `${user.id}/videos/${Date.now()}_${sanitizedName}`;
-          const { error: uploadError } = await supabase.storage
-            .from("ObrazkiKsiazek")
-            .upload(fileName, post.videoFile);
-
-          if (uploadError) {
-            console.error("Video upload error:", uploadError);
-            toast.error(`Błąd uploadu wideo dla posta: ${uploadError.message}`);
-            // uploadedVideoUrl remains undefined - never store blob URL
+          const key = fileKey(post.videoFile);
+          if (uploadCache.has(key)) {
+            uploadedVideoUrl = uploadCache.get(key);
           } else {
+            const fileName = `${user.id}/videos/${Date.now()}_${sanitizeFileName(post.videoFile.name)}`;
+            const { error: uploadError } = await supabase.storage
+              .from("ObrazkiKsiazek")
+              .upload(fileName, post.videoFile);
+
+            if (uploadError) {
+              console.error("Video upload error:", uploadError);
+              throw new Error(
+                `Nie udało się przesłać wideo „${post.videoFile.name}": ${uploadError.message}. ` +
+                `Przy dużych plikach dodaj film do Biblioteki wideo jako link Mega.nz.`
+              );
+            }
             const { data: { publicUrl } } = supabase.storage
               .from("ObrazkiKsiazek")
               .getPublicUrl(fileName);
             uploadedVideoUrl = publicUrl;
+            uploadCache.set(key, publicUrl);
           }
         }
         
@@ -256,6 +257,7 @@ export const SimpleCampaignSetup = () => {
           videoUrl: uploadedVideoUrl   // Always public URL or undefined, never blob URL
         });
       }
+
 
       // Create campaign
       const campaignName = `Prosta kampania ${format(new Date(startDate), "dd.MM.yyyy")}`;
@@ -308,7 +310,12 @@ export const SimpleCampaignSetup = () => {
           status: "scheduled",
           platforms: targetPlatforms,
           target_accounts: selectedAccounts,
-          custom_image_url: post.imageUrl || post.videoUrl || null,
+          // custom_image_url zostaje wspólnym polem mediów (czytają je funkcje publikujące),
+          // a custom_video_url trzyma film osobno, żeby grafika go nie nadpisywała.
+          custom_image_url: post.videoUrl || post.imageUrl || null,
+          custom_video_url: post.videoUrl || null,
+
+
           ...(targetPlatforms.includes("tiktok") && {
             tiktok_account_id: tiktokOptions.accountId ?? null,
             tiktok_privacy_level: tiktokOptions.privacyLevel,

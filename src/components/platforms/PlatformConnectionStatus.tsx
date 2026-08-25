@@ -90,7 +90,11 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
         else if (platform === "mastodon") name = token.username ? `@${token.username}@${(token.server_url || '').replace('https://', '')}` : "Konto Mastodon";
 
 
-        const expiresAt = token.expires_at ? new Date(token.expires_at) : null;
+        // Gdy mamy refresh_token (YouTube, Google Business, TikTok, LinkedIn...),
+        // expires_at dotyczy krótkiego access tokena, który odnawiamy automatycznie.
+        // Pokazywanie "Wygasa za 1 dzień" wprowadzało użytkowników w błąd.
+        const autoRefreshes = !!token.refresh_token;
+        const expiresAt = token.expires_at && !autoRefreshes ? new Date(token.expires_at) : null;
         const now = new Date();
         const isExpired = expiresAt ? expiresAt < now : false;
         const expiresInDays = expiresAt ? Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : undefined;
@@ -98,10 +102,11 @@ export const PlatformConnectionStatus = ({ platform, onConnect }: PlatformConnec
         return {
           id: token.id,
           name,
-          expires_at: token.expires_at,
+          expires_at: autoRefreshes ? undefined : token.expires_at,
           isExpired,
           expiresInDays,
         };
+
       });
     },
   });
