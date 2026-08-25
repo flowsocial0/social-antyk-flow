@@ -16,6 +16,8 @@ import { useNavigate } from "react-router-dom";
 import { TikTokPublishOptions, defaultTikTokOptions, type TikTokPublishOptionsValue } from "./TikTokPublishOptions";
 import { YouTubePublishOptions, defaultYouTubeOptions, type YouTubePublishOptionsValue } from "./YouTubePublishOptions";
 import { VideoPickerDialog } from "@/components/videos/VideoPickerDialog";
+import { sanitizeFileName } from "@/lib/videoLibrary";
+
 import { useConnectedAccounts } from "@/hooks/useConnectedAccounts";
 import { Badge } from "@/components/ui/badge";
 import { Library } from "lucide-react";
@@ -308,7 +310,9 @@ export const SimpleCampaignSetup = () => {
           status: "scheduled",
           platforms: targetPlatforms,
           target_accounts: selectedAccounts,
-          custom_image_url: post.imageUrl || post.videoUrl || null,
+          custom_image_url: post.imageUrl || null,
+          custom_video_url: post.videoUrl || null,
+
           ...(targetPlatforms.includes("tiktok") && {
             tiktok_account_id: tiktokOptions.accountId ?? null,
             tiktok_privacy_level: tiktokOptions.privacyLevel,
