@@ -180,7 +180,12 @@ export async function uploadVideoFile(
     const thumbPath = `${VIDEO_PREFIX}/${userId}/thumbs/${stamp}.jpg`;
     const { error: thumbError } = await supabase.storage
       .from(VIDEO_BUCKET)
-      .upload(thumbPath, probe.thumbnailBlob, { contentType: "image/jpeg", upsert: true });
+      .upload(thumbPath, probe.thumbnailBlob, {
+        contentType: "image/jpeg",
+        upsert: true,
+        cacheControl: "31536000",
+      });
+
     if (!thumbError) {
       thumbnail_path = thumbPath;
       thumbnail_url = supabase.storage.from(VIDEO_BUCKET).getPublicUrl(thumbPath).data.publicUrl;
