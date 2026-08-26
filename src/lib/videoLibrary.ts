@@ -162,7 +162,13 @@ export async function uploadVideoFile(
   onPhase?.("Przesyłanie wideo...");
   const { error: uploadError } = await supabase.storage
     .from(VIDEO_BUCKET)
-    .upload(base, file, { contentType: file.type || "video/mp4", upsert: false });
+    .upload(base, file, {
+      contentType: file.type || "video/mp4",
+      upsert: false,
+      // Długi cache = mniej powtarzalnego transferu przy każdym podglądzie/publikacji.
+      cacheControl: "31536000",
+    });
+
   if (uploadError) throw new Error(`Upload nie powiódł się: ${uploadError.message}`);
 
   const { data: urlData } = supabase.storage.from(VIDEO_BUCKET).getPublicUrl(base);
