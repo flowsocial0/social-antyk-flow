@@ -1225,20 +1225,15 @@ Deno.serve(async (req) => {
           if (currentPostState?.status === 'rate_limited' && currentPostState?.next_retry_at) {
             console.log(`⏳ Post ${post.id} already rate_limited with retry at ${currentPostState.next_retry_at}`);
           } else {
-            const retryAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
-            await supabase
-              .from('campaign_posts')
-              .update({
-                status: 'rate_limited',
-                error_message: platformErrors.length > 0
-                  ? platformErrors.join(' | ')
-                  : 'Limit platformy — automatyczna ponowna próba za 2 godziny.',
-                error_code: 'RATE_LIMITED',
-                next_retry_at: retryAt
-              })
-              .eq('id', post.id);
-            console.log(`⏳ Post ${post.id} set to rate_limited, retry at ${retryAt}`);
+            await markPostAttemptFailure(supabase, post.id, {
+              message: platformErrors.length > 0
+                ? platformErrors.join(' | ')
+                : 'Limit platformy — publikacja odrzucona.',
+              code: 'RATE_LIMITED',
+              retryDelayMs: 2 * 60 * 60 * 1000,
+            });
           }
+
 
           results.push({
             id: post.id,
