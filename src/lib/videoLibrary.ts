@@ -162,7 +162,13 @@ export async function uploadVideoFile(
   onPhase?.("Przesyłanie wideo...");
   const { error: uploadError } = await supabase.storage
     .from(VIDEO_BUCKET)
-    .upload(base, file, { contentType: file.type || "video/mp4", upsert: false });
+    .upload(base, file, {
+      contentType: file.type || "video/mp4",
+      upsert: false,
+      // Długi cache = mniej powtarzalnego transferu przy każdym podglądzie/publikacji.
+      cacheControl: "31536000",
+    });
+
   if (uploadError) throw new Error(`Upload nie powiódł się: ${uploadError.message}`);
 
   const { data: urlData } = supabase.storage.from(VIDEO_BUCKET).getPublicUrl(base);
@@ -174,7 +180,12 @@ export async function uploadVideoFile(
     const thumbPath = `${VIDEO_PREFIX}/${userId}/thumbs/${stamp}.jpg`;
     const { error: thumbError } = await supabase.storage
       .from(VIDEO_BUCKET)
-      .upload(thumbPath, probe.thumbnailBlob, { contentType: "image/jpeg", upsert: true });
+      .upload(thumbPath, probe.thumbnailBlob, {
+        contentType: "image/jpeg",
+        upsert: true,
+        cacheControl: "31536000",
+      });
+
     if (!thumbError) {
       thumbnail_path = thumbPath;
       thumbnail_url = supabase.storage.from(VIDEO_BUCKET).getPublicUrl(thumbPath).data.publicUrl;

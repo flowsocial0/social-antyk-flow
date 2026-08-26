@@ -2,6 +2,20 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const MEGA_REGEX = /^https?:\/\/mega\.nz\/(file|folder)\//;
 
+const TEMP_VIDEO_REUSE_MS = 6 * 60 * 60 * 1000; // reuse a temp file for 6h instead of re-downloading
+const SIGNED_URL_TTL_SEC = 60 * 60; // 1h — enough for any platform upload
+
+async function signTempUrl(supabase: any, tempPath: string, supabaseUrl: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from('ObrazkiKsiazek')
+    .createSignedUrl(tempPath, SIGNED_URL_TTL_SEC);
+  if (error || !data?.signedUrl) {
+    // Fallback to the public URL so publishing never breaks on a signing hiccup
+    return `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${tempPath}`;
+  }
+  return data.signedUrl;
+}
+
 async function resolveMegaUrl(
   videoUrl: string,
   postId: string,
@@ -13,7 +27,27 @@ async function resolveMegaUrl(
   }
 
   console.log(`Resolving Mega.nz URL for post ${postId}...`);
-  
+
+  // 1) Reuse a recent temp file for this post instead of downloading the same video again.
+  //    Repeated re-downloads were the main source of egress on this project.
+  try {
+    const { data: existing } = await supabase.storage
+      .from('ObrazkiKsiazek')
+      .list('temp-videos', { limit: 100, search: postId });
+    const fresh = (existing || []).find((f: any) => {
+      if (!f?.name?.startsWith(postId)) return false;
+      const created = new Date(f.created_at || f.updated_at || 0).getTime();
+      return Date.now() - created < TEMP_VIDEO_REUSE_MS;
+    });
+    if (fresh) {
+      const reusePath = `temp-videos/${fresh.name}`;
+      console.log(`Reusing existing temp video for post ${postId}: ${reusePath}`);
+      return { resolvedUrl: await signTempUrl(supabase, reusePath, supabaseUrl), tempPath: reusePath };
+    }
+  } catch (listErr: any) {
+    console.warn(`Temp video lookup failed for post ${postId}:`, listErr?.message);
+  }
+
   // Dynamic import to avoid build failures when megajs is unavailable
   let MegaFile: any;
   try {
@@ -34,14 +68,66 @@ async function resolveMegaUrl(
 
   const { error } = await supabase.storage
     .from('ObrazkiKsiazek')
-    .upload(tempPath, blob, { upsert: true });
+    .upload(tempPath, blob, { upsert: true, cacheControl: '3600' });
 
   if (error) throw new Error(`Mega temp upload failed: ${error.message}`);
 
-  const publicUrl = `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${tempPath}`;
-  console.log(`Mega resolved to temp URL: ${publicUrl}`);
-  return { resolvedUrl: publicUrl, tempPath };
+  const signedUrl = await signTempUrl(supabase, tempPath, supabaseUrl);
+  console.log(`Mega resolved to temp URL for post ${postId}`);
+  return { resolvedUrl: signedUrl, tempPath };
 }
+
+/**
+ * Maksymalna liczba prób publikacji jednego posta.
+ * Po trzeciej nieudanej próbie post dostaje status 'failed' z czytelnym komunikatem —
+ * bez tego posty z wideo wracały w kolejce w nieskończoność i generowały ogromny transfer.
+ */
+const MAX_PUBLISH_ATTEMPTS = 3;
+
+async function markPostAttemptFailure(
+  supabase: any,
+  postId: string,
+  opts: { message: string; code: string; retryDelayMs: number }
+): Promise<{ attempt: number; final: boolean }> {
+  const { data: current } = await supabase
+    .from('campaign_posts')
+    .select('retry_count')
+    .eq('id', postId)
+    .maybeSingle();
+
+  const attempt = (current?.retry_count || 0) + 1;
+  const final = attempt >= MAX_PUBLISH_ATTEMPTS;
+
+  if (final) {
+    await supabase
+      .from('campaign_posts')
+      .update({
+        status: 'failed',
+        retry_count: attempt,
+        next_retry_at: null,
+        error_code: opts.code,
+        error_message: `❌ Nie udało się opublikować po ${MAX_PUBLISH_ATTEMPTS} próbach. Powód: ${opts.message} Popraw problem i uruchom post ręcznie.`,
+      })
+      .eq('id', postId);
+    console.log(`❌ Post ${postId}: attempt ${attempt}/${MAX_PUBLISH_ATTEMPTS} — marked as failed`);
+  } else {
+    const retryAt = new Date(Date.now() + opts.retryDelayMs).toISOString();
+    await supabase
+      .from('campaign_posts')
+      .update({
+        status: 'rate_limited',
+        retry_count: attempt,
+        next_retry_at: retryAt,
+        error_code: opts.code,
+        error_message: `⚠️ Próba ${attempt} z ${MAX_PUBLISH_ATTEMPTS} nieudana. Powód: ${opts.message} Automatycznie ponawiam o ${new Date(retryAt).toLocaleTimeString('pl-PL')}.`,
+      })
+      .eq('id', postId);
+    console.log(`⚠️ Post ${postId}: attempt ${attempt}/${MAX_PUBLISH_ATTEMPTS} — retry at ${retryAt}`);
+  }
+
+  return { attempt, final };
+}
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1102,31 +1188,20 @@ Deno.serve(async (req) => {
               is_rate_limit: true
             });
           } else {
-            // Mark as failed with detailed error message
+            // Mark with detailed error message — max 3 attempts, then final failure
             const errorMessage = platformErrors.length > 0 
               ? platformErrors.join(' | ')
               : `Nie udało się opublikować na ${platformFailCount} z ${platforms.length} platform.`;
             
-            // Check if the error is rate-limit related → use rate_limited instead of failed
             const isRateError = isRateLimitErrorMessage(errorMessage);
             const isTikTokUnaudited = platformErrors.some(error => /TIKTOK_APP_UNAUDITED|Content Posting API|Direct Post|prywatne konta testowe|unaudited_client/i.test(error));
-            const newStatus = isRateError ? 'rate_limited' : 'failed';
-            const retryAt = isRateError ? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() : null;
-            
-            const { error: updateError } = await supabase
-              .from('campaign_posts')
-              .update({
-                status: newStatus,
-                error_message: errorMessage,
-                error_code: isRateError ? 'RATE_LIMITED' : isTikTokUnaudited ? 'TIKTOK_APP_UNAUDITED' : 'PUBLISH_FAILED',
-                next_retry_at: retryAt
-              })
-              .eq('id', post.id);
 
-            if (updateError) {
-              console.error(`Error updating campaign post status to ${newStatus}:`, updateError);
-            }
-            
+            await markPostAttemptFailure(supabase, post.id, {
+              message: errorMessage,
+              code: isRateError ? 'RATE_LIMITED' : isTikTokUnaudited ? 'TIKTOK_APP_UNAUDITED' : 'PUBLISH_FAILED',
+              retryDelayMs: isRateError ? 2 * 60 * 60 * 1000 : 15 * 60 * 1000,
+            });
+
             failCount++;
             results.push({
               id: post.id,
@@ -1136,6 +1211,7 @@ Deno.serve(async (req) => {
               error: errorMessage
             });
           }
+
         } else if (platformSuccessCount === 0) {
           // Wszystkie konta zwróciły limit platformy (np. Facebook code 368), więc żadna
           // gałąź powyżej nie zmieniła statusu — post zostawał w 'publishing' i wracał
@@ -1149,20 +1225,15 @@ Deno.serve(async (req) => {
           if (currentPostState?.status === 'rate_limited' && currentPostState?.next_retry_at) {
             console.log(`⏳ Post ${post.id} already rate_limited with retry at ${currentPostState.next_retry_at}`);
           } else {
-            const retryAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
-            await supabase
-              .from('campaign_posts')
-              .update({
-                status: 'rate_limited',
-                error_message: platformErrors.length > 0
-                  ? platformErrors.join(' | ')
-                  : 'Limit platformy — automatyczna ponowna próba za 2 godziny.',
-                error_code: 'RATE_LIMITED',
-                next_retry_at: retryAt
-              })
-              .eq('id', post.id);
-            console.log(`⏳ Post ${post.id} set to rate_limited, retry at ${retryAt}`);
+            await markPostAttemptFailure(supabase, post.id, {
+              message: platformErrors.length > 0
+                ? platformErrors.join(' | ')
+                : 'Limit platformy — publikacja odrzucona.',
+              code: 'RATE_LIMITED',
+              retryDelayMs: 2 * 60 * 60 * 1000,
+            });
           }
+
 
           results.push({
             id: post.id,
@@ -1181,40 +1252,24 @@ Deno.serve(async (req) => {
         // Check if it's a rate limit error using expanded patterns
         const isRateLimitError = isRateLimitErrorMessage(error.message || '');
         
-        if (isRateLimitError) {
-          // Set rate_limited with retry instead of failed
-          const retryAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
-          await supabase
-            .from('campaign_posts')
-            .update({
-              status: 'rate_limited',
-              error_message: error.message || 'Limit platformy - automatyczna ponowna próba.',
-              error_code: 'RATE_LIMITED',
-              next_retry_at: retryAt
-            })
-            .eq('id', post.id);
-        } else {
-          // Mark post as failed only for non-rate-limit errors
-          // But first check if post is already rate_limited (don't overwrite!)
-          const { data: currentPost } = await supabase
-            .from('campaign_posts')
-            .select('status')
-            .eq('id', post.id)
-            .single();
-          
-          if (currentPost?.status !== 'rate_limited') {
-            await supabase
-              .from('campaign_posts')
-              .update({
-                status: 'failed',
-                error_message: error.message || 'Wystąpił nieoczekiwany błąd podczas publikacji.',
-                error_code: 'UNEXPECTED_ERROR'
-              })
-              .eq('id', post.id);
-          }
-          
+        const { data: currentPost } = await supabase
+          .from('campaign_posts')
+          .select('status')
+          .eq('id', post.id)
+          .maybeSingle();
+
+        if (currentPost?.status !== 'published') {
+          await markPostAttemptFailure(supabase, post.id, {
+            message: error.message || 'Wystąpił nieoczekiwany błąd podczas publikacji.',
+            code: isRateLimitError ? 'RATE_LIMITED' : 'UNEXPECTED_ERROR',
+            retryDelayMs: isRateLimitError ? 2 * 60 * 60 * 1000 : 15 * 60 * 1000,
+          });
+        }
+
+        if (!isRateLimitError) {
           failCount++;
         }
+
         
         results.push({
           id: post.id,

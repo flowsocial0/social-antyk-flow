@@ -204,10 +204,12 @@ export const ResourceMonitor = () => {
 
             {/* Free Plan Info */}
             <div className="text-xs text-muted-foreground border-t pt-3 space-y-1">
-              <p>📊 <strong>Limity Free Plan:</strong> DB 500 MB | Storage 1 GB | Egress 5 GB/mies | Edge Invocations 500K/mies</p>
+              <p>📊 <strong>Limity planu Pro:</strong> DB 8 GB | Storage 100 GB | Egress 250 GB/mies</p>
               <p>⚠️ Cached Egress nie jest mierzalny z poziomu API — sprawdź w Supabase Dashboard → Usage</p>
-              <p>🔄 Crony: auto-publish (co 2 min), cleanup-temp-videos (co 1h), czyszczenie logów (co 24h)</p>
+              <p>🎬 Duża liczba plików „Temp video” oznacza pętlę ponawiania publikacji wideo — to główne źródło transferu.</p>
+              <p>🔄 Crony: auto-publish (co 5 min, max 3 próby na post), cleanup-temp-videos (co 1h), czyszczenie logów (co 24h)</p>
             </div>
+
           </>
         )}
       </CardContent>
