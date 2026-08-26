@@ -2,6 +2,20 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const MEGA_REGEX = /^https?:\/\/mega\.nz\/(file|folder)\//;
 
+const TEMP_VIDEO_REUSE_MS = 6 * 60 * 60 * 1000; // reuse a temp file for 6h instead of re-downloading
+const SIGNED_URL_TTL_SEC = 60 * 60; // 1h — enough for any platform upload
+
+async function signTempUrl(supabase: any, tempPath: string, supabaseUrl: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from('ObrazkiKsiazek')
+    .createSignedUrl(tempPath, SIGNED_URL_TTL_SEC);
+  if (error || !data?.signedUrl) {
+    // Fallback to the public URL so publishing never breaks on a signing hiccup
+    return `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${tempPath}`;
+  }
+  return data.signedUrl;
+}
+
 async function resolveMegaUrl(
   videoUrl: string,
   postId: string,
@@ -13,7 +27,27 @@ async function resolveMegaUrl(
   }
 
   console.log(`Resolving Mega.nz URL for post ${postId}...`);
-  
+
+  // 1) Reuse a recent temp file for this post instead of downloading the same video again.
+  //    Repeated re-downloads were the main source of egress on this project.
+  try {
+    const { data: existing } = await supabase.storage
+      .from('ObrazkiKsiazek')
+      .list('temp-videos', { limit: 100, search: postId });
+    const fresh = (existing || []).find((f: any) => {
+      if (!f?.name?.startsWith(postId)) return false;
+      const created = new Date(f.created_at || f.updated_at || 0).getTime();
+      return Date.now() - created < TEMP_VIDEO_REUSE_MS;
+    });
+    if (fresh) {
+      const reusePath = `temp-videos/${fresh.name}`;
+      console.log(`Reusing existing temp video for post ${postId}: ${reusePath}`);
+      return { resolvedUrl: await signTempUrl(supabase, reusePath, supabaseUrl), tempPath: reusePath };
+    }
+  } catch (listErr: any) {
+    console.warn(`Temp video lookup failed for post ${postId}:`, listErr?.message);
+  }
+
   // Dynamic import to avoid build failures when megajs is unavailable
   let MegaFile: any;
   try {
@@ -34,14 +68,15 @@ async function resolveMegaUrl(
 
   const { error } = await supabase.storage
     .from('ObrazkiKsiazek')
-    .upload(tempPath, blob, { upsert: true });
+    .upload(tempPath, blob, { upsert: true, cacheControl: '3600' });
 
   if (error) throw new Error(`Mega temp upload failed: ${error.message}`);
 
-  const publicUrl = `${supabaseUrl}/storage/v1/object/public/ObrazkiKsiazek/${tempPath}`;
-  console.log(`Mega resolved to temp URL: ${publicUrl}`);
-  return { resolvedUrl: publicUrl, tempPath };
+  const signedUrl = await signTempUrl(supabase, tempPath, supabaseUrl);
+  console.log(`Mega resolved to temp URL for post ${postId}`);
+  return { resolvedUrl: signedUrl, tempPath };
 }
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
