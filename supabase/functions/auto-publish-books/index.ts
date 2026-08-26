@@ -1188,31 +1188,20 @@ Deno.serve(async (req) => {
               is_rate_limit: true
             });
           } else {
-            // Mark as failed with detailed error message
+            // Mark with detailed error message — max 3 attempts, then final failure
             const errorMessage = platformErrors.length > 0 
               ? platformErrors.join(' | ')
               : `Nie udało się opublikować na ${platformFailCount} z ${platforms.length} platform.`;
             
-            // Check if the error is rate-limit related → use rate_limited instead of failed
             const isRateError = isRateLimitErrorMessage(errorMessage);
             const isTikTokUnaudited = platformErrors.some(error => /TIKTOK_APP_UNAUDITED|Content Posting API|Direct Post|prywatne konta testowe|unaudited_client/i.test(error));
-            const newStatus = isRateError ? 'rate_limited' : 'failed';
-            const retryAt = isRateError ? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() : null;
-            
-            const { error: updateError } = await supabase
-              .from('campaign_posts')
-              .update({
-                status: newStatus,
-                error_message: errorMessage,
-                error_code: isRateError ? 'RATE_LIMITED' : isTikTokUnaudited ? 'TIKTOK_APP_UNAUDITED' : 'PUBLISH_FAILED',
-                next_retry_at: retryAt
-              })
-              .eq('id', post.id);
 
-            if (updateError) {
-              console.error(`Error updating campaign post status to ${newStatus}:`, updateError);
-            }
-            
+            await markPostAttemptFailure(supabase, post.id, {
+              message: errorMessage,
+              code: isRateError ? 'RATE_LIMITED' : isTikTokUnaudited ? 'TIKTOK_APP_UNAUDITED' : 'PUBLISH_FAILED',
+              retryDelayMs: isRateError ? 2 * 60 * 60 * 1000 : 15 * 60 * 1000,
+            });
+
             failCount++;
             results.push({
               id: post.id,
@@ -1222,6 +1211,7 @@ Deno.serve(async (req) => {
               error: errorMessage
             });
           }
+
         } else if (platformSuccessCount === 0) {
           // Wszystkie konta zwróciły limit platformy (np. Facebook code 368), więc żadna
           // gałąź powyżej nie zmieniła statusu — post zostawał w 'publishing' i wracał
