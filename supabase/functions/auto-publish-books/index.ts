@@ -77,6 +77,57 @@ async function resolveMegaUrl(
   return { resolvedUrl: signedUrl, tempPath };
 }
 
+/**
+ * Maksymalna liczba prób publikacji jednego posta.
+ * Po trzeciej nieudanej próbie post dostaje status 'failed' z czytelnym komunikatem —
+ * bez tego posty z wideo wracały w kolejce w nieskończoność i generowały ogromny transfer.
+ */
+const MAX_PUBLISH_ATTEMPTS = 3;
+
+async function markPostAttemptFailure(
+  supabase: any,
+  postId: string,
+  opts: { message: string; code: string; retryDelayMs: number }
+): Promise<{ attempt: number; final: boolean }> {
+  const { data: current } = await supabase
+    .from('campaign_posts')
+    .select('retry_count')
+    .eq('id', postId)
+    .maybeSingle();
+
+  const attempt = (current?.retry_count || 0) + 1;
+  const final = attempt >= MAX_PUBLISH_ATTEMPTS;
+
+  if (final) {
+    await supabase
+      .from('campaign_posts')
+      .update({
+        status: 'failed',
+        retry_count: attempt,
+        next_retry_at: null,
+        error_code: opts.code,
+        error_message: `❌ Nie udało się opublikować po ${MAX_PUBLISH_ATTEMPTS} próbach. Powód: ${opts.message} Popraw problem i uruchom post ręcznie.`,
+      })
+      .eq('id', postId);
+    console.log(`❌ Post ${postId}: attempt ${attempt}/${MAX_PUBLISH_ATTEMPTS} — marked as failed`);
+  } else {
+    const retryAt = new Date(Date.now() + opts.retryDelayMs).toISOString();
+    await supabase
+      .from('campaign_posts')
+      .update({
+        status: 'rate_limited',
+        retry_count: attempt,
+        next_retry_at: retryAt,
+        error_code: opts.code,
+        error_message: `⚠️ Próba ${attempt} z ${MAX_PUBLISH_ATTEMPTS} nieudana. Powód: ${opts.message} Automatycznie ponawiam o ${new Date(retryAt).toLocaleTimeString('pl-PL')}.`,
+      })
+      .eq('id', postId);
+    console.log(`⚠️ Post ${postId}: attempt ${attempt}/${MAX_PUBLISH_ATTEMPTS} — retry at ${retryAt}`);
+  }
+
+  return { attempt, final };
+}
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
