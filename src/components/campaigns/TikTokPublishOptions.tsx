@@ -130,7 +130,7 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
         privacyLevel: clearSelfOnly ? "" : value.privacyLevel,
       });
       toast.info("Branded content visibility cannot be set to private", {
-        description: "Treści markowej nie można opublikować jako „Tylko ja" — wybierz inny poziom prywatności.",
+        description: "Treści markowej nie można opublikować jako „Tylko ja” — wybierz inny poziom prywatności.",
       });
     } else {
       onChange({ ...value, brandedContent: false });
