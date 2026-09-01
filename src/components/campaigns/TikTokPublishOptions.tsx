@@ -180,6 +180,18 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
     return labels;
   }, [value.discloseContent, value.brandOrganic, value.brandedContent]);
 
+  // Dokładne brzmienie etykiety wymagane przez TikTok UX Guidelines
+  const complianceSentence = useMemo(() => {
+    if (!value.discloseContent) return null;
+    if (value.brandOrganic && value.brandedContent)
+      return "Your video will be labeled 'Paid partnership' and 'Promotional content'.";
+    if (value.brandedContent) return "Your video will be labeled 'Paid partnership'.";
+    if (value.brandOrganic) return "Your video will be labeled 'Promotional content'.";
+    return null;
+  }, [value.discloseContent, value.brandOrganic, value.brandedContent]);
+
+  const selfOnlyBlocked = value.brandedContent;
+
   return (
     <Card className="p-6 space-y-5 border-pink-500/30 bg-pink-500/5">
       <div className="flex items-start justify-between gap-3">
