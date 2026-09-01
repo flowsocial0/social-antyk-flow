@@ -276,15 +276,25 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
             >
               {privacyOptions.map((opt) => {
                 const meta = PRIVACY_LABELS[opt] || { label: opt, helper: "" };
+                const disabled = opt === "SELF_ONLY" && selfOnlyBlocked;
                 return (
                   <label
                     key={opt}
-                    className="flex items-start gap-3 rounded-md border p-3 cursor-pointer hover:bg-secondary/40"
+                    className={`flex items-start gap-3 rounded-md border p-3 ${
+                      disabled
+                        ? "opacity-50 cursor-not-allowed bg-muted/40"
+                        : "cursor-pointer hover:bg-secondary/40"
+                    }`}
                   >
-                    <RadioGroupItem value={opt} className="mt-0.5" />
+                    <RadioGroupItem value={opt} disabled={disabled} className="mt-0.5" />
                     <div>
                       <p className="text-sm font-medium">{meta.label}</p>
                       <p className="text-xs text-muted-foreground">{meta.helper}</p>
+                      {disabled && (
+                        <p className="text-xs text-destructive mt-1">
+                          Branded content visibility cannot be set to private
+                        </p>
+                      )}
                     </div>
                   </label>
                 );
