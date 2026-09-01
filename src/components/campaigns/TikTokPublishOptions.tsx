@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Music, ShieldAlert, ExternalLink, Video, Tag, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export type TikTokPublishOptionsValue = {
   accountId?: string;
