@@ -343,9 +343,13 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
           <div className="space-y-3 rounded-md border p-4 bg-background">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <Label className="text-sm font-medium">Ujawnij treść wideo</Label>
+                <Label className="text-sm font-medium">Disclose video content · Ujawnij treść wideo</Label>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Włącz, jeśli ten film promuje markę, produkt lub usługę. Wymagane przez TikTok dla treści komercyjnych.
+                  Turn on to disclose that this video promotes goods or services in exchange for something of value.
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Włącz, jeśli ten film promuje towary lub usługi w zamian za korzyść. Twój film może zostać
+                  sprawdzony pod kątem zgodności z zasadami TikToka.
                 </p>
               </div>
               <Switch
@@ -372,9 +376,10 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
                     onCheckedChange={(c) => update({ brandOrganic: c })}
                   />
                   <div>
-                    <p className="text-sm font-medium">Twoja marka</p>
+                    <p className="text-sm font-medium">Your brand · Twoja marka</p>
                     <p className="text-xs text-muted-foreground">
-                      Promujesz własną markę, produkt lub usługę. Film zostanie oznaczony jako <strong>„Promotional content"</strong>.
+                      You are promoting yourself or your own business. Film zostanie oznaczony jako{" "}
+                      <strong>„Promotional content”</strong>.
                     </p>
                   </div>
                 </label>
@@ -382,74 +387,122 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
                 <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer hover:bg-secondary/40">
                   <Switch
                     checked={value.brandedContent}
-                    onCheckedChange={(c) => update({ brandedContent: c })}
+                    onCheckedChange={setBrandedContent}
                   />
                   <div>
-                    <p className="text-sm font-medium">Treść markowa (Branded content)</p>
+                    <p className="text-sm font-medium">Branded content · Treść markowa</p>
                     <p className="text-xs text-muted-foreground">
-                      Płatne partnerstwo z marką trzecią. Film zostanie oznaczony jako <strong>„Paid partnership"</strong>. Nie można ustawić „Tylko ja".
+                      You are promoting another brand or a third party. Film zostanie oznaczony jako{" "}
+                      <strong>„Paid partnership”</strong>. Nie można wtedy ustawić prywatności „Tylko ja”.
                     </p>
                   </div>
                 </label>
 
-                {/* Compliance label preview — dokładnie to zobaczy widz na filmie */}
-                {complianceLabels.length > 0 && (
+                {/* Compliance label — dokładne brzmienie wymagane przez TikTok */}
+                {complianceSentence && (
                   <Alert className="border-pink-500/40 bg-pink-500/10">
                     <Tag className="h-4 w-4 text-pink-500" />
                     <AlertDescription className="text-sm">
-                      <strong>Twój film zostanie oznaczony jako:</strong>{" "}
-                      {complianceLabels.map((l, i) => (
-                        <span key={l}>
-                          <span className="inline-block px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-700 dark:text-pink-300 font-mono text-xs">
-                            {l}
+                      <strong>{complianceSentence}</strong>
+                      <span className="block text-xs text-muted-foreground mt-1">
+                        Twój film zostanie oznaczony etykietą:{" "}
+                        {complianceLabels.map((l, i) => (
+                          <span key={l}>
+                            <span className="inline-block px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-700 dark:text-pink-300 font-mono text-xs">
+                              {l}
+                            </span>
+                            {i < complianceLabels.length - 1 ? " oraz " : ""}
                           </span>
-                          {i < complianceLabels.length - 1 ? " oraz " : ""}
-                        </span>
-                      ))}
+                        ))}
+                      </span>
                     </AlertDescription>
                   </Alert>
                 )}
-
-                {/* Consent statement — warunkowy, dokładnie w miejscu Disclosure */}
-                {(value.brandOrganic || value.brandedContent) && (
-                  <div className="text-xs text-muted-foreground border rounded-md p-3 bg-secondary/30">
-                    <p className="mb-2 flex items-center gap-1">
-                      <Music className="h-3 w-3" />
-                      Publikując ten film akceptujesz:
-                    </p>
-                    <ul className="space-y-1 pl-4 list-disc">
-                      <li>
-                        TikTok{" "}
-                        <a
-                          href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-pink-600 dark:text-pink-400 hover:underline"
-                        >
-                          Music Usage Confirmation
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      </li>
-                      {value.brandedContent && (
-                        <li>
-                          TikTok{" "}
-                          <a
-                            href="https://www.tiktok.com/legal/page/global/bc-policy/en"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-pink-600 dark:text-pink-400 hover:underline"
-                          >
-                            Branded Content Policy
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        </li>
-                      )}
-                    </ul>
-                  </div>
-                )}
               </div>
             )}
+
+            {/* Consent statement — ZAWSZE widoczny, treść zmienia się wg ustawień (wymóg TikTok) */}
+            <div className="text-xs text-muted-foreground border rounded-md p-3 bg-secondary/30">
+              <p className="flex items-start gap-1 flex-wrap">
+                <Music className="h-3 w-3 mt-0.5" />
+                <span>
+                  By posting, you agree to TikTok's{" "}
+                  {value.brandedContent && (
+                    <>
+                      <a
+                        href="https://www.tiktok.com/legal/page/global/bc-policy/en"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-pink-600 dark:text-pink-400 hover:underline"
+                      >
+                        Branded Content Policy
+                        <ExternalLink className="h-3 w-3" />
+                      </a>{" "}
+                      and{" "}
+                    </>
+                  )}
+                  <a
+                    href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-pink-600 dark:text-pink-400 hover:underline"
+                  >
+                    Music Usage Confirmation
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                  .
+                </span>
+              </p>
+              <p className="mt-1 pl-4">
+                Publikując ten film akceptujesz powyższe zasady TikToka.
+              </p>
+            </div>
           </div>
+
+          {/* Podsumowanie ustawień tuż przed publikacją */}
+          <div className="rounded-md border p-4 bg-background space-y-1 text-sm">
+            <p className="font-medium mb-1">Podsumowanie publikacji TikTok</p>
+            <p className="text-muted-foreground">
+              Konta:{" "}
+              <span className="text-foreground">
+                {accounts.length > 0
+                  ? accounts.map((a) => `@${a.info.creator_username || "—"}`).join(", ")
+                  : "—"}
+              </span>
+            </p>
+            <p className="text-muted-foreground">
+              Prywatność:{" "}
+              <span className="text-foreground">
+                {value.privacyLevel ? PRIVACY_LABELS[value.privacyLevel]?.label || value.privacyLevel : "nie wybrano"}
+              </span>
+            </p>
+            <p className="text-muted-foreground">
+              Interakcje:{" "}
+              <span className="text-foreground">
+                {[
+                  `Komentarze: ${!creatorInfo.comment_disabled && value.allowComment ? "tak" : "nie"}`,
+                  `Duet: ${!creatorInfo.duet_disabled && value.allowDuet ? "tak" : "nie"}`,
+                  `Stitch: ${!creatorInfo.stitch_disabled && value.allowStitch ? "tak" : "nie"}`,
+                ].join(" · ")}
+              </span>
+            </p>
+            <p className="text-muted-foreground">
+              Ujawnienie treści:{" "}
+              <span className="text-foreground">
+                {value.discloseContent
+                  ? [value.brandOrganic ? "Twoja marka" : null, value.brandedContent ? "Treść markowa" : null]
+                      .filter(Boolean)
+                      .join(" + ") || "wymaga wyboru"
+                  : "wyłączone"}
+              </span>
+            </p>
+            {complianceSentence && (
+              <p className="text-muted-foreground">
+                Etykieta: <span className="text-foreground">{complianceSentence}</span>
+              </p>
+            )}
+          </div>
+
 
           {/* Zbiorczy blok błędów walidacji — blokuje przycisk „Publikuj/Zaplanuj" u rodzica */}
           {errors.length > 0 && (
