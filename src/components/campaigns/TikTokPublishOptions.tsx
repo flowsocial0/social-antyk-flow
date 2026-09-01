@@ -117,6 +117,26 @@ export const TikTokPublishOptions = ({ value, onChange, selectedAccountId, selec
     onChange({ ...value, ...patch });
   };
 
+  /**
+   * Branded content nie może być prywatny (wymóg TikTok UX pkt 4).
+   * Blokujemy opcję „Tylko ja", czyścimy wybór i pokazujemy widoczną informację zwrotną.
+   */
+  const setBrandedContent = (checked: boolean) => {
+    if (checked) {
+      const clearSelfOnly = value.privacyLevel === "SELF_ONLY";
+      onChange({
+        ...value,
+        brandedContent: true,
+        privacyLevel: clearSelfOnly ? "" : value.privacyLevel,
+      });
+      toast.info("Branded content visibility cannot be set to private", {
+        description: "Treści markowej nie można opublikować jako „Tylko ja" — wybierz inny poziom prywatności.",
+      });
+    } else {
+      onChange({ ...value, brandedContent: false });
+    }
+  };
+
   // Dostępne poziomy prywatności = przecięcie opcji ze wszystkich wybranych kont
   const privacyOptions = accounts.length > 0
     ? accounts
