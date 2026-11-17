@@ -51,6 +51,7 @@ export const CampaignSetup = ({
     initialConfig?.tiktokOptions ?? defaultTikTokOptions()
   );
   const [tiktokValid, setTiktokValid] = useState(true);
+  const [tiktokHint, setTiktokHint] = useState<string | undefined>(undefined);
   const [youtubeOptions, setYoutubeOptions] = useState<YouTubePublishOptionsValue>(
     (initialConfig?.youtubeOptions as YouTubePublishOptionsValue) ?? defaultYouTubeOptions()
   );
@@ -353,7 +354,7 @@ export const CampaignSetup = ({
         <TikTokPublishOptions
           value={tiktokOptions}
           onChange={setTiktokOptions}
-          onValidChange={setTiktokValid}
+          onValidChange={(v, h) => { setTiktokValid(v); setTiktokHint(h); }}
           selectedAccountIds={selectedAccounts.tiktok}
         />
 
@@ -469,10 +470,12 @@ export const CampaignSetup = ({
         </div>
       </Card>
 
+      <span className="block" title={targetPlatforms.includes('tiktok') && !tiktokValid ? tiktokHint : undefined}>
       <Button onClick={handleSubmit} className="w-full" size="lg" disabled={!canSubmit || (targetPlatforms.includes('tiktok') && !tiktokValid)}>
         Przejdź do generowania planu
         <ArrowRight className="ml-2 h-4 w-4" />
       </Button>
+      </span>
 
       <VideoPickerDialog
         open={videoPickerOpen}

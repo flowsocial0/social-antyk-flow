@@ -49,6 +49,7 @@ export const SimpleCampaignSetup = () => {
   const { connectedPlatforms, accountCounts } = useConnectedAccounts();
   const [tiktokOptions, setTiktokOptions] = useState<TikTokPublishOptionsValue>(defaultTikTokOptions());
   const [tiktokValid, setTiktokValid] = useState(true);
+  const [tiktokHint, setTiktokHint] = useState<string | undefined>(undefined);
   const [youtubeOptions, setYoutubeOptions] = useState<YouTubePublishOptionsValue>(defaultYouTubeOptions());
   const [isCreating, setIsCreating] = useState(false);
   const [pickerPostId, setPickerPostId] = useState<string | null>(null);
@@ -605,7 +606,7 @@ export const SimpleCampaignSetup = () => {
         <TikTokPublishOptions
           value={tiktokOptions}
           onChange={setTiktokOptions}
-          onValidChange={setTiktokValid}
+          onValidChange={(v, h) => { setTiktokValid(v); setTiktokHint(h); }}
           selectedAccountIds={selectedAccounts.tiktok}
         />
 
@@ -641,6 +642,10 @@ export const SimpleCampaignSetup = () => {
         )}
       </Card>
 
+      <span
+        className="block"
+        title={targetPlatforms.includes("tiktok") && !tiktokValid ? tiktokHint : undefined}
+      >
       <Button
         onClick={handleCreateCampaign}
         className="w-full"
@@ -659,6 +664,7 @@ export const SimpleCampaignSetup = () => {
           </>
         )}
       </Button>
+      </span>
 
       <VideoPickerDialog
         open={pickerPostId !== null}
