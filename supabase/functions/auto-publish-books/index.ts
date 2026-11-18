@@ -251,6 +251,7 @@ const RATE_LIMIT_ERROR_PATTERNS = [
 const PERMANENT_ERROR_PATTERNS = [
   'CreditsDepleted', 'credits depleted', 'X_CREDITS_DEPLETED',
   '402', 'does not have any credits',
+  'YOUTUBE_REAUTH_REQUIRED', 'invalid_grant',
 ];
 
 function isPermanentErrorMessage(msg: string): boolean {
@@ -387,8 +388,8 @@ async function validateAccountToken(
   if (TABLES_WITH_EXPIRY.includes(tableName) && account.expires_at) {
     const expiresAt = new Date(account.expires_at);
     if (expiresAt < new Date()) {
-      if (platform === 'tiktok' && account.refresh_token) {
-        console.log(`TikTok token ${accountId.substring(0, 8)} expired but has refresh_token — publish-to-tiktok will refresh it`);
+      if ((platform === 'tiktok' || platform === 'youtube') && account.refresh_token) {
+        console.log(`${platform} token ${accountId.substring(0, 8)} expired but has refresh_token — publish-to-tiktok will refresh it`);
       } else {
         return { valid: false, reason: `Token ${getPlatformNamePL(platform)} wygasł. Połącz konto ponownie.` };
       }
@@ -1025,7 +1026,7 @@ Deno.serve(async (req) => {
               if (isPermanentError) {
                 console.error(`⛔ Permanent error for ${platform} account ${accountId.substring(0,8)} — flagging depleted, no retry: ${errorMsg}`);
                 depletedAccountsThisCycle.add(`${platform}:${accountId}`);
-                accountErrors.push(`Konto ${accountId.substring(0, 8)}: brak kredytów na X — doładuj konto na developer.x.com`);
+                accountErrors.push(platform === 'x' ? `Konto ${accountId.substring(0, 8)}: brak kredytów na X — doładuj konto na developer.x.com` : `Konto ${accountId.substring(0, 8)}: ${errorMsg}`);
               } else if (isRateLimitError) {
                 // Track rate-limited accounts separately — don't treat as hard failure
                 console.log(`Rate limit detected for ${platform} account ${accountId}, will set rate_limited`);
@@ -1196,6 +1197,13 @@ Deno.serve(async (req) => {
             const isRateError = isRateLimitErrorMessage(errorMessage);
             const isTikTokUnaudited = platformErrors.some(error => /TIKTOK_APP_UNAUDITED|Content Posting API|Direct Post|prywatne konta testowe|unaudited_client/i.test(error));
 
+            const needsReauth = /YOUTUBE_REAUTH_REQUIRED|invalid_grant|Połącz konto .*ponownie/i.test(errorMessage);
+            if (needsReauth) {
+              await supabase.from('campaign_posts').update({
+                status: 'failed', next_retry_at: null, error_code: 'REAUTH_REQUIRED',
+                error_message: `🔑 Wymagane ponowne połączenie konta. ${errorMessage.replace(/YOUTUBE_REAUTH_REQUIRED:\s*/g, '')} Po połączeniu uruchom post ponownie.`,
+              }).eq('id', post.id);
+            } else
             await markPostAttemptFailure(supabase, post.id, {
               message: errorMessage,
               code: isRateError ? 'RATE_LIMITED' : isTikTokUnaudited ? 'TIKTOK_APP_UNAUDITED' : 'PUBLISH_FAILED',

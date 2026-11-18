@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Sparkles, ArrowLeft, BookOpen, TrendingUp, FileText, CheckCircle2 } from "lucide-react";
 import type { CampaignConfig, CampaignPost } from "./CampaignBuilder";
+import { isYouTubeOnly, buildSlots, repeatVideos } from "@/lib/campaignScheduling";
 
 type GenerationStage = 'idle' | 'generating' | 'scheduling';
 
@@ -495,8 +496,62 @@ export const CampaignPlan = ({ config, onComplete, onBack }: CampaignPlanProps) 
     return scheduledPosts;
   };
 
+  // Tylko YouTube: bez AI i bez tekstów — same filmy (z biblioteki lub z produktów)
+  const handleGenerateYouTubeOnly = async () => {
+    setIsGenerating(true);
+    try {
+      const videos = config.videoItems || [];
+      let posts: CampaignPost[] = [];
+      if (videos.length > 0) {
+        const list = repeatVideos(videos, config.repeatCount || 1);
+        const slots = buildSlots(config.startDate, config.postingTimes, list.length);
+        posts = list.map((v, i) => ({
+          day: slots[i].day,
+          time: slots[i].time,
+          type: "content",
+          category: "wideo",
+          text: v.title,
+          scheduledAt: slots[i].date.toISOString(),
+          bookId: null,
+          customVideoUrl: v.url,
+          youtubeTitle: v.title,
+        }));
+      } else {
+        const { data: books, error } = await supabase
+          .from('books')
+          .select('id, title, image_url')
+          .in('id', config.selectedBooks || []);
+        if (error) throw error;
+        if (!books?.length) throw new Error('Nie znaleziono wybranych produktów');
+        const slots = buildSlots(config.startDate, config.postingTimes, totalPosts);
+        posts = slots.map((slot, i) => {
+          const book = books[i % books.length];
+          return {
+            day: slot.day,
+            time: slot.time,
+            type: "sales",
+            category: "wideo",
+            text: book.title,
+            scheduledAt: slot.date.toISOString(),
+            bookId: book.id,
+            youtubeTitle: book.title,
+            youtubeThumbnailUrl: book.image_url || null,
+          };
+        });
+      }
+      toast.success(`Przygotowano ${posts.length} publikacji wideo (bez generowania tekstów)`);
+      onComplete({ structure: [] }, posts);
+    } catch (error: any) {
+      toast.error('Błąd tworzenia kampanii YouTube', { description: error.message });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleGenerate = () => {
-    if (useAI) {
+    if (isYouTubeOnly(config.targetPlatforms)) {
+      handleGenerateYouTubeOnly();
+    } else if (useAI) {
       handleGenerateWithAI();
     } else {
       handleGenerateWithoutAI();

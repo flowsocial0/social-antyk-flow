@@ -22,6 +22,7 @@ import { VideoPickerDialog } from "@/components/videos/VideoPickerDialog";
 import { useConnectedAccounts } from "@/hooks/useConnectedAccounts";
 import { Badge } from "@/components/ui/badge";
 import { Library, Video } from "lucide-react";
+import { isYouTubeOnly } from "@/lib/campaignScheduling";
 
 interface CampaignSetupProps {
   onComplete: (config: CampaignConfig) => void;
@@ -58,6 +59,18 @@ export const CampaignSetup = ({
   const [libraryVideoUrl, setLibraryVideoUrl] = useState<string | undefined>(initialConfig?.libraryVideoUrl);
   const [libraryVideoTitle, setLibraryVideoTitle] = useState<string | undefined>(initialConfig?.libraryVideoTitle);
   const [videoPickerOpen, setVideoPickerOpen] = useState(false);
+  const [videoItems, setVideoItems] = useState<{ url: string; title: string }[]>(initialConfig?.videoItems || []);
+  const [repeatCount, setRepeatCount] = useState<number>(initialConfig?.repeatCount || 1);
+  const youtubeOnly = isYouTubeOnly(targetPlatforms);
+
+  // Tylko YouTube: nic nie generujemy (YouTube publikuje samo wideo, bez tekstu posta)
+  useEffect(() => {
+    if (youtubeOnly) {
+      setUseAI(false);
+      setUseRandomContent(false);
+      setRegenerateTexts(false);
+    }
+  }, [youtubeOnly]);
 
   const handlePostsPerDayChange = (value: number) => {
     // Allow up to 50 posts per day (no platform limit restriction)
@@ -144,17 +157,21 @@ export const CampaignSetup = ({
       randomContentTopic: useRandomContent ? randomContentTopic : undefined,
       libraryVideoUrl,
       libraryVideoTitle,
+      videoItems: youtubeOnly ? videoItems : undefined,
+      repeatCount: youtubeOnly ? repeatCount : undefined,
       tiktokOptions: targetPlatforms.includes('tiktok') ? tiktokOptions : undefined,
       youtubeOptions: targetPlatforms.includes('youtube') ? youtubeOptions : undefined
     });
   };
-  const requiresVideo = targetPlatforms.includes('tiktok');
+  const requiresVideo = targetPlatforms.includes('tiktok') || youtubeOnly;
   const tiktokInvalid =
     targetPlatforms.includes('tiktok') &&
     tiktokOptions.brandedContent &&
     tiktokOptions.privacyLevel === 'SELF_ONLY';
 
-  const canSubmit = (useRandomContent || selectedBooks.length > 0) && !tiktokInvalid;
+  const canSubmit = (youtubeOnly
+    ? (videoItems.length > 0 || selectedBooks.length > 0)
+    : (useRandomContent || selectedBooks.length > 0)) && !tiktokInvalid;
   return <div className="space-y-6">
       <Card className="p-6 bg-secondary/30">
         <h3 className="text-lg font-semibold mb-4">Parametry kampanii</h3>
@@ -171,7 +188,14 @@ export const CampaignSetup = ({
         </div>
         
         {/* Use AI Checkbox - hidden when useRandomContent is enabled */}
-        {!useRandomContent && <div className="flex items-center space-x-3 mb-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
+        {youtubeOnly && <Alert className="mb-4">
+            <Video className="h-4 w-4" />
+            <AlertDescription className="text-sm">
+              Kampania tylko na YouTube: nie generujemy żadnych tekstów. YouTube publikuje samo wideo — wybierz filmy z biblioteki
+              albo produkty z przypisanym wideo. Tytuł, opis i miniaturkę ustawisz w sekcji YouTube.
+            </AlertDescription>
+          </Alert>}
+        {!youtubeOnly && !useRandomContent && <div className="flex items-center space-x-3 mb-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
             <Checkbox id="useAI" checked={useAI} onCheckedChange={checked => setUseAI(checked === true)} />
             <div className="flex-1">
               <Label htmlFor="useAI" className="flex items-center gap-2 cursor-pointer">
@@ -185,7 +209,7 @@ export const CampaignSetup = ({
           </div>}
         
         {/* Random Content Generation */}
-        <div className="space-y-3 mb-6 p-4 bg-purple-500/5 rounded-lg border border-purple-500/20">
+        {!youtubeOnly && <div className="space-y-3 mb-6 p-4 bg-purple-500/5 rounded-lg border border-purple-500/20">
           <div className="flex items-center space-x-3">
             <Checkbox id="useRandomContent" checked={useRandomContent} onCheckedChange={checked => {
             const isEnabled = checked === true;
@@ -214,10 +238,10 @@ export const CampaignSetup = ({
               <Label htmlFor="randomContentTopic" className="text-sm">Temat do generowania</Label>
               <Textarea id="randomContentTopic" value={randomContentTopic} onChange={e => setRandomContentTopic(e.target.value)} placeholder="np. Historia Polski XX wieku, Literatura romantyzmu, Powstanie Warszawskie..." className="mt-1 min-h-[80px]" />
             </div>}
-        </div>
+        </div>}
         
         {/* Regenerate Texts Checkbox - hidden when using random content */}
-        {!useRandomContent && (
+        {!youtubeOnly && !useRandomContent && (
           <div className="flex items-center space-x-3 mb-4 p-4 bg-amber-500/5 rounded-lg border border-amber-500/20">
             <Checkbox id="regenerateTexts" checked={regenerateTexts} onCheckedChange={checked => setRegenerateTexts(checked === true)} />
             <div className="flex-1">
@@ -367,6 +391,49 @@ export const CampaignSetup = ({
 
 
       {/* Video from the reusable library, applied to every post of this campaign */}
+      {youtubeOnly ? (
+      <Card className="p-6 bg-secondary/30 space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Video className="h-5 w-5 text-primary" />
+              Filmy do kampanii
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-xl">
+              Dodaj jeden lub kilka filmów z biblioteki. Każdy film zostanie opublikowany tyle razy, ile wskażesz poniżej,
+              w kolejnych terminach z harmonogramu. Wybór książek jest wtedy opcjonalny.
+            </p>
+          </div>
+          <Button type="button" variant="outline" onClick={() => setVideoPickerOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Dodaj film
+          </Button>
+        </div>
+        {videoItems.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {videoItems.map((v, i) => (
+              <Badge key={`${v.url}-${i}`} variant="secondary" className="gap-1 py-1">
+                <Video className="h-3 w-3" />
+                {v.title}
+                <button type="button" aria-label={`Usuń ${v.title}`} onClick={() => setVideoItems(videoItems.filter((_, j) => j !== i))}>
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        )}
+        <div className="flex items-center gap-3">
+          <Label htmlFor="repeatCount">Ile razy powtórzyć każdy film</Label>
+          <Input id="repeatCount" type="number" min={1} max={100} value={repeatCount}
+            onChange={e => setRepeatCount(Math.max(1, Math.min(100, Number(e.target.value) || 1)))} className="w-24" />
+        </div>
+        {videoItems.length > 0 && (
+          <p className="text-sm text-muted-foreground">
+            Powstanie {videoItems.length * repeatCount} publikacji ({postingTimes.length} dziennie,
+            ok. {Math.ceil((videoItems.length * repeatCount) / Math.max(1, postingTimes.length))} dni).
+          </p>
+        )}
+      </Card>
+      ) : (
       <Card className="p-6 bg-secondary/30">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -417,6 +484,7 @@ export const CampaignSetup = ({
           </Alert>
         )}
       </Card>
+      )}
 
 
       {/* Book Selection - optional when using random content */}
@@ -432,7 +500,7 @@ export const CampaignSetup = ({
       {!canSubmit && <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Musisz wybrać co najmniej jedną książkę lub włączyć generowanie losowych treści
+            {youtubeOnly ? "Dodaj co najmniej jeden film lub wybierz produkt z wideo" : "Musisz wybrać co najmniej jedną książkę lub włączyć generowanie losowych treści"}
           </AlertDescription>
         </Alert>}
 
@@ -481,6 +549,11 @@ export const CampaignSetup = ({
         open={videoPickerOpen}
         onOpenChange={setVideoPickerOpen}
         onSelect={(url, video) => {
+          if (youtubeOnly) {
+            setVideoItems(prev => [...prev, { url, title: video.title }]);
+            setVideoPickerOpen(false);
+            return;
+          }
           setLibraryVideoUrl(url);
           setLibraryVideoTitle(video.title);
           setVideoPickerOpen(false);

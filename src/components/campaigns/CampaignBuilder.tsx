@@ -15,6 +15,9 @@ export type CampaignPost = {
   text: string;
   scheduledAt: string;
   bookId?: string | null;
+  customVideoUrl?: string | null;
+  youtubeTitle?: string | null;
+  youtubeThumbnailUrl?: string | null;
 };
 
 export type CampaignConfig = {
@@ -34,6 +37,8 @@ export type CampaignConfig = {
   randomContentTopic?: string; // Topic for random content generation
   libraryVideoUrl?: string; // Video from the library applied to every post in this campaign
   libraryVideoTitle?: string;
+  videoItems?: { url: string; title: string }[]; // Tylko YouTube: filmy powtarzane w kampanii
+  repeatCount?: number;
 
   youtubeOptions?: {
     title: string;

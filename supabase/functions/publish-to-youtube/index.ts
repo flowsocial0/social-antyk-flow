@@ -56,6 +56,9 @@ async function refreshAccessToken(refreshToken: string): Promise<{ access_token:
   
   if (data.error) {
     console.error('[YouTube] Token refresh failed:', data);
+    if (data.error === 'invalid_grant') {
+      throw new Error('YOUTUBE_REAUTH_REQUIRED: Dostęp do kanału YouTube został cofnięty lub wygasł. Połącz konto YouTube ponownie w Ustawieniach.');
+    }
     throw new Error(`Token refresh failed: ${data.error_description || data.error}`);
   }
 
@@ -344,7 +347,7 @@ Deno.serve(async (req) => {
             expires_at: newExpiresAt,
             updated_at: new Date().toISOString(),
           })
-          .eq('user_id', userId);
+          .eq('id', tokenData.id);
 
         console.log('[YouTube] Token refreshed successfully');
       }
@@ -405,8 +408,11 @@ Deno.serve(async (req) => {
       console.error('[YouTube] Upload init error:', errorText);
       
       // Check for quota exceeded
-      if (initResponse.status === 403) {
-        throw new Error('YouTube API quota exceeded. Try again tomorrow.');
+      if (initResponse.status === 403 && /quota/i.test(errorText)) {
+        throw new Error('YouTube API quota exceeded (dzienny limit YouTube). Ponowię po resecie limitu.');
+      }
+      if (initResponse.status === 401) {
+        throw new Error('YOUTUBE_REAUTH_REQUIRED: Token YouTube nieważny. Połącz konto YouTube ponownie.');
       }
       
       throw new Error(`Failed to initialize upload: ${initResponse.status}`);

@@ -20,7 +20,8 @@ import { sanitizeFileName } from "@/lib/videoLibrary";
 
 import { useConnectedAccounts } from "@/hooks/useConnectedAccounts";
 import { Badge } from "@/components/ui/badge";
-import { Library } from "lucide-react";
+import { Library, Repeat } from "lucide-react";
+import { isYouTubeOnly } from "@/lib/campaignScheduling";
 
 interface SimplePost {
   id: string;
@@ -34,7 +35,21 @@ interface SimplePost {
   /** Publishable URL taken straight from the video library (direct file or Mega link). */
   libraryVideoUrl?: string;
   libraryVideoTitle?: string;
+  /** Powtarzanie: dodatkowe godziny w ciągu dnia (oprócz `time`) i liczba dni. */
+  repeatEnabled?: boolean;
+  repeatExtraTimes?: string[];
+  repeatDays?: number;
 }
+
+/** Rozwija post z powtarzaniem na wszystkie terminy: godziny × dni, licząc od dnia posta. */
+const expandPostOccurrences = (p: SimplePost): { day: number; time: string }[] => {
+  if (!p.repeatEnabled) return [{ day: p.day, time: p.time }];
+  const times = Array.from(new Set([p.time, ...(p.repeatExtraTimes || [])].filter(Boolean))).sort();
+  const days = Math.max(1, p.repeatDays || 1);
+  const out: { day: number; time: string }[] = [];
+  for (let d = 0; d < days; d++) for (const t of times) out.push({ day: p.day + d, time: t });
+  return out;
+};
 
 
 export const SimpleCampaignSetup = () => {
@@ -158,7 +173,12 @@ export const SimpleCampaignSetup = () => {
   };
 
   const handleCreateCampaign = async () => {
-    const emptyPosts = posts.filter((p) => !p.text.trim());
+    const ytOnly = isYouTubeOnly(targetPlatforms);
+    if (ytOnly && posts.some((p) => !p.videoFile && !p.libraryVideoUrl)) {
+      toast.error("YouTube wymaga wideo", { description: "Dodaj film do każdego posta." });
+      return;
+    }
+    const emptyPosts = ytOnly ? [] : posts.filter((p) => !p.text.trim());
     if (emptyPosts.length > 0) {
       toast.error("Wypełnij treść wszystkich postów");
       return;
@@ -262,21 +282,23 @@ export const SimpleCampaignSetup = () => {
 
       // Create campaign
       const campaignName = `Prosta kampania ${format(new Date(startDate), "dd.MM.yyyy")}`;
-      const allTimes = [...new Set(posts.map(p => p.time))].sort();
+      const allTimes = [...new Set(posts.flatMap(p => expandPostOccurrences(p).map(o => o.time)))].sort();
+      const totalOccurrences = posts.reduce((n, p) => n + expandPostOccurrences(p).length, 0);
+      const lastDay = Math.max(durationDays, ...posts.flatMap(p => expandPostOccurrences(p).map(o => o.day)));
 
       const { data: campaign, error: campaignError } = await supabase
         .from("campaigns")
         .insert({
           name: campaignName,
           user_id: user.id,
-          duration_days: durationDays,
-          posts_per_day: Math.ceil(posts.length / durationDays),
+          duration_days: lastDay,
+          posts_per_day: Math.ceil(totalOccurrences / lastDay),
           start_date: new Date(startDate).toISOString(),
           posting_times: allTimes,
           target_platforms: targetPlatforms,
           selected_accounts: selectedAccounts,
           content_posts_count: 0,
-          sales_posts_count: posts.length,
+          sales_posts_count: totalOccurrences,
           status: "active",
           ...(targetPlatforms.includes("tiktok") && {
             tiktok_account_id: tiktokOptions.accountId ?? null,
@@ -295,18 +317,22 @@ export const SimpleCampaignSetup = () => {
       if (campaignError) throw campaignError;
 
       // Create posts with proper scheduled dates based on day
-      const campaignPosts = postsWithUploadedMedia.map((post) => {
-        const [hours, minutes] = post.time.split(":").map(Number);
-        const scheduledAt = addDays(new Date(startDate), post.day - 1);
+      const seen = new Set<string>();
+      const campaignPosts = postsWithUploadedMedia.flatMap((post) => expandPostOccurrences(post).map((occ) => {
+        const [hours, minutes] = occ.time.split(":").map(Number);
+        const scheduledAt = addDays(new Date(startDate), occ.day - 1);
         scheduledAt.setHours(hours, minutes, 0, 0);
+        const dedupKey = `${scheduledAt.toISOString()}|${post.text}|${post.videoUrl || post.imageUrl || ""}`;
+        if (seen.has(dedupKey)) return null;
+        seen.add(dedupKey);
 
         return {
           campaign_id: campaign.id,
-          day: post.day,
-          time: post.time,
+          day: occ.day,
+          time: occ.time,
           type: "sales",
           category: "Promocja",
-          text: post.text,
+          text: post.text.trim() || youtubeOptions.title || post.libraryVideoTitle || "Wideo",
           scheduled_at: scheduledAt.toISOString(),
           status: "scheduled",
           platforms: targetPlatforms,
@@ -337,7 +363,7 @@ export const SimpleCampaignSetup = () => {
               : null,
           }),
         };
-      });
+      })).filter((x): x is NonNullable<typeof x> => x !== null);
 
       const { error: postsError } = await supabase.from("campaign_posts").insert(campaignPosts);
       if (postsError) throw postsError;
@@ -352,9 +378,10 @@ export const SimpleCampaignSetup = () => {
     }
   };
 
-  const requiresVideo = targetPlatforms.includes("tiktok");
+  const ytOnlySimple = isYouTubeOnly(targetPlatforms);
+  const requiresVideo = targetPlatforms.includes("tiktok") || ytOnlySimple;
   const hasVideo = (p: SimplePost) => !!p.videoFile || !!p.libraryVideoUrl;
-  const canSubmit = posts.every((p) => p.text.trim()) && targetPlatforms.length > 0 && (!requiresVideo || posts.every(hasVideo));
+  const canSubmit = (ytOnlySimple || posts.every((p) => p.text.trim())) && targetPlatforms.length > 0 && (!requiresVideo || posts.every(hasVideo));
 
 
   // Group posts by day
@@ -466,12 +493,81 @@ export const SimpleCampaignSetup = () => {
                       </div>
                     </div>
 
+                    {!ytOnlySimple ? (
                     <Textarea
                       placeholder="Wklej lub napisz treść posta..."
                       value={post.text}
                       onChange={(e) => updatePost(post.id, { text: e.target.value })}
                       rows={4}
                     />
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        YouTube publikuje samo wideo — treść posta nie jest potrzebna. Tytuł i opis ustawisz w sekcji YouTube.
+                      </p>
+                    )}
+
+                    {/* Powtarzanie posta */}
+                    <div className="rounded-md border p-3 space-y-2">
+                      <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!post.repeatEnabled}
+                          onChange={(e) => updatePost(post.id, {
+                            repeatEnabled: e.target.checked,
+                            repeatDays: post.repeatDays || 7,
+                            repeatExtraTimes: post.repeatExtraTimes || [],
+                          })}
+                        />
+                        <Repeat className="h-4 w-4" />
+                        Powtarzaj ten post
+                      </label>
+                      {post.repeatEnabled && (
+                        <div className="space-y-2 pl-6">
+                          <div className="flex flex-wrap items-center gap-2 text-sm">
+                            <span>Godziny w ciągu dnia:</span>
+                            <Badge variant="secondary">{post.time}</Badge>
+                            {(post.repeatExtraTimes || []).map((t, ti) => (
+                              <span key={ti} className="flex items-center gap-1">
+                                <Input
+                                  type="time"
+                                  value={t}
+                                  className="w-28 h-8"
+                                  onChange={(e) => {
+                                    const next = [...(post.repeatExtraTimes || [])];
+                                    next[ti] = e.target.value;
+                                    updatePost(post.id, { repeatExtraTimes: next });
+                                  }}
+                                />
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label="Usuń godzinę"
+                                  onClick={() => updatePost(post.id, { repeatExtraTimes: (post.repeatExtraTimes || []).filter((_, j) => j !== ti) })}>
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </span>
+                            ))}
+                            <Button variant="outline" size="sm" className="h-8"
+                              onClick={() => {
+                                const all = [post.time, ...(post.repeatExtraTimes || [])].sort();
+                                const [h] = (all[all.length - 1] || "10:00").split(":").map(Number);
+                                updatePost(post.id, { repeatExtraTimes: [...(post.repeatExtraTimes || []), `${String((h + 3) % 24).padStart(2, "0")}:00`] });
+                              }}>
+                              <Plus className="h-3 w-3 mr-1" /> Dodaj godzinę
+                            </Button>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <span>Przez</span>
+                            <Input type="number" min={1} max={365} className="w-20 h-8" value={post.repeatDays || 1}
+                              onChange={(e) => updatePost(post.id, { repeatDays: Math.max(1, Math.min(365, Number(e.target.value) || 1)) })} />
+                            <span>dni (od dnia {post.day})</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Powstanie {expandPostOccurrences(post).length} publikacji:
+                            {" "}{new Set([post.time, ...(post.repeatExtraTimes || [])]).size} razy dziennie przez {post.repeatDays || 1} dni,
+                            od {format(addDays(new Date(startDate), post.day - 1), "d MMM", { locale: pl })} do{" "}
+                            {format(addDays(new Date(startDate), post.day - 1 + (post.repeatDays || 1) - 1), "d MMM", { locale: pl })}.
+                          </p>
+                        </div>
+                      )}
+                    </div>
 
                     {/* Media upload section */}
                     <div className="flex flex-wrap items-center gap-3">

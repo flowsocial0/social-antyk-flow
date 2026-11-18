@@ -94,6 +94,8 @@ const CampaignDetails = () => {
     category: "trivia",
     text: "",
   });
+  const [newPostBookId, setNewPostBookId] = useState<string>("");
+  const [newPostBookFilter, setNewPostBookFilter] = useState("");
   const [newPostMediaFile, setNewPostMediaFile] = useState<File | null>(null);
   const [newPostMediaPreview, setNewPostMediaPreview] = useState<string>('');
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
@@ -437,6 +439,29 @@ const CampaignDetails = () => {
     },
   });
 
+  const campaignPlatforms = ((campaign?.target_platforms as string[] | null) || []);
+  const campaignHasYouTube = campaignPlatforms.includes("youtube");
+  const campaignYouTubeOnly = campaignHasYouTube && campaignPlatforms.length === 1;
+  const { data: productOptions = [] } = useQuery({
+    queryKey: ["add-post-products", user?.id, campaignHasYouTube],
+    enabled: !!user && isAddingPost,
+    queryFn: async () => {
+      let q = supabase
+        .from("books")
+        .select("id, title, image_url, video_url, video_storage_path")
+        .eq("user_id", user!.id)
+        .order("title")
+        .limit(1000);
+      if (campaignHasYouTube) q = q.or("video_url.not.is.null,video_storage_path.not.is.null");
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    },
+  });
+  const filteredProducts = productOptions
+    .filter((b) => !newPostBookFilter || b.title.toLowerCase().includes(newPostBookFilter.toLowerCase()))
+    .slice(0, 200);
+
   const addPostMutation = useMutation({
     mutationFn: async () => {
       if (!campaign || !user) throw new Error("Kampania nie została załadowana");
@@ -473,17 +498,34 @@ const CampaignDetails = () => {
       const [hours, minutes] = newPost.time.split(":").map(Number);
       scheduledDate.setHours(hours, minutes, 0, 0);
 
+      const platformsList = (campaign.target_platforms as string[] | null) || ["x"];
+      const hasYouTube = platformsList.includes("youtube");
+      const book = newPostBookId ? productOptions.find((b) => b.id === newPostBookId) : undefined;
+      const uploadedIsImage = !!newPostMediaFile && newPostMediaFile.type.startsWith("image/");
+      const ytExtra = hasYouTube
+        ? {
+            youtube_title: book?.title || newPost.text.slice(0, 100) || null,
+            // Miniaturka: wgrana grafika statyczna, inaczej okładka produktu
+            youtube_thumbnail_url: (uploadedIsImage ? mediaUrl : null) || book?.image_url || null,
+            youtube_privacy_status: "public",
+          }
+        : {};
+      const isYouTubeOnlyCampaign = hasYouTube && platformsList.length === 1;
+
       const { error } = await (supabase as any).from("campaign_posts").insert({
+        ...ytExtra,
+        book_id: book?.id || null,
         campaign_id: id,
         day: newPost.day,
         time: newPost.time,
         type: newPost.type,
         category: newPost.category,
-        text: newPost.text,
+        text: newPost.text.trim() || book?.title || "Wideo",
         scheduled_at: scheduledDate.toISOString(),
         status: "scheduled",
         platforms: campaign.target_platforms || ["x"],
-        custom_image_url: mediaUrl,
+        // Przy YouTube grafika służy jako miniaturka, a nie jako media posta
+        custom_image_url: isYouTubeOnlyCampaign && uploadedIsImage ? null : mediaUrl,
       });
 
       if (error) throw error;
@@ -493,6 +535,8 @@ const CampaignDetails = () => {
       toast.success("Post został dodany");
       setIsAddingPost(false);
       clearNewPostMedia();
+      setNewPostBookId("");
+      setNewPostBookFilter("");
       setNewPost({
         day: 1,
         time: "09:00",
@@ -1201,6 +1245,38 @@ const CampaignDetails = () => {
                     </div>
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="newPostBook">
+                      Produkt (opcjonalnie){campaignHasYouTube ? " — tylko produkty z wideo" : ""}
+                    </Label>
+                    <Input
+                      placeholder="Szukaj produktu po tytule..."
+                      value={newPostBookFilter}
+                      onChange={(e) => setNewPostBookFilter(e.target.value)}
+                    />
+                    <select
+                      id="newPostBook"
+                      className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                      value={newPostBookId}
+                      onChange={(e) => {
+                        const bid = e.target.value;
+                        setNewPostBookId(bid);
+                        const b = productOptions.find((x) => x.id === bid);
+                        if (b && !newPost.text.trim() && !campaignYouTubeOnly) setNewPost({ ...newPost, text: b.title, type: "sales" });
+                      }}
+                    >
+                      <option value="">— bez produktu —</option>
+                      {filteredProducts.map((b) => (
+                        <option key={b.id} value={b.id}>{b.title}</option>
+                      ))}
+                    </select>
+                    {campaignHasYouTube && newPostBookId && (
+                      <p className="text-xs text-muted-foreground">
+                        Film produktu zostanie opublikowany na YouTube, a jego okładka będzie miniaturką.
+                        Aby użyć innej miniaturki, wgraj poniżej grafikę (zdjęcie).
+                      </p>
+                    )}
+                  </div>
+                  {!campaignYouTubeOnly && <div className="space-y-2">
                     <Label htmlFor="text">Treść posta</Label>
                     <Textarea
                       id="text"
@@ -1209,7 +1285,7 @@ const CampaignDetails = () => {
                       onChange={(e) => setNewPost({ ...newPost, text: e.target.value })}
                       placeholder="Wpisz treść posta..."
                     />
-                  </div>
+                  </div>}
                   
                   {/* Media upload section */}
                   <div className="space-y-2">
@@ -1276,7 +1352,7 @@ const CampaignDetails = () => {
                   </Button>
                   <Button
                     onClick={() => addPostMutation.mutate()}
-                    disabled={!newPost.text.trim() || addPostMutation.isPending || isUploadingMedia}
+                    disabled={(campaignYouTubeOnly ? !newPostBookId && !newPostMediaFile : !newPost.text.trim() && !newPostBookId) || addPostMutation.isPending || isUploadingMedia}
                   >
                     {isUploadingMedia ? "Przesyłanie..." : addPostMutation.isPending ? "Dodawanie..." : "Dodaj post"}
                   </Button>
